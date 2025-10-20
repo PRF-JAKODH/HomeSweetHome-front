@@ -1,4 +1,4 @@
-name: 리펙토링 (Refactor)
+name: 🔧 리펙토링 (Refactor)
 description: 코드 및 성능 개선
 title: "[Refactor]: "
 labels: ["refactor"]
@@ -6,39 +6,25 @@ body:
   - type: input
     id: branch_keyword
     attributes:
-      label: "Branch Keyword"
-      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: employee, login-modal)"
+      label: 🌳 Branch Keyword
+      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: ci-config, github-actions)"
+    validations:
+        required: true
+  - type: textarea
+    attributes:
+      label: 📄 설명
+      description: 작업할 기능에 대한 설명을 작성해 주세요.
+      placeholder: 자세히 적을수록 좋습니다.
     validations:
       required: true
-
   - type: textarea
-    id: refactor_target
     attributes:
-      label: "리펙토링 대상"
-      description: "어떤 기능을 리펙토링할지 간략하게 설명해주세요"
+      label: ✅ 작업할 내용
+      description: 할 일을 체크박스 형태로 작성해주세요.
+      placeholder: 최대한 세분화 해서 적어주세요.
     validations:
       required: true
-
   - type: textarea
-    id: related_api
     attributes:
-      label: "관련 API"
-      description: "리펙토링할 API의 정보를 명시해주세요 (openapi.json 기준)"
-    validations:
-      required: false
-
-  - type: textarea
-    id: issue_analysis
-    attributes:
-      label: "문제점"
-      description: "기존 코드의 문제점 분석을 입력해주세요"
-    validations:
-      required: false
-
-  - type: textarea
-    id: improvement_plan
-    attributes:
-      label: "개선 방안"
-      description: "제안하는 리팩토링 전략을 입력해주세요"
-    validations:
-      required: false
+      label: 🙋🏻 참고 자료
+      description: 참고 자료가 있다면 작성해 주세요.

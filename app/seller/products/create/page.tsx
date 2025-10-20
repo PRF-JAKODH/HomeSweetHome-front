@@ -89,6 +89,7 @@ export default function CreateProductPage() {
   const [mainImage, setMainImage] = useState<string | null>(null)
   const [subImages, setSubImages] = useState<string[]>([])
   const [productName, setProductName] = useState("")
+  const [brand, setBrand] = useState("") // Added brand state
   const [originalPrice, setOriginalPrice] = useState("")
   const [discountRate, setDiscountRate] = useState("")
   const [shippingType, setShippingType] = useState("free")
@@ -412,6 +413,16 @@ export default function CreateProductPage() {
                 onChange={(e) => setProductName(e.target.value)}
                 placeholder="상품명을 입력하세요"
                 required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="brand">브랜드</Label>
+              <Input
+                id="brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="브랜드명을 입력하세요"
               />
             </div>
 
