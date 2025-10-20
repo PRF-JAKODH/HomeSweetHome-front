@@ -3,25 +3,40 @@
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit, Package, User, Ban, Play } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Plus, Edit, Package, User, Ban, Play } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import SettlementFilters from "@/components/settlement-filters"
+import SettlementSummary from "@/components/settlement-summary"
+import SettlementTable from "@/components/settlement-table"
+
+export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
+export type SettlementStatus = "carried-over" | "confirmed" | "completed"
+export type DrillDownState = {
+  level: "base" | "drilled"
+  selectedPeriod: string | null
+}
 
 export default function SellerPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("products")
-  const [activeMenu, setActiveMenu] = useState("정산 계산")
-  const [activeSubMenu, setActiveSubMenu] = useState("지급액 자동 산출")
-  const [settlementPeriod, setSettlementPeriod] = useState("일별")
+  const [period, setPeriod] = useState<PeriodType>("daily")
+  const [status, setStatus] = useState<SettlementStatus | "all">("all")
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    to: new Date(),
+  })
+  const [drillDown, setDrillDown] = useState<DrillDownState>({
+    level: "base",
+    selectedPeriod: null,
+  })
   const [orderStatusFilter, setOrderStatusFilter] = useState("전체")
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
-  const [showOptionsModal, setShowOptionsModal] = useState(false)
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null)
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set())
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+  const [showOptionsModal, setShowOptionsModal] = useState(false) // Declare the variable here
 
   const settlementRecords = [
     {
@@ -314,7 +329,7 @@ export default function SellerPage() {
     },
     "정산 조회": {
       code: "AD-007",
-      description: "일별/주별/월별로 내역 조회할 수 있다.",
+      description: "일별/주별/월별/년별로 내역 조회할 수 있다.",
     },
   }
 
@@ -346,20 +361,10 @@ export default function SellerPage() {
   }
 
   const filteredProducts =
-    startDate || endDate
+    dateRange.from || dateRange.to
       ? products.filter((product) => {
           const productDate = new Date(product.createdAt)
-          const start = startDate ? new Date(startDate) : null
-          const end = endDate ? new Date(endDate) : null
-
-          if (start && end) {
-            return productDate >= start && productDate <= end
-          } else if (start) {
-            return productDate >= start
-          } else if (end) {
-            return productDate <= end
-          }
-          return true
+          return productDate >= dateRange.from && productDate <= dateRange.to
         })
       : products
 
@@ -391,28 +396,19 @@ export default function SellerPage() {
     return product.options.reduce((sum: number, opt: any) => sum + opt.stock, 0)
   }
 
-  // Function to toggle all products selection
-  // const toggleAllProducts = (checked: boolean) => {
-  //   if (checked) {
-  //     const allProductIds = filteredProducts.map((product) => product.id)
-  //     // setSelectedProducts(new Set(allProductIds)) // REMOVED
-  //   } else {
-  //     // setSelectedProducts(new Set()) // REMOVED
-  //   }
-  // }
+  const handleDrillDown = (selectedPeriod: string) => {
+    setDrillDown({
+      level: "drilled",
+      selectedPeriod,
+    })
+  }
 
-  // Function to toggle a single product selection
-  // const toggleProductSelection = (productId: number) => {
-  //   // setSelectedProducts((prevSelected) => { // REMOVED
-  //   //   const newSelected = new Set(prevSelected)
-  //   //   if (newSelected.has(productId)) {
-  //   //     newSelected.delete(productId)
-  //   //   } else {
-  //   //     newSelected.add(productId)
-  //   //   }
-  //   //   return newSelected
-  //   // })
-  // }
+  const handleBackToBase = () => {
+    setDrillDown({
+      level: "base",
+      selectedPeriod: null,
+    })
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -482,23 +478,25 @@ export default function SellerPage() {
                     <span className="text-sm font-medium">등록일 조회:</span>
                     <input
                       type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      value={dateRange.from.toISOString().split("T")[0]}
+                      onChange={(e) => setDateRange({ ...dateRange, from: new Date(e.target.value) })}
                       className="px-3 py-2 border rounded-lg text-sm"
                     />
                     <span className="text-sm">~</span>
                     <input
                       type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      value={dateRange.to.toISOString().split("T")[0]}
+                      onChange={(e) => setDateRange({ ...dateRange, to: new Date(e.target.value) })}
                       className="px-3 py-2 border rounded-lg text-sm"
                     />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setStartDate("")
-                        setEndDate("")
+                        setDateRange({
+                          from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+                          to: new Date(),
+                        })
                       }}
                     >
                       초기화
@@ -781,315 +779,34 @@ export default function SellerPage() {
         )}
 
         {activeTab === "settlement" && (
-          <div className="flex gap-6">
-            <aside className="w-64 flex-shrink-0">
-              <Card className="p-4">
-                <nav className="space-y-2">
-                  {menuItems.map((menu) => (
-                    <div key={menu.title}>
-                      <button
-                        onClick={() => setActiveMenu(menu.title)}
-                        className={`w-full text-left px-4 py-2 rounded-lg font-medium transition-colors ${
-                          activeMenu === menu.title ? "bg-primary text-white" : "hover:bg-background-section"
-                        }`}
-                      >
-                        {menu.title}
-                      </button>
-                      {activeMenu === menu.title && (
-                        <div className="ml-4 mt-2 space-y-1">
-                          {menu.subItems.map((subItem) => (
-                            <button
-                              key={subItem}
-                              onClick={() => setActiveSubMenu(subItem)}
-                              className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors ${
-                                activeSubMenu === subItem
-                                  ? "bg-primary/10 text-primary font-medium"
-                                  : "hover:bg-background-section"
-                              }`}
-                            >
-                              {subItem}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </nav>
-              </Card>
-            </aside>
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold mb-2">정산 조회</h2>
+              <div className="flex items-center gap-4 text-sm text-text-secondary">
+                <span className="font-mono bg-background-section px-3 py-1 rounded">AD-007</span>
+                <span>일별/주별/월별/년별로 내역 조회할 수 있다.</span>
+              </div>
+            </div>
 
-            <main className="flex-1">
-              <Card className="p-6">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold mb-2">{activeSubMenu}</h2>
-                  {settlementDetails[activeSubMenu as keyof typeof settlementDetails] && (
-                    <div className="flex items-center gap-4 text-sm text-text-secondary">
-                      <span className="font-mono bg-background-section px-3 py-1 rounded">
-                        {settlementDetails[activeSubMenu as keyof typeof settlementDetails].code}
-                      </span>
-                      <span>{settlementDetails[activeSubMenu as keyof typeof settlementDetails].description}</span>
-                    </div>
-                  )}
-                </div>
+            <SettlementFilters
+              period={period}
+              setPeriod={setPeriod}
+              status={status}
+              setStatus={setStatus}
+              dateRange={dateRange}
+              setDateRange={setDateRange}
+            />
 
-                <div className="space-y-6">
-                  {activeSubMenu === "지급액 자동 산출" && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 매출액</div>
-                          <div className="text-2xl font-bold">₩12,450,000</div>
-                        </Card>
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">판매 수수료</div>
-                          <div className="text-2xl font-bold text-red-500">-1,245,000</div>
-                        </Card>
-                        <Card className="p-4 bg-primary/10">
-                          <div className="text-sm text-text-secondary mb-1">최종 지급액</div>
-                          <div className="text-2xl font-bold text-primary">₩11,205,000</div>
-                        </Card>
-                      </div>
-                      <div className="border-t pt-4">
-                        <h3 className="font-semibold mb-3">계산 상세</h3>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>총 매출액</span>
-                            <span className="font-mono">₩12,450,000</span>
-                          </div>
-                          <div className="flex justify-between text-red-500">
-                            <span>판매 수수료 (10%)</span>
-                            <span className="font-mono">-1,245,000</span>
-                          </div>
-                          <div className="flex justify-between font-bold text-lg border-t pt-2">
-                            <span>최종 지급액</span>
-                            <span className="font-mono text-primary">₩11,205,000</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+            <SettlementSummary period={period} status={status} dateRange={dateRange} />
 
-                  {activeSubMenu === "지급 현황 분류" && (
-                    <div className="space-y-4">
-                      <div className="flex gap-2 mb-4">
-                        <Button variant="outline">전체</Button>
-                        <Button variant="outline">지급 완료</Button>
-                        <Button variant="outline">지급 예정</Button>
-                        <Button variant="outline">지급 보류</Button>
-                      </div>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full">
-                          <thead className="bg-background-section">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-medium">날짜</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">주문번호</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">금액</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">상태</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            <tr>
-                              <td className="px-4 py-3 text-sm">2025-10-15</td>
-                              <td className="px-4 py-3 text-sm font-mono">ORD-20251015-001</td>
-                              <td className="px-4 py-3 text-sm font-mono">₩450,000</td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">지급 완료</span>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-3 text-sm">2025-10-14</td>
-                              <td className="px-4 py-3 text-sm font-mono">ORD-20251014-002</td>
-                              <td className="px-4 py-3 text-sm font-mono">₩320,000</td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">지급 완료</span>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-3 text-sm">2025-10-13</td>
-                              <td className="px-4 py-3 text-sm font-mono">ORD-20251013-003</td>
-                              <td className="px-4 py-3 text-sm font-mono">₩890,000</td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">지급 완료</span>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeSubMenu === "엑셀 다운로드" && (
-                    <div className="text-center py-12">
-                      <div className="mb-4">
-                        <svg
-                          className="w-16 h-16 mx-auto text-primary"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-semibold mb-2">정산 내역 다운로드</h3>
-                      <p className="text-text-secondary mb-6">조회된 정산 내역을 엑셀 파일로 다운로드할 수 있습니다.</p>
-                      <Button className="bg-primary hover:bg-primary/90">엑셀 다운로드</Button>
-                    </div>
-                  )}
-
-                  {activeSubMenu === "정산 주기" && (
-                    <div className="space-y-4">
-                      <Card className="p-4 bg-background-section">
-                        <h3 className="font-semibold mb-3">정산 주기 설정</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-sm text-text-secondary mb-1 block">정산 기준일</label>
-                            <select className="w-full px-3 py-2 border rounded-lg">
-                              <option>매월 말일</option>
-                              <option>매월 1일</option>
-                              <option>매월 15일</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-sm text-text-secondary mb-1 block">지급일 (D+N일)</label>
-                            <input type="number" defaultValue="7" className="w-full px-3 py-2 border rounded-lg" />
-                            <p className="text-xs text-text-secondary mt-1">
-                              정산 기준일로부터 며칠 후 지급할지 설정합니다.
-                            </p>
-                          </div>
-                          <Button className="w-full bg-primary hover:bg-primary/90">설정 저장</Button>
-                        </div>
-                      </Card>
-                    </div>
-                  )}
-
-                  {activeSubMenu === "수수료 설정" && (
-                    <div className="space-y-4">
-                      <Card className="p-4 bg-background-section">
-                        <h3 className="font-semibold mb-3">판매 수수료 설정</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-sm text-text-secondary mb-1 block">수수료율 (%)</label>
-                            <input
-                              type="number"
-                              defaultValue="10"
-                              step="0.1"
-                              className="w-full px-3 py-2 border rounded-lg"
-                            />
-                            <p className="text-xs text-text-secondary mt-1">
-                              판매 금액에서 차감할 수수료율을 설정합니다.
-                            </p>
-                          </div>
-                          <div className="p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm">
-                              <span className="font-semibold">예시:</span> 수수료 10% 설정 시, 100,000원 판매 시
-                              90,000원 지급
-                            </p>
-                          </div>
-                          <Button className="w-full bg-primary hover:bg-primary/90">설정 저장</Button>
-                        </div>
-                      </Card>
-                    </div>
-                  )}
-
-                  {activeSubMenu === "정산 조회" && (
-                    <div className="space-y-4">
-                      <div className="flex gap-2 mb-4 items-center">
-                        <select
-                          value={settlementPeriod}
-                          onChange={(e) => setSettlementPeriod(e.target.value)}
-                          className="px-3 py-2 border rounded-lg"
-                        >
-                          <option value="일별">일별</option>
-                          <option value="주별">주별</option>
-                          <option value="월별">월별</option>
-                        </select>
-                        <input type="date" className="px-3 py-2 border rounded-lg" />
-                        <span className="flex items-center">~</span>
-                        <input type="date" className="px-3 py-2 border rounded-lg" />
-                        <Button variant="outline">조회</Button>
-                      </div>
-
-                      <div className="grid grid-cols-6 gap-4 mb-6">
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 주문 수</div>
-                          <div className="text-2xl font-bold">{totalOrders}건</div>
-                        </Card>
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 판매금액</div>
-                          <div className="text-2xl font-bold">₩{totalSales.toLocaleString()}</div>
-                        </Card>
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 수수료</div>
-                          <div className="text-2xl font-bold text-red-500">₩{totalCommission.toLocaleString()}</div>
-                        </Card>
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 부가세</div>
-                          <div className="text-2xl font-bold text-orange-500">₩{totalVat.toLocaleString()}</div>
-                        </Card>
-                        <Card className="p-4 bg-background-section">
-                          <div className="text-sm text-text-secondary mb-1">총 환불액</div>
-                          <div className="text-2xl font-bold text-purple-500">₩{totalRefund.toLocaleString()}</div>
-                        </Card>
-                        <Card className="p-4 bg-primary/10">
-                          <div className="text-sm text-text-secondary mb-1">총 정산액</div>
-                          <div className="text-2xl font-bold text-primary">₩{totalSettlement.toLocaleString()}</div>
-                        </Card>
-                      </div>
-
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full">
-                          <thead className="bg-background-section">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-medium">정산 상태</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">판매 금액</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">수수료</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">부가세</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">환불 금액</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">정산 금액</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">정산 일자</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {settlementRecords.map((record) => (
-                              <tr key={record.id} className="hover:bg-background-section/50">
-                                <td className="px-4 py-3">
-                                  <span
-                                    className={`px-2 py-1 rounded text-xs font-medium ${getSettlementStatusColor(
-                                      record.status,
-                                    )}`}
-                                  >
-                                    {getSettlementStatusLabel(record.status)}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono">₩{record.salesAmount.toLocaleString()}</td>
-                                <td className="px-4 py-3 text-sm font-mono text-red-500">
-                                  ₩{record.commission.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-orange-500">
-                                  ₩{record.vat.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-purple-500">
-                                  {record.refundAmount > 0 ? `₩${record.refundAmount.toLocaleString()}` : "-"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono font-semibold">
-                                  ₩{record.settlementAmount.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-3 text-sm">{record.settlementDate}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </main>
+            <SettlementTable
+              period={period}
+              status={status}
+              dateRange={dateRange}
+              drillDown={drillDown}
+              onDrillDown={handleDrillDown}
+              onBackToBase={handleBackToBase}
+            />
           </div>
         )}
       </div>

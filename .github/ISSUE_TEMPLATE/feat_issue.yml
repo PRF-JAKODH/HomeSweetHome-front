@@ -1,4 +1,4 @@
-name: 기능 구현 (Feat)
+name: ✨ 기능 구현 (Feat)
 description: API 구현 작업을 위한 템플릿
 title: "[Feat]: "
 labels: ["feat"]
@@ -10,32 +10,21 @@ body:
       description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: employee, login-modal)"
     validations:
       required: true
-
   - type: textarea
-    id: implementation
     attributes:
-      label: "구현할 기능"
-      description: "어떤 기능을 구현할지 간략하게 설명해주세요"
+      label: 📄 설명
+      description: 새로운 기능에 대한 설명을 작성해 주세요.
+      placeholder: 자세히 적을수록 좋습니다.
     validations:
       required: true
-
   - type: textarea
-    id: api_spec
     attributes:
-      label: "API 명세 참조"
-      description: "구현할 API의 정보를 명시해주세요 (openapi.json 기준)"
-      value: |
-        ### 엔드포인트
-        - [HTTP 메서드] /api/[경로]
-        - [HTTP 메서드] /api/[경로]
-        - [HTTP 메서드] /api/[경로]
-
+      label: ✅ 작업할 내용
+      description: 할 일을 체크박스 형태로 작성해주세요.
+      placeholder: 최대한 세분화 해서 적어주세요.
+    validations:
+      required: true
   - type: textarea
-    id: test_plan
     attributes:
-      label: "테스트 계획"
-      description: "기능 검증을 위한 테스트 계획을 작성해주세요"
-      value: |
-        - [ ] 단위 테스트
-        - [ ] 통합 테스트
-        - [ ] API 테스트
+      label: 🙋🏻 참고 자료
+      description: 참고 자료가 있다면 작성해 주세요.

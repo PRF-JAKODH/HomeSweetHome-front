@@ -91,6 +91,7 @@ export default function EditProductPage() {
   const [selectedCategory3, setSelectedCategory3] = useState<string>("")
 
   const [productName, setProductName] = useState("")
+  const [brand, setBrand] = useState("")
   const [originalPrice, setOriginalPrice] = useState("")
   const [discountRate, setDiscountRate] = useState("")
   const [shippingType, setShippingType] = useState("free")
@@ -115,6 +116,7 @@ export default function EditProductPage() {
     setSelectedCategory2("거실가구")
     setSelectedCategory3("소파")
     setProductName("모던 미니멀 소파")
+    setBrand("홈스윗홈")
     setOriginalPrice("450000")
     setDiscountRate("20")
     setShippingType("free")
@@ -442,6 +444,16 @@ export default function EditProductPage() {
                 onChange={(e) => setProductName(e.target.value)}
                 placeholder="상품명을 입력하세요"
                 required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="brand">브랜드</Label>
+              <Input
+                id="brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="브랜드명을 입력하세요"
               />
             </div>
 
