@@ -6,10 +6,10 @@ body:
   - type: input
     id: branch_keyword
     attributes:
-      label: 🌳 Branch Keyword
-      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: ci-config, github-actions)"
+      label: "Branch Keyword"
+      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: employee, login-modal)"
     validations:
-        required: true
+      required: true
   - type: textarea
     attributes:
       label: 📄 설명
