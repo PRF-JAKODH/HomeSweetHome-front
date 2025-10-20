@@ -6,28 +6,25 @@ body:
   - type: input
     id: branch_keyword
     attributes:
-      label: "Branch Keyword"
-      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: employee, login-modal)"
+      label: 🌳 Branch Keyword
+      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: ci-config, github-actions)"
     validations:
-      required: true
-
-  - type: input
-    id: setting_title
-    attributes:
-      label: "설정 제목"
-      description: "이번에 무엇을 세팅/변경하나요?"
-      placeholder: "프로덕션 환경 변수 정리"
-    validations:
-      required: true
-
+        required: true
   - type: textarea
-    id: setting_summary
     attributes:
-      label: "설정 내용(간단히)"
-      description: "무엇을, 왜, 어디에 세팅할지 짧게 적어주세요."
-      placeholder: |
-        - 대상: prod / dev
-        - 항목: SPRING_PROFILES_ACTIVE, LOG_LEVEL, CORS 도메인
-        - 목적: 배포 전 환경 정합성 확보
+      label: 📄 설명
+      description: 새로운 기능에 대한 설명을 작성해 주세요.
+      placeholder: 자세히 적을수록 좋습니다.
     validations:
       required: true
+  - type: textarea
+    attributes:
+      label: ✅ 작업할 내용
+      description: 할 일을 체크박스 형태로 작성해주세요.
+      placeholder: 최대한 세분화 해서 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 🙋🏻 참고 자료
+      description: 참고 자료가 있다면 작성해 주세요.
