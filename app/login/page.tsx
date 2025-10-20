@@ -1,39 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { useRedirectIfAuthenticated, useAuth } from "@/hooks/use-auth"
+import { toast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
+  // 이미 인증된 사용자는 홈으로 리다이렉트
+  useRedirectIfAuthenticated("/")
+  
+  // use-auth 훅에서 필요한 상태와 함수들을 가져옴
+  const { isLoading, error, clearError, login } = useAuth()
+
+  // 에러가 있으면 토스트 표시
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "로그인 오류",
+        description: error,
+        variant: "destructive",
+      })
+      clearError()
+    }
+  }, [error, clearError])
 
   const handleGoogleLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      const user = {
-        id: "google_user_123",
-        name: "구글 사용자",
-        email: "user@gmail.com",
-        provider: "google",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=google",
-      }
-      localStorage.setItem("ohouse_user", JSON.stringify(user))
-      window.location.href = "/"
-    }, 1000)
+    clearError()
+    login('google')
   }
 
   const handleKakaoLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      const user = {
-        id: "kakao_user_456",
-        name: "카카오 사용자",
-        email: "user@kakao.com",
-        provider: "kakao",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=kakao",
-      }
-      localStorage.setItem("ohouse_user", JSON.stringify(user))
-      window.location.href = "/"
-    }, 1000)
+    clearError()
+    login('kakao')
   }
 
   return (

@@ -7,21 +7,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { useAuthStore } from "@/stores/auth-store"
 
 export function Header() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, isAuthenticated, isLoading, logout, initializeAuth } = useAuthStore()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [cartCount, setCartCount] = useState(0)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("ohouse_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-
+    // 인증 상태 초기화
+    initializeAuth()
+    
+    // 사용자 타입은 여전히 localStorage에서 관리 (별도 기능)
     const storedUserType = localStorage.getItem("ohouse_user_type")
     if (storedUserType) {
       setUserType(storedUserType as "buyer" | "seller")
@@ -101,9 +101,8 @@ export function Header() {
     }
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem("ohouse_user")
-    setUser(null)
+  const handleLogout = async () => {
+    await logout()
     router.push("/")
   }
 
@@ -170,7 +169,7 @@ export function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {user && (
+            {isAuthenticated && user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="hidden md:flex relative">
@@ -228,12 +227,12 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {user && (
+            {isAuthenticated && user && (
               <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
                 <MessageCircle className="h-5 w-5" />
               </Button>
             )}
-            {user && (
+            {isAuthenticated && user && (
               <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/cart")}>
                 <ShoppingCart className="h-5 w-5" />
                 {cartCount > 0 && (
@@ -243,7 +242,7 @@ export function Header() {
                 )}
               </Button>
             )}
-            {user ? (
+            {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="hidden md:flex">
@@ -263,9 +262,10 @@ export function Header() {
             ) : (
               <Button
                 onClick={handleLogin}
-                className="hidden md:flex text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6"
+                disabled={isLoading}
+                className="hidden md:flex text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6 disabled:opacity-50"
               >
-                로그인
+                {isLoading ? "로딩 중..." : "로그인"}
               </Button>
             )}
             <Button variant="ghost" size="icon" className="md:hidden">
