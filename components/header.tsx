@@ -7,19 +7,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { useAuthStore } from "@/stores/auth-store"
+import { useAuth } from "@/hooks/use-auth"
 
 export function Header() {
   const router = useRouter()
-  const { user, isAuthenticated, isLoading, logout, initializeAuth } = useAuthStore()
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [cartCount, setCartCount] = useState(0)
 
   useEffect(() => {
-    // 인증 상태 초기화
-    initializeAuth()
+
     
     // 사용자 타입은 여전히 localStorage에서 관리 (별도 기능)
     const storedUserType = localStorage.getItem("ohouse_user_type")

@@ -6,13 +6,17 @@ import {
   AuthResponse, 
   LoginCredentials, 
   RefreshTokenResponse, 
-  LogoutResponse, 
+  LogoutResponse,
+  SignupRequest,
+  UserResponse,
+  accessTokenResponse, 
 } from '@/types/auth';
 import apiClient from '@/lib/api';
 
 interface AuthStore extends AuthState {
   // Actions
   login: (provider: LoginCredentials['provider']) => void;
+  signup: (signupRequest: SignupRequest) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   setUser: (user: User | null) => void;
@@ -42,6 +46,45 @@ export const useAuthStore = create<AuthStore>()(
         if (provider === 'kakao') {
           // Kakao OAuth 로그인 - 서버로 리다이렉트
           window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/oauth2/authorization/kakao`;
+        }
+      },
+
+      signup: async (signupRequest: SignupRequest) => {
+        try {
+          set({ isLoading: true, error: null });
+          
+          const response = await apiClient.post<accessTokenResponse>('/api/v1/auth/signup', signupRequest, {
+            withCredentials: true,
+          });
+
+          if (response.status === 200 && response.data) {
+            const {accessToken, userResponse} = response.data;
+            set({
+              accessToken,
+              user: {
+                id: userResponse.id,
+                email: userResponse.email,
+                name: userResponse.name,
+                profileImageUrl: userResponse.profileImageUrl,
+                grade: userResponse.grade,
+                role: userResponse.role,
+                phone: userResponse.phoneNumber,
+                birthDate: userResponse.birthDate,
+              } as User,  
+              isAuthenticated: true, 
+              isLoading: false, 
+              error: null });
+            return true;
+          } else {
+            set({ error: 'Signup failed', isLoading: false });
+            return false;
+          }
+        } catch (error) {
+          console.error('Signup error:', error);
+          set({ error: 'Signup failed', isLoading: false });
+          return false;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -92,7 +135,6 @@ export const useAuthStore = create<AuthStore>()(
             
             set({
               accessToken,
-              user,
               isAuthenticated: true,
               isLoading: false,
               error: null,

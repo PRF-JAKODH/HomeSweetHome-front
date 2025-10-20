@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useRedirectIfAuthenticated, useAuth } from "@/hooks/use-auth"
 import { toast } from "@/hooks/use-toast"
 
-export default function LoginPage() {
+export default function SignupPage() {
   // 이미 인증된 사용자는 홈으로 리다이렉트
   useRedirectIfAuthenticated("/")
   
@@ -16,7 +17,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (error) {
       toast({
-        title: "로그인 오류",
+        title: "회원가입 오류",
         description: error,
         variant: "destructive",
       })
@@ -24,12 +25,12 @@ export default function LoginPage() {
     }
   }, [error, clearError])
 
-  const handleGoogleLogin = () => {
+  const handleGoogleSignup = () => {
     clearError()
     login('google')
   }
 
-  const handleKakaoLogin = () => {
+  const handleKakaoSignup = () => {
     clearError()
     login('kakao')
   }
@@ -54,15 +55,15 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             홈스윗<span className="text-primary">홈</span>
           </h1>
-          <p className="text-text-secondary">로그인하고 다양한 인테리어를 만나보세요</p>
+          <p className="text-text-secondary">회원가입하고 다양한 인테리어를 만나보세요</p>
         </div>
 
-        {/* Login Card */}
+        {/* Signup Card */}
         <div className="bg-background rounded-lg border border-divider p-8 shadow-sm">
           <div className="space-y-4">
-            {/* Google Login Button */}
+            {/* Google Signup Button */}
             <Button
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignup}
               disabled={isLoading}
               className="w-full h-12 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium flex items-center justify-center gap-3"
             >
@@ -84,12 +85,12 @@ export default function LoginPage() {
                   fill="#EA4335"
                 />
               </svg>
-              {isLoading ? "로그인 중..." : "구글로 시작하기"}
+              {isLoading ? "회원가입 중..." : "구글로 시작하기"}
             </Button>
 
-            {/* Kakao Login Button */}
+            {/* Kakao Signup Button */}
             <Button
-              onClick={handleKakaoLogin}
+              onClick={handleKakaoSignup}
               disabled={isLoading}
               className="w-full h-12 font-medium flex items-center justify-center gap-3"
               style={{ backgroundColor: "#FEE500", color: "#000000" }}
@@ -100,12 +101,12 @@ export default function LoginPage() {
                   fill="#000000"
                 />
               </svg>
-              {isLoading ? "로그인 중..." : "카카오로 시작하기"}
+              {isLoading ? "회원가입 중..." : "카카오로 시작하기"}
             </Button>
           </div>
 
           <div className="mt-6 text-center text-sm text-text-secondary">
-            로그인하면{" "}
+            회원가입하면{" "}
             <span>
               홈스윗<span className="text-primary">홈</span>
             </span>
@@ -121,16 +122,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Signup Link */}
+        {/* Login Link */}
         <div className="mt-6 text-center">
           <p className="text-sm text-text-secondary">
-            아직 계정이 없으신가요?{" "}
-            <a 
-              href="/signup" 
+            이미 계정이 있으신가요?{" "}
+            <Link 
+              href="/login" 
               className="text-primary hover:underline font-medium"
             >
-              회원가입하기
-            </a>
+              로그인하기
+            </Link>
           </p>
         </div>
       </div>
