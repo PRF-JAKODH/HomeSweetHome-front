@@ -9,10 +9,7 @@ export interface User {
   grade: string | null;
   phone: string;
   birthDate: Date;
-  address?: {
-    roadAddress: string;
-    detailAddress: string;
-  };
+  address: string;
 }
 // Response Types
 export interface AuthResponse {
@@ -29,8 +26,8 @@ export interface UserResponse {
   role: 'USER' | 'SELLER';
   phoneNumber: string;
   birthDate: Date;
+  address: string;
 }
-
 export interface accessTokenResponse {
   accessToken : string;
   userResponse : UserResponse
@@ -60,5 +57,5 @@ export interface LoginCredentials {
 export interface SignupRequest {
   phoneNumber: string;
   birthDate: Date;
-  role: 'USER' | 'SELLER';
+  address: string;
 }

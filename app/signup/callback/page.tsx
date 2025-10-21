@@ -5,25 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/hooks/use-auth"
-import { useAuthStore } from "@/stores/auth-store"
 import { toast } from "@/hooks/use-toast"
-import { Loader2, CheckCircle, XCircle } from "lucide-react"
+import { Loader2, XCircle } from "lucide-react"
 
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isLoading, clearError, signup } = useAuth()
-  const { refreshToken } = useAuthStore()
 
   const [formData, setFormData] = useState({
     phone: "",
     birthDate: "",
     roadAddress: "",
-    detailAddress: "",
-    userType: "USER" as "USER" | "SELLER"
+    detailAddress: ""
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -101,7 +97,7 @@ export default function OnboardingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.phone || !formData.birthDate || !formData.roadAddress || !formData.userType) {
+    if (!formData.phone || !formData.birthDate || !formData.roadAddress) {
       toast({
         title: "입력 오류",
         description: "모든 필수 정보를 입력해주세요.",
@@ -117,8 +113,8 @@ export default function OnboardingPage() {
       const response = await signup({
         phoneNumber: formData.phone,
         birthDate: new Date(formData.birthDate),
-        role: formData.userType as "USER" | "SELLER",
-        })
+        address: formData.roadAddress + "/" + formData.detailAddress,
+      })
         
       if (response) {
         toast({
@@ -314,24 +310,6 @@ export default function OnboardingPage() {
                   value={formData.detailAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, detailAddress: e.target.value }))}
                 />
-              </div>
-
-              {/* 사용자 타입 */}
-              <div className="space-y-3">
-                <Label>회원 유형 *</Label>
-                <RadioGroup
-                  value={formData.userType}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, userType: value as "USER" | "SELLER" }))}
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="USER" id="user" />
-                    <Label htmlFor="user">일반 회원 (구매자)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="SELLER" id="seller" />
-                    <Label htmlFor="seller">판매자</Label>
-                  </div>
-                </RadioGroup>
               </div>
 
               {/* 제출 버튼 */}

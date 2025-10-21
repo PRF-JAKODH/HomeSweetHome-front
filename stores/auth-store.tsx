@@ -70,6 +70,7 @@ export const useAuthStore = create<AuthStore>()(
                 role: userResponse.role,
                 phone: userResponse.phoneNumber,
                 birthDate: userResponse.birthDate,
+                address: signupRequest.address,
               } as User,  
               isAuthenticated: true, 
               isLoading: false, 
@@ -197,7 +198,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           set({ isLoading: true, error: null });
           
-          const response = await apiClient.get<User>('/api/v1/auth/me', {
+          const response = await apiClient.get<User>('/api/v1/user/me', {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
