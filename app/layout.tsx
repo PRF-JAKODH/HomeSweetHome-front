@@ -17,6 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+      </head>
       <body className="font-sans antialiased">
         <Suspense fallback={<div>Loading...</div>}>
           <Header />
