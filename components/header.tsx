@@ -9,18 +9,16 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
 
+
 export function Header() {
   const router = useRouter()
-  const { user, isAuthenticated, isLoading, logout } = useAuth()
+  const { isLoading, logout, isAuthenticated } = useAuth()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [cartCount, setCartCount] = useState(0)
 
   useEffect(() => {
-
-    
-    // 사용자 타입은 여전히 localStorage에서 관리 (별도 기능)
     const storedUserType = localStorage.getItem("ohouse_user_type")
     if (storedUserType) {
       setUserType(storedUserType as "buyer" | "seller")
@@ -128,163 +126,239 @@ export function Header() {
       <div className="mx-auto max-w-[1256px] px-4">
         {/* Top Bar */}
         <div className="flex h-[60px] items-center justify-between gap-4">
-          {/* Logo */}
+          {/* Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <a href="/" className="flex items-center gap-2">
-              <Image
-                src="/house-logo.png"
-                alt="홈스윗홈"
-                width={32}
-                height={32}
-                className="w-8 h-8"
-              />
-              <span className="text-xl font-bold text-foreground">
-                홈스윗<span className="text-primary">홈</span>
-              </span>
-            </a>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden items-center gap-6 md:flex">
-              <a href="/store" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-                스토어
-              </a>
-              <a href="/community" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-                커뮤니티
-              </a>
-            </nav>
+            <Logo />
+            <Navigation />
           </div>
 
           {/* Search Bar */}
           <div className="hidden flex-1 max-w-md md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-              <Input
-                type="search"
-                placeholder="검색어를 입력하세요"
-                className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent focus:border-primary"
-              />
-            </div>
+            <SearchBar />
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
-            {isAuthenticated && user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="hidden md:flex relative">
-                    <Bell className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
+          {!isLoading && (
+            <>
+              {isAuthenticated ? (
+                  <UserActions
+                    userType={userType}
+                    cartCount={cartCount}
+                    onLogout={handleLogout}
+                    notificationDropdownProps={{
+                      notifications: notifications,
+                      unreadCount: unreadCount,
+                      onNotificationClick: handleNotificationClick,
+                    }}
+                  />
+              ) : (
+                 <>
+                  <Button
+                    onClick={handleLogin}
+                    className="text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6"
+                  >
+                    로그인
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
-                    <span className="text-sm font-semibold">알림</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-primary hover:text-primary"
-                      onClick={() => router.push("/notifications")}
-                    >
-                      모두 보기
-                    </Button>
-                  </div>
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm text-text-secondary">알림이 없습니다</div>
-                    ) : (
-                      notifications.slice(0, 5).map((notification) => (
-                        <div
-                          key={notification.id}
-                          onClick={() => handleNotificationClick(notification)}
-                          className={`px-3 py-3 border-b border-divider last:border-0 cursor-pointer hover:bg-background-section transition-colors ${
-                            !notification.read ? "bg-blue-50" : ""
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-medium text-primary">{notification.category}</span>
-                                {!notification.read && (
-                                  <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                                )}
-                              </div>
-                              <p className="text-sm font-medium text-foreground mb-1 line-clamp-1">
-                                {notification.title}
-                              </p>
-                              <p className="text-xs text-text-secondary line-clamp-2">{notification.content}</p>
-                              <span className="text-xs text-text-tertiary mt-1 inline-block">{notification.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {isAuthenticated && user && (
-              <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
-                <MessageCircle className="h-5 w-5" />
-              </Button>
-            )}
-            {isAuthenticated && user && (
-              <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/cart")}>
-                <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                    {cartCount > 9 ? "9+" : cartCount}
-                  </span>
-                )}
-              </Button>
-            )}
-            {isAuthenticated && user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="hidden md:flex">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => router.push("/profile")}>내 프로필</DropdownMenuItem>
-                  {userType === "seller" && (
-                    <DropdownMenuItem onClick={() => router.push("/seller")}>판매자 정보</DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                    로그아웃
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                onClick={handleLogin}
-                disabled={isLoading}
-                className="hidden md:flex text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6 disabled:opacity-50"
-              >
-                {isLoading ? "로딩 중..." : "로그인"}
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </div>
+                </>
+              )}
+            </>
+          )}
         </div>
 
         {/* Mobile Search */}
         <div className="pb-3 md:hidden">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-            <Input
-              type="search"
-              placeholder="검색어를 입력하세요"
-              className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent"
-            />
-          </div>
+          <SearchBar />
         </div>
       </div>
     </header>
+  )
+}
+
+// ===== 내부 컴포넌트들 =====
+
+// Logo 컴포넌트
+function Logo() {
+  return (
+    <a href="/" className="flex items-center gap-2">
+      <Image
+        src="/house-logo.png"
+        alt="홈스윗홈"
+        width={32}
+        height={32}
+        className="w-8 h-8"
+      />
+      <span className="text-xl font-bold text-foreground">
+        홈스윗<span className="text-primary">홈</span>
+      </span>
+    </a>
+  )
+}
+
+// Navigation 컴포넌트
+function Navigation() {
+  return (
+    <nav className="hidden items-center gap-6 md:flex">
+      <a href="/store" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+        스토어
+      </a>
+      <a href="/community" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+        커뮤니티
+      </a>
+    </nav>
+  )
+}
+
+// SearchBar 컴포넌트
+interface SearchBarProps {
+  className?: string
+}
+
+function SearchBar({ className = "" }: SearchBarProps) {
+  return (
+    <div className={`relative ${className}`}>
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+      <Input
+        type="search"
+        placeholder="검색어를 입력하세요"
+        className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent focus:border-primary"
+      />
+    </div>
+  )
+}
+
+// NotificationDropdown 컴포넌트
+interface Notification {
+  id: number
+  category: string
+  title: string
+  content: string
+  time: string
+  read: boolean
+  link: string
+}
+
+interface NotificationDropdownProps {
+  notifications: Notification[]
+  unreadCount: number
+  onNotificationClick: (notification: Notification) => void
+}
+
+function NotificationDropdown({ 
+  notifications, 
+  unreadCount, 
+  onNotificationClick 
+}: NotificationDropdownProps) {
+  const router = useRouter()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="hidden md:flex relative">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
+          <span className="text-sm font-semibold">알림</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-primary hover:text-primary"
+            onClick={() => router.push("/notifications")}
+          >
+            모두 보기
+          </Button>
+        </div>
+        <div className="max-h-[400px] overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-text-secondary">알림이 없습니다</div>
+          ) : (
+            notifications.slice(0, 5).map((notification) => (
+              <div
+                key={notification.id}
+                onClick={() => onNotificationClick(notification)}
+                className={`px-3 py-3 border-b border-divider last:border-0 cursor-pointer hover:bg-background-section transition-colors ${
+                  !notification.read ? "bg-blue-50" : ""
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-primary">{notification.category}</span>
+                      {!notification.read && (
+                        <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-foreground mb-1 line-clamp-1">
+                      {notification.title}
+                    </p>
+                    <p className="text-xs text-text-secondary line-clamp-2">{notification.content}</p>
+                    <span className="text-xs text-text-tertiary mt-1 inline-block">{notification.time}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// UserActions 컴포넌트 (인증된 사용자용)
+interface UserActionsProps {
+  userType: "buyer" | "seller"
+  cartCount: number
+  onLogout: () => void
+  notificationDropdownProps: NotificationDropdownProps
+}
+
+function UserActions({ 
+  userType, 
+  cartCount, 
+  onLogout,
+  notificationDropdownProps
+}: UserActionsProps) {
+  const router = useRouter()
+
+  return (
+    <div className="flex items-center gap-2">
+      <NotificationDropdown {...notificationDropdownProps} />
+      <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
+        <MessageCircle className="h-5 w-5" />
+      </Button>
+      <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/cart")}>
+        <ShoppingCart className="h-5 w-5" />
+        {cartCount > 0 && (
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
+            {cartCount > 9 ? "9+" : cartCount}
+          </span>
+        )}
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="hidden md:flex">
+            <User className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => router.push("/profile")}>내 프로필</DropdownMenuItem>
+          {userType === "seller" && (
+            <DropdownMenuItem onClick={() => router.push("/seller")}>판매자 정보</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={onLogout} className="text-red-600">
+            로그아웃
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button variant="ghost" size="icon" className="md:hidden">
+        <Menu className="h-5 w-5" />
+      </Button>
+    </div>
   )
 }

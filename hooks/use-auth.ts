@@ -1,69 +1,125 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth-store';
+"use client"
 
-/**
- * 기본 인증 훅 - 모든 인증 관련 상태와 액션을 제공
- * @param redirectTo - 인증되지 않은 경우 리다이렉트할 경로 (선택사항)
- */
-export function useAuth(redirectTo?: string) {
-  const { 
-    isAuthenticated, 
-    isLoading, 
-    user, 
-    error, 
-    clearError, 
-    login, 
-    signup, 
-    logout,
-    refreshToken,
-    initializeAuth 
-  } = useAuthStore();
-  const router = useRouter();
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/auth-store'
+import { logout as logoutApi, signup as signupApi, refreshToken as refreshTokenApi } from '@/api/auth-api'
+import type { LoginCredentials, SignupRequest } from '@/types/auth'
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated && redirectTo) {
-      router.push(redirectTo);
+type AuthAction = {
+  login: (provider: LoginCredentials['provider']) => void
+  signup: (signupRequest: SignupRequest) => Promise<boolean>
+  refreshToken: () => Promise<boolean>
+  logout: () => Promise<void>
+  getIsAuthenticated: () => boolean
+  clearError: () => void
+}
+
+type AuthState = {
+  isAuthenticated: boolean
+  isLoading: boolean
+  error: string | null
+}
+
+type UseAuth = AuthAction & AuthState
+
+export function useAuth (): UseAuth {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const setUser = useAuthStore((s) => s.setUser)
+  const setAccessToken = useAuthStore((s) => s.setAccessToken)
+  const setIsAuthenticated = useAuthStore((s) => s.setIsAuthenticated)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+
+  const login = useCallback((provider: LoginCredentials['provider']) => {
+    if (typeof window === 'undefined') return
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/oauth2/authorization/${provider}`
+  }, [])
+
+  const signup = useCallback(async (signupRequest: SignupRequest) => {
+    setIsLoading(true)
+    try {
+      const response = await signupApi(signupRequest)
+      if (response.status === 200 && response.data) {
+        const { accessToken, user } = response.data
+        setUser(user)
+        setAccessToken(accessToken)
+        setIsAuthenticated(true)
+        setError(null)
+        return true
+      }
+      setError('회원가입 실패')
+      return false
+    } catch (e) {
+      setError('회원가입 실패')
+      return false
+    } finally {
+      setIsLoading(false)
     }
-  }, [isAuthenticated, isLoading, redirectTo, router]);
+  }, [setUser, setAccessToken, setIsAuthenticated])
+
+  const refreshToken = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await refreshTokenApi()
+      if (response.status === 200 && response.data) {
+        const { accessToken, user } = response.data
+        setUser(user)
+        setAccessToken(accessToken)
+        setIsAuthenticated(true)
+        setError(null)
+        return true
+      }
+      setError('토큰 갱신 실패')
+      return false
+    } catch (e) {
+      setError('토큰 갱신 실패')
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [setUser, setAccessToken, setIsAuthenticated])
+
+  const logout = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await logoutApi()
+      if (response.status === 200 && response.data) {
+        setError(null)
+      } else {
+        setError('로그아웃 실패')
+      }
+    } catch (e) {
+      setError('로그아웃 실패')
+    } finally {
+      clearAuth()
+      setIsLoading(false)
+    }
+  }, [clearAuth])
+
+  const clearError = useCallback(() => setError(null), [])
+  const getIsAuthenticated = useCallback(() => isAuthenticated, [isAuthenticated])
 
   return {
-    isAuthenticated,
     isLoading,
-    user,
     error,
     clearError,
     login,
     signup,
-    logout,
     refreshToken,
-    initializeAuth,
-  };
+    logout,
+    getIsAuthenticated,
+    isAuthenticated,
+  }
 }
 
-/**
- * 인증이 필요한 페이지에서 사용하는 훅
- * 인증되지 않은 경우 지정된 경로로 리다이렉트
- * @param redirectTo - 리다이렉트할 경로 (기본값: '/login')
- */
-export function useRequireAuth(redirectTo: string = '/login') {
-  return useAuth(redirectTo);
-}
-
-/**
- * 이미 인증된 사용자를 리다이렉트하는 훅
- * 로그인 페이지에서 사용하여 이미 로그인한 사용자를 다른 페이지로 보냄
- * @param redirectTo - 리다이렉트할 경로 (기본값: '/dashboard')
- */
-export function useRedirectIfAuthenticated(redirectTo: string = '/dashboard') {
-  const { isAuthenticated, isLoading } = useAuthStore();
-  const router = useRouter();
+export function useRedirectIfAuthenticated (redirectTo: string) {
+  const router = useRouter()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push(redirectTo);
-    }
-  }, [isAuthenticated, isLoading, redirectTo, router]);
-
-  return { isAuthenticated, isLoading };
+    if (isAuthenticated) router.push(redirectTo)
+  }, [isAuthenticated, redirectTo, router])
 }

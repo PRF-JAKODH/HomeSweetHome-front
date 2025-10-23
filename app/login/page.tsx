@@ -2,15 +2,14 @@
 
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { useRedirectIfAuthenticated, useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/hooks/use-auth"
 import { toast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
-  // 이미 인증된 사용자는 홈으로 리다이렉트
-  useRedirectIfAuthenticated("/")
   
-  // use-auth 훅에서 필요한 상태와 함수들을 가져옴
-  const { isLoading, error, clearError, login } = useAuth()
+  const { login, isLoading, error, clearError } = useAuth()
+  const router = useRouter()
 
   // 에러가 있으면 토스트 표시
   useEffect(() => {
@@ -25,13 +24,7 @@ export default function LoginPage() {
   }, [error, clearError])
 
   const handleGoogleLogin = () => {
-    clearError()
     login('google')
-  }
-
-  const handleKakaoLogin = () => {
-    clearError()
-    login('kakao')
   }
 
   return (

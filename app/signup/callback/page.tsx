@@ -13,7 +13,7 @@ import { Loader2, XCircle } from "lucide-react"
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isLoading, clearError, signup } = useAuth()
+  const { signup, isLoading, error, clearError } = useAuth()
 
   const [formData, setFormData] = useState({
     phone: "",

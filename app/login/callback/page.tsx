@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshToken, initializeAuth } = useAuth();
+  const { refreshToken, isLoading, error, clearError } = useAuth();
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('인증 처리 중...');
@@ -33,7 +33,6 @@ export default function AuthCallbackPage() {
         const refreshSuccess = await refreshToken();
         
         if (refreshSuccess) {
-          await initializeAuth();
           setStatus('success');
           setMessage('로그인에 성공했습니다!');
           

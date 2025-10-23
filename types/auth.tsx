@@ -28,26 +28,19 @@ export interface UserResponse {
   birthDate: Date;
   address: string;
 }
-export interface accessTokenResponse {
+export interface AccessTokenResponse {
   accessToken : string;
-  userResponse : UserResponse
+  user : User
 }
 
 export interface RefreshTokenResponse {
   accessToken: string;
-  user: UserResponse;
+  user: User;
 }
 
 export interface LogoutResponse {
 }
 
-export interface AuthState {
-  user: User | null;
-  accessToken: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-}
 
 export interface LoginCredentials {
   provider: 'google' | 'kakao';
