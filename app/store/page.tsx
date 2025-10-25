@@ -134,8 +134,6 @@ export default function StorePage() {
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-foreground mb-4">카테고리</h3>
-                
                 {/* 카테고리 경로 표시 */}
                 {categoryPath && (
                   <div className="mb-4">
