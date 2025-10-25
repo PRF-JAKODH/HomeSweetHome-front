@@ -762,7 +762,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 onClick={handleChatWithSeller}
               >
                 <MessageCircle className="h-5 w-5" />
-                판매자와 1:1 채팅하기
+                판매자 1:1 문의하기
               </Button>
             </div>
           </div>
