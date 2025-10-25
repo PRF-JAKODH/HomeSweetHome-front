@@ -11,13 +11,9 @@ export interface ApiResponse<T = any> {
 }
 
 // 에러 응답 형식
-export interface ApiError {
-  success: false
-  error: {
-    code: string
-    message: string
-    details?: any
-  }
+export interface ErrorResponse {
+  status: number
+  message: string
   timestamp: string
 }
 
