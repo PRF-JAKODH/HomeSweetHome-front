@@ -2,10 +2,11 @@
 
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
+import { Category } from "@/types/api/category"
 import { ProductSortType } from "@/types/api/product"
 import { useSearchParams } from "next/navigation"
 
@@ -57,40 +58,39 @@ export default function StorePage() {
   }, [])
 
   // 무한 스크롤 Intersection Observer 설정
-// 무한 스크롤 Intersection Observer 설정
-useEffect(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      console.log('Observer triggered:', {
-        isIntersecting: entries[0].isIntersecting,
-        hasNext,
-        isLoadingMore
-      })
-      
-      if (entries[0].isIntersecting && hasNext && !isLoadingMore) {
-        console.log('Calling loadMore()')
-        loadMore()
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // 타겟이 화면에 보이고, 더 불러올 데이터가 있으면 loadMore 호출
+        if (entries[0].isIntersecting && hasNext && !isLoadingMore) {
+          loadMore()
+        }
+      },
+      {
+        threshold: 0.1, // 10%만 보여도 트리거
+        rootMargin: '100px', // 100px 전에 미리 로드
       }
-    },
-    {
-      threshold: 0.1,
-      rootMargin: '100px',
-    }
-  )
+    )
 
-  const currentTarget = observerTarget.current
-  console.log('Observer target:', currentTarget)
-  
-  if (currentTarget) {
-    observer.observe(currentTarget)
-  }
-
-  return () => {
+    const currentTarget = observerTarget.current
     if (currentTarget) {
-      observer.unobserve(currentTarget)
+      observer.observe(currentTarget)
     }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [hasNext, isLoadingMore, loadMore])
+
+  // "전체" 버튼 클릭 핸들러
+  const handleAllCategoriesClick = () => {
+    setSelectedMainCategory(null)
+    setSelectedSubCategory(null)
+    setSelectedSubSubCategory(null)
+    setExpandedCategories(new Set()) // 모든 확장된 카테고리 닫기
   }
-}, [hasNext, isLoadingMore, loadMore])
 
   const handleMainCategoryChange = (categoryId: number) => {
     setSelectedMainCategory(categoryId)
@@ -121,13 +121,15 @@ useEffect(() => {
   const selectedSubCategoryData = subCategories.find(cat => cat.id === selectedSubCategory)
   const selectedSubSubCategoryData = subSubCategories.find(cat => cat.id === selectedSubSubCategory)
   
-  const categoryPath = [
-    selectedCategory?.name,
-    selectedSubCategoryData?.name,
-    selectedSubSubCategoryData?.name,
-  ]
-    .filter(Boolean)
-    .join(" > ")
+  const categoryPath = selectedMainCategory === null 
+    ? '전체' 
+    : [
+        selectedCategory?.name,
+        selectedSubCategoryData?.name,
+        selectedSubSubCategoryData?.name,
+      ]
+        .filter(Boolean)
+        .join(" > ")
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -176,12 +178,12 @@ useEffect(() => {
                   <div className="mb-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                       <button 
-                        onClick={() => setSelectedMainCategory(null)}
+                        onClick={handleAllCategoriesClick}
                         className="hover:text-foreground transition-colors"
                       >
                         전체
                       </button>
-                      {categoryPath.split(" > ").map((path, index) => (
+                      {categoryPath !== '전체' && categoryPath.split(" > ").map((path, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <span>{'>'}</span>
                           <span className="text-foreground">{path}</span>
@@ -190,6 +192,18 @@ useEffect(() => {
                     </div>
                   </div>
                 )}
+
+                {/* 전체 카테고리 버튼 */}
+                <button
+                  onClick={handleAllCategoriesClick}
+                  className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
+                    selectedMainCategory === null
+                      ? "bg-primary text-white"
+                      : "bg-background text-foreground hover:bg-background-section"
+                  }`}
+                >
+                  <span>전체</span>
+                </button>
 
                 {/* 상위 카테고리 목록 */}
                 {topCategories.map((category) => {
@@ -261,7 +275,7 @@ useEffect(() => {
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
                                             className={`w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
-                                              selectedSubCategory === subSubCategory.id
+                                              selectedSubSubCategory === subSubCategory.id
                                                 ? "bg-primary/20 text-primary"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-background-section"
                                             }`}
@@ -377,20 +391,20 @@ useEffect(() => {
               </div>
 
               {/* 무한 스크롤 트리거 & 로딩 인디케이터 */}
-              {/* 무한 스크롤 트리거 & 로딩 인디케이터 */}
-              <div ref={observerTarget} className="col-span-full py-8">
-                {isLoadingMore && (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="ml-2">더 불러오는 중...</p>
-                  </div>
-                )}
-                {hasNext && !isLoadingMore && (
-                  <p className="text-center text-muted-foreground text-sm">
-                    스크롤하여 더 보기...
-                  </p>
-                )}
-              </div>
+              {!productsLoading && products.length > 0 && (
+                <div ref={observerTarget} className="col-span-full py-8">
+                  {isLoadingMore && (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  )}
+                  {!hasNext && !isLoadingMore && (
+                    <p className="text-center text-muted-foreground">
+                      모든 상품을 불러왔습니다.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
