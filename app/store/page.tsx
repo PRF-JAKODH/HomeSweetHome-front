@@ -8,11 +8,12 @@ import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categor
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
 import { ProductSortType } from "@/types/api/product"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation" // useRouter 추가
 
 
 export default function StorePage() {
   const searchParams = useSearchParams()
+  const router = useRouter() // router 추가
   const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
   const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState<number | null>(null)
@@ -84,27 +85,38 @@ export default function StorePage() {
     }
   }, [hasNext, isLoadingMore, loadMore])
 
+  // URL에서 검색 키워드 제거하는 함수
+  const clearSearchKeyword = () => {
+    if (searchKeyword) {
+      router.push('/store') // 검색 키워드 없는 URL로 이동
+    }
+  }
+
   // "전체" 버튼 클릭 핸들러
   const handleAllCategoriesClick = () => {
     setSelectedMainCategory(null)
     setSelectedSubCategory(null)
     setSelectedSubSubCategory(null)
     setExpandedCategories(new Set()) // 모든 확장된 카테고리 닫기
+    clearSearchKeyword() // 검색 키워드 제거
   }
 
   const handleMainCategoryChange = (categoryId: number) => {
     setSelectedMainCategory(categoryId)
     setSelectedSubCategory(null)
     setSelectedSubSubCategory(null)
+    clearSearchKeyword() // 검색 키워드 제거
   }
 
   const handleSubCategoryChange = (subCategoryId: number) => {
     setSelectedSubCategory(subCategoryId)
     setSelectedSubSubCategory(null)
+    clearSearchKeyword() // 검색 키워드 제거
   }
 
   const handleSubSubCategoryChange = (subSubCategoryId: number) => {
     setSelectedSubSubCategory(subSubCategoryId)
+    clearSearchKeyword() // 검색 키워드 제거
   }
 
   const toggleCategory = (categoryId: number) => {
@@ -121,15 +133,13 @@ export default function StorePage() {
   const selectedSubCategoryData = subCategories.find(cat => cat.id === selectedSubCategory)
   const selectedSubSubCategoryData = subSubCategories.find(cat => cat.id === selectedSubSubCategory)
   
-  const categoryPath = selectedMainCategory === null 
-    ? '전체' 
-    : [
-        selectedCategory?.name,
-        selectedSubCategoryData?.name,
-        selectedSubSubCategoryData?.name,
-      ]
-        .filter(Boolean)
-        .join(" > ")
+  const categoryPath = [
+    selectedCategory?.name,
+    selectedSubCategoryData?.name,
+    selectedSubSubCategoryData?.name,
+  ]
+    .filter(Boolean)
+    .join(" > ")
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -183,7 +193,7 @@ export default function StorePage() {
                       >
                         전체
                       </button>
-                      {categoryPath !== '전체' && categoryPath.split(" > ").map((path, index) => (
+                      {categoryPath.split(" > ").map((path, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <span>{'>'}</span>
                           <span className="text-foreground">{path}</span>
@@ -363,7 +373,7 @@ export default function StorePage() {
                   </div>
                 ) : (
                   <>
-                    {products.map((product) => {
+                    {products.map((product, index) => {
                       // 할인가 계산
                       const finalPrice = product.discountRate > 0 
                         ? Math.round(product.basePrice * (1 - product.discountRate / 100))
@@ -371,7 +381,7 @@ export default function StorePage() {
                       
                       return (
                         <ProductCard
-                          key={product.id}
+                          key={`${product.id}-${index}`}
                           id={product.id.toString()}
                           name={product.name}
                           price={finalPrice}

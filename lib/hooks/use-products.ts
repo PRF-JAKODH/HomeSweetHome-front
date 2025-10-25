@@ -35,11 +35,16 @@ export const useInfiniteProductPreviews = (
     refetchOnWindowFocus: false,
   })
 
-  // 모든 페이지의 상품을 평탄화
+  // 모든 페이지의 상품을 평탄화하고 중복 제거
   const products = data?.pages.flatMap((page) => page.contents) ?? []
+  
+  // ID 기반 중복 제거
+  const uniqueProducts = products.filter((product, index, self) =>
+    index === self.findIndex((p) => p.id === product.id)
+  )
 
   return {
-    products,
+    products: uniqueProducts,
     isLoading,
     isLoadingMore: isFetchingNextPage,
     hasNext: hasNextPage ?? false,
