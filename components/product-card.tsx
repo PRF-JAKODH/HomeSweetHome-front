@@ -46,7 +46,7 @@ export function ProductCard({
         {/* Product Info */}
         <div className="p-3 flex flex-col flex-grow">
           {/* Brand */}
-          <div className="mb-1 text-sm font-medium text-text-secondary">{brand}</div>
+          <div className="mb-1 text-sm font-medium text-gray-500">{brand}</div>
 
           {/* Product Name */}
           <h3 className="mb-2 line-clamp-2 text-base font-medium text-foreground leading-relaxed">{name}</h3>
@@ -54,17 +54,17 @@ export function ProductCard({
           {/* Price */}
           <div className="mb-2 flex items-center gap-2">
             {discountRate && <span className="text-lg font-bold text-primary">{discountRate}%</span>}
-            <span className="text-lg font-bold text-foreground">{price?.toLocaleString() || '0'}원</span>
+            <span className="text-lg font-bold text-foreground">{price?.toLocaleString() || '0'}</span>
           </div>
 
           {originalPrice && (
-            <div className="mb-2 text-sm text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}원</div>
+            <div className="mb-2 text-sm text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}</div>
           )}
 
           {/* Rating & Reviews */}
           <div className="flex items-center gap-2 text-sm">
             <div className="flex items-center gap-1">
-              <span className="text-warning">★</span>
+              <span className="text-sky-400">★</span>
               <span className="font-medium text-foreground">{rating}</span>
             </div>
             <span className="text-text-secondary">리뷰 {reviewCount.toLocaleString()}</span>

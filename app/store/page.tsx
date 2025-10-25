@@ -20,6 +20,7 @@ export default function StorePage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
+  const [showSortOptions, setShowSortOptions] = useState(false)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -30,6 +31,23 @@ export default function StorePage() {
   // 정렬 타입 변경 핸들러
   const handleSortTypeChange = (newSortType: ProductSortType) => {
     setSortType(newSortType)
+    setShowSortOptions(false)
+  }
+
+  // 정렬 옵션 표시 토글
+  const toggleSortOptions = () => {
+    setShowSortOptions(!showSortOptions)
+  }
+
+  // 정렬 타입별 표시명
+  const getSortTypeLabel = (type: ProductSortType) => {
+    switch (type) {
+      case 'POPULAR': return '인기순'
+      case 'LATEST': return '최신순'
+      case 'PRICE_LOW': return '낮은가격순'
+      case 'PRICE_HIGH': return '높은가격순'
+      default: return '최신순'
+    }
   }
 
   // 최상단 카테고리 조회
@@ -57,6 +75,21 @@ export default function StorePage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showSortOptions && !target.closest('.sort-dropdown')) {
+        setShowSortOptions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSortOptions])
 
   // 무한 스크롤 Intersection Observer 설정
   useEffect(() => {
@@ -319,39 +352,71 @@ export default function StorePage() {
                     }
                   </h2>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="relative sort-dropdown">
                   <Button 
-                    variant={sortType === 'POPULAR' ? 'default' : 'ghost'} 
+                    variant="outline" 
                     size="default" 
-                    className="text-base"
-                    onClick={() => handleSortTypeChange('POPULAR')}
+                    className="text-base flex items-center gap-2"
+                    onClick={toggleSortOptions}
                   >
-                    인기순
+                    {getSortTypeLabel(sortType)}
+                    <svg className={`w-4 h-4 transition-transform ${showSortOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </Button>
-                  <Button 
-                    variant={sortType === 'LATEST' ? 'default' : 'ghost'} 
-                    size="default" 
-                    className="text-base"
-                    onClick={() => handleSortTypeChange('LATEST')}
-                  >
-                    최신순
-                  </Button>
-                  <Button 
-                    variant={sortType === 'PRICE_LOW' ? 'default' : 'ghost'} 
-                    size="default" 
-                    className="text-base"
-                    onClick={() => handleSortTypeChange('PRICE_LOW')}
-                  >
-                    낮은가격순
-                  </Button>
-                  <Button 
-                    variant={sortType === 'PRICE_HIGH' ? 'default' : 'ghost'} 
-                    size="default" 
-                    className="text-base"
-                    onClick={() => handleSortTypeChange('PRICE_HIGH')}
-                  >
-                    높은가격순
-                  </Button>
+                  
+                  {showSortOptions && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                      <div className="p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleSortTypeChange('POPULAR')}
+                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-gray-100 ${
+                              sortType === 'POPULAR' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 ${
+                              sortType === 'POPULAR' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                            }`}></div>
+                            인기순
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange('LATEST')}
+                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-gray-100 ${
+                              sortType === 'LATEST' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 ${
+                              sortType === 'LATEST' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                            }`}></div>
+                            최신순
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange('PRICE_LOW')}
+                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-gray-100 ${
+                              sortType === 'PRICE_LOW' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 ${
+                              sortType === 'PRICE_LOW' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                            }`}></div>
+                            낮은가격순
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange('PRICE_HIGH')}
+                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-gray-100 ${
+                              sortType === 'PRICE_HIGH' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 ${
+                              sortType === 'PRICE_HIGH' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                            }`}></div>
+                            높은가격순
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
