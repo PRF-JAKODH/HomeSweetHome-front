@@ -11,8 +11,10 @@ import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getProduct, getProductStock } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
+import { getProductReviews } from "@/lib/api/reviews"
 import { Product, SkuStockResponse } from "@/types/api/product"
 import { Category } from "@/types/api/category"
+import { ProductReviewResponse } from "@/types/api/review"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -62,7 +64,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [hoveredRating, setHoveredRating] = useState(0)
   const [reviewContent, setReviewContent] = useState("")
   const [reviewImages, setReviewImages] = useState<string[]>([])
-  const [userReviews, setUserReviews] = useState<any[]>([])
+  const [userReviews, setUserReviews] = useState<ProductReviewResponse[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
 
   // 옵션 그룹 추출 함수
   const getOptionGroups = () => {
@@ -184,6 +188,33 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     }
 
     fetchProduct()
+  }, [resolvedParams.productId])
+
+  // 리뷰 데이터 가져오기
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setReviewsLoading(true)
+        const reviewsResponse = await getProductReviews(resolvedParams.productId)
+        console.log('리뷰 응답:', reviewsResponse)
+        console.log('리뷰 데이터:', reviewsResponse?.contents)
+        // 응답 구조에 따라 수정
+        const reviews = reviewsResponse?.contents || []
+        console.log('최종 리뷰 데이터:', reviews)
+        setUserReviews(reviews)
+        setReviewsTotalCount((reviewsResponse as any)?.totalCount || 0)
+      } catch (err) {
+        console.error('리뷰 조회 실패:', err)
+        // 리뷰 조회 실패 시 빈 배열로 초기화
+        setUserReviews([])
+      } finally {
+        setReviewsLoading(false)
+      }
+    }
+
+    if (resolvedParams.productId) {
+      fetchReviews()
+    }
   }, [resolvedParams.productId])
 
   useEffect(() => {
@@ -341,13 +372,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       return
     }
 
-    const newReview = {
-      id: Date.now(),
-      author: "나",
+    const newReview: ProductReviewResponse = {
+      reviewId: Date.now(),
+      productId: parseInt(resolvedParams.productId),
+      userId: 1, // 임시 사용자 ID
+      productName: product?.name || "",
+      username: "나",
       rating: reviewRating,
-      date: new Date().toLocaleDateString("ko-KR").replace(/\. /g, ".").slice(0, -1),
-      content: reviewContent,
-      images: reviewImages,
+      comment: reviewContent,
+      imageUrl: reviewImages[0] || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
 
     setUserReviews([newReview, ...userReviews])
@@ -836,10 +871,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
           <div className="space-y-4">
             {userReviews.map((review) => (
-              <Card key={review.id} className="p-6">
+              <Card key={review.reviewId} className="p-6">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">{review.author}</span>
+                    <span className="font-medium text-foreground">{review.username}</span>
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
                         <span key={i} className={`text-sm ${i < review.rating ? "text-warning" : "text-divider"}`}>
@@ -848,19 +883,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       ))}
                     </div>
                   </div>
-                  <span className="text-sm text-text-secondary">{review.date}</span>
+                  <span className="text-sm text-text-secondary">
+                    {new Date(review.createdAt).toLocaleDateString("ko-KR")}
+                  </span>
                 </div>
-                <p className="mb-3 text-sm text-foreground leading-relaxed">{review.content}</p>
-                {review.images.length > 0 && (
+                <p className="mb-3 text-sm text-foreground leading-relaxed">{review.comment}</p>
+                {review.imageUrl && (
                   <div className="flex gap-2">
-                    {review.images.map((image: string, index: number) => (
-                      <img
-                        key={index}
-                        src={image || "/placeholder.svg"}
-                        alt={`리뷰 이미지 ${index + 1}`}
-                        className="h-20 w-20 rounded-lg object-cover"
-                      />
-                    ))}
+                    <img
+                      src={review.imageUrl}
+                      alt="리뷰 이미지"
+                      className="h-20 w-20 rounded-lg object-cover"
+                    />
                   </div>
                 )}
               </Card>
