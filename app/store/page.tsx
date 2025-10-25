@@ -130,7 +130,7 @@ export default function StorePage() {
     <div className="min-h-screen bg-background">
       <main>
         <div className="mx-auto max-w-[1256px] px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 py-6">
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
               <div className="space-y-2">
@@ -166,7 +166,7 @@ export default function StorePage() {
                           handleMainCategoryChange(category.id)
                           toggleCategory(category.id)
                         }}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between font-medium text-lg ${
+                        className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
                           selectedMainCategory === category.id
                             ? "bg-primary text-white"
                             : "bg-background text-foreground hover:bg-background-section"
@@ -174,7 +174,7 @@ export default function StorePage() {
                       >
                         <span>{category.name}</span>
                         <ChevronRight 
-                          className={`h-4 w-4 transition-transform ${
+                          className={`h-3 w-3 transition-transform ${
                             isExpanded ? "rotate-90" : ""
                           }`}
                         />
@@ -197,7 +197,7 @@ export default function StorePage() {
                                       handleSubCategoryChange(subCategory.id)
                                       toggleCategory(subCategory.id)
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded-md text-lg transition-all flex items-center justify-between font-medium ${
+                                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
                                       selectedSubCategory === subCategory.id
                                         ? "bg-primary/20 text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -205,7 +205,7 @@ export default function StorePage() {
                                   >
                                     <span>{subCategory.name}</span>
                                     <ChevronRight 
-                                      className={`h-3 w-3 transition-transform ${
+                                      className={`h-2.5 w-2.5 transition-transform ${
                                         isSubExpanded ? "rotate-90" : ""
                                       }`}
                                     />
@@ -223,7 +223,7 @@ export default function StorePage() {
                                           <button
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
-                                            className={`w-full text-left px-2 py-1 rounded text-base transition-all font-medium ${
+                                            className={`w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
                                               selectedSubCategory === subSubCategory.id
                                                 ? "bg-primary/20 text-primary"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -248,7 +248,7 @@ export default function StorePage() {
             </div>
 
             {/* 오른쪽 - 상품 영역 */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-4">
               <div className="mb-8 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-semibold text-foreground">
@@ -344,26 +344,6 @@ export default function StorePage() {
                 )}
               </div>
 
-              {/* 더보기 버튼 */}
-              {products.length > 0 && hasNext && (
-                <div className="mt-8 text-center">
-                  <Button 
-                    onClick={loadMore} 
-                    disabled={isLoadingMore}
-                    variant="outline"
-                    className="px-8"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                        로딩 중...
-                      </>
-                    ) : (
-                      '더보기'
-                    )}
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </div>
