@@ -8,15 +8,20 @@ import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categor
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
 import { ProductSortType } from "@/types/api/product"
+import { useSearchParams } from "next/navigation"
 
 
 export default function StorePage() {
+  const searchParams = useSearchParams()
   const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
   const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState<number | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
+  
+  // URL에서 검색 키워드 가져오기
+  const searchKeyword = searchParams.get('keyword') || ''
   
   // 정렬 타입 변경 핸들러
   const handleSortTypeChange = (newSortType: ProductSortType) => {
@@ -43,7 +48,7 @@ export default function StorePage() {
     hasNext, 
     error: productsError, 
     loadMore 
-  } = useInfiniteProductPreviews(currentCategoryId || undefined, sortType, 12)
+  } = useInfiniteProductPreviews(currentCategoryId || undefined, sortType, 12, searchKeyword)
 
   useEffect(() => {
     setIsClient(true)
@@ -129,7 +134,7 @@ export default function StorePage() {
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-foreground mb-4">카테고리</h3>
+                <h3 className="text-xl font-semibold text-foreground mb-4">카테고리</h3>
                 
                 {/* 카테고리 경로 표시 */}
                 {categoryPath && (
@@ -163,7 +168,7 @@ export default function StorePage() {
                           handleMainCategoryChange(category.id)
                           toggleCategory(category.id)
                         }}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between font-medium text-base ${
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between font-medium text-lg ${
                           selectedMainCategory === category.id
                             ? "bg-primary text-white"
                             : "bg-background text-foreground hover:bg-background-section"
@@ -194,7 +199,7 @@ export default function StorePage() {
                                       handleSubCategoryChange(subCategory.id)
                                       toggleCategory(subCategory.id)
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded-md text-base transition-all flex items-center justify-between font-medium ${
+                                    className={`w-full text-left px-3 py-2 rounded-md text-lg transition-all flex items-center justify-between font-medium ${
                                       selectedSubCategory === subCategory.id
                                         ? "bg-primary/20 text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -220,7 +225,7 @@ export default function StorePage() {
                                           <button
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
-                                            className={`w-full text-left px-2 py-1 rounded text-sm transition-all font-medium ${
+                                            className={`w-full text-left px-2 py-1 rounded text-base transition-all font-medium ${
                                               selectedSubCategory === subSubCategory.id
                                                 ? "bg-primary/20 text-primary"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -247,38 +252,48 @@ export default function StorePage() {
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-3">
               <div className="mb-8 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-foreground">
-                  {categoryPath ? `${categoryPath} 상품` : '전체 상품'}
-                </h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-semibold text-foreground">
+                    {searchKeyword 
+                      ? `"${searchKeyword}" 검색 결과` 
+                      : categoryPath ? `${categoryPath} 상품` : '전체 상품'
+                    }
+                  </h2>
+                  {!productsLoading && (
+                    <span className="text-lg text-text-secondary">
+                      ({products.length.toLocaleString()}개)
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant={sortType === 'POPULAR' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="text-sm"
+                    size="default" 
+                    className="text-base"
                     onClick={() => handleSortTypeChange('POPULAR')}
                   >
                     인기순
                   </Button>
                   <Button 
                     variant={sortType === 'LATEST' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="text-sm"
+                    size="default" 
+                    className="text-base"
                     onClick={() => handleSortTypeChange('LATEST')}
                   >
                     최신순
                   </Button>
                   <Button 
                     variant={sortType === 'PRICE_LOW' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="text-sm"
+                    size="default" 
+                    className="text-base"
                     onClick={() => handleSortTypeChange('PRICE_LOW')}
                   >
                     낮은가격순
                   </Button>
                   <Button 
                     variant={sortType === 'PRICE_HIGH' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="text-sm"
+                    size="default" 
+                    className="text-base"
                     onClick={() => handleSortTypeChange('PRICE_HIGH')}
                   >
                     높은가격순

@@ -482,9 +482,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             <div className="mb-6 border-y border-divider py-6">
               <div className="mb-2 flex items-center gap-3">
                 {product.discountRate && product.discountRate > 0 && (
-                  <span className="text-3xl font-bold text-secondary">{product.discountRate}%</span>
+                  <span className="text-3xl font-bold text-sky-500">{product.discountRate}%</span>
                 )}
-                <span className="text-3xl font-bold text-foreground">
+                <span className="text-3xl font-bold text-red-500">
                   {(product.discountedPrice || currentPrice).toLocaleString()}원
                 </span>
               </div>
@@ -497,21 +497,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
             {/* Delivery Info */}
             <div className="mb-6">
-              <div className="mb-2 text-sm font-medium text-foreground">배송</div>
-              <div className="flex items-center gap-2 text-sm">
-                {product.shippingPrice === 0 && (
-                  <span className="rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary">무료배송</span>
-                )}
-                <span className="text-text-secondary">{product.deliveryInfo || (product.shippingPrice === 0 ? "무료배송" : `배송비 ${product.shippingPrice?.toLocaleString()}원`)}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-foreground">배송</span>
+                <div className="flex items-center gap-2">
+                  {product.shippingPrice === 0 ? (
+                    <span className="text-sm font-bold text-foreground">무료배송</span>
+                  ) : (
+                    <span className="text-sm font-bold text-foreground">배송비 {product.shippingPrice?.toLocaleString()}원</span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Option Selection */}
             {product.productType === "options" && stockData && stockData.length > 0 && (
               <div className="mb-6">
-                <div className="mb-3 text-sm font-medium text-foreground">옵션 선택</div>
                 <Select value={selectedOption} onValueChange={setSelectedOption}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full h-12 text-base">
                     <SelectValue placeholder="옵션을 선택해주세요" />
                   </SelectTrigger>
                   <SelectContent>
@@ -542,20 +544,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   </SelectContent>
                 </Select>
 
-                {selectedOption && selectedSku && (
-                  <div className="mt-3 rounded-lg bg-background-section p-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-foreground">{selectedOption}</span>
-                      <span
-                        className={`font-medium ${
-                          selectedSku.stockQuantity === 0 ? "text-red-500" : selectedSku.stockQuantity < 5 ? "text-orange-500" : "text-green-600"
-                        }`}
-                      >
-                        {selectedSku.stockQuantity === 0 ? "품절" : `재고 ${selectedSku.stockQuantity}개`}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -574,27 +562,55 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               </div>
             )}
 
-            {/* Quantity */}
-            <div className="mb-6">
-              <div className="mb-3 text-sm font-medium text-foreground">수량</div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-divider text-foreground hover:bg-background-section"
-                  disabled={selectedSku?.stockQuantity === 0}
-                >
-                  -
-                </button>
-                <span className="w-12 text-center font-medium text-foreground">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(Math.min(selectedSku?.stockQuantity || 0, quantity + 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-divider text-foreground hover:bg-background-section"
-                  disabled={selectedSku?.stockQuantity === 0}
-                >
-                  +
-                </button>
+            {/* Selected Option Box */}
+            {selectedOption && selectedSku && (
+              <div className="mb-6 rounded-lg bg-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-foreground">{selectedOption}</div>
+                    <div className="text-xs text-text-secondary">
+                      {selectedSku.stockQuantity === 0 ? "품절" : `재고 ${selectedSku.stockQuantity}개`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedOption("")
+                      setSelectedSku(null)
+                      setQuantity(1)
+                    }}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-background hover:bg-divider text-text-secondary hover:text-foreground transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center border border-divider rounded-lg bg-white">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="flex h-10 w-10 items-center justify-center text-foreground hover:bg-background-section transition-colors"
+                      disabled={selectedSku?.stockQuantity === 0}
+                    >
+                      -
+                    </button>
+                    <span className="w-12 text-center font-medium text-foreground border-x border-divider flex items-center justify-center h-10">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={() => setQuantity(Math.min(selectedSku?.stockQuantity || 0, quantity + 1))}
+                      className="flex h-10 w-10 items-center justify-center text-foreground hover:bg-background-section transition-colors"
+                      disabled={selectedSku?.stockQuantity === 0}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-lg font-bold text-foreground">
+                    {(currentPrice * quantity).toLocaleString()}원
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Total Price */}
             <div className="mb-6 rounded-lg bg-background-section p-4">

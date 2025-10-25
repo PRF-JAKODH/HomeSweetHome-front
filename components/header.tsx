@@ -16,6 +16,7 @@ export function Header() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [cartCount, setCartCount] = useState(0)
+  const [searchKeyword, setSearchKeyword] = useState("")
 
   useEffect(() => {
     const storedUser = localStorage.getItem("ohouse_user")
@@ -112,6 +113,17 @@ export function Header() {
     router.push("/login")
   }
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchKeyword.trim()) {
+      router.push(`/store?keyword=${encodeURIComponent(searchKeyword.trim())}`)
+    }
+  }
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKeyword(e.target.value)
+  }
+
   const markAsRead = (id: number) => {
     const updatedNotifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     setNotifications(updatedNotifications)
@@ -141,7 +153,7 @@ export function Header() {
                 height={32}
                 className="w-8 h-8"
               />
-              <span className="text-xl font-bold text-foreground">
+              <span className="text-2xl font-bold text-foreground">
                 홈스윗<span className="text-primary">홈</span>
               </span>
             </a>
@@ -150,7 +162,7 @@ export function Header() {
             <nav className="hidden items-center gap-6 md:flex">
               <a 
                 href="/store" 
-                className={`text-sm font-medium transition-colors ${
+                className={`text-base font-medium transition-colors ${
                   pathname?.startsWith("/store") 
                     ? "text-sky-500 font-bold" 
                     : "text-foreground hover:text-primary"
@@ -160,7 +172,7 @@ export function Header() {
               </a>
               <a 
                 href="/community" 
-                className={`text-sm font-medium transition-colors ${
+                className={`text-base font-medium transition-colors ${
                   pathname?.startsWith("/community") 
                     ? "text-sky-500 font-bold" 
                     : "text-foreground hover:text-primary"
@@ -173,14 +185,16 @@ export function Header() {
 
           {/* Search Bar */}
           <div className="hidden flex-1 max-w-md md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
               <Input
                 type="search"
                 placeholder="검색어를 입력하세요"
-                className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent focus:border-primary"
+                value={searchKeyword}
+                onChange={handleSearchInputChange}
+                className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
               />
-            </div>
+            </form>
           </div>
 
           {/* Actions */}
@@ -199,11 +213,11 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80">
                   <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
-                    <span className="text-sm font-semibold">알림</span>
+                    <span className="text-base font-semibold">알림</span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-primary hover:text-primary"
+                      className="h-7 text-sm text-primary hover:text-primary"
                       onClick={() => router.push("/notifications")}
                     >
                       모두 보기
@@ -211,7 +225,7 @@ export function Header() {
                   </div>
                   <div className="max-h-[400px] overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm text-text-secondary">알림이 없습니다</div>
+                      <div className="px-4 py-8 text-center text-base text-text-secondary">알림이 없습니다</div>
                     ) : (
                       notifications.slice(0, 5).map((notification) => (
                         <div
@@ -224,16 +238,16 @@ export function Header() {
                           <div className="flex items-start gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-medium text-primary">{notification.category}</span>
+                                <span className="text-sm font-medium text-primary">{notification.category}</span>
                                 {!notification.read && (
                                   <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                                 )}
                               </div>
-                              <p className="text-sm font-medium text-foreground mb-1 line-clamp-1">
+                              <p className="text-base font-medium text-foreground mb-1 line-clamp-1">
                                 {notification.title}
                               </p>
-                              <p className="text-xs text-text-secondary line-clamp-2">{notification.content}</p>
-                              <span className="text-xs text-text-tertiary mt-1 inline-block">{notification.time}</span>
+                              <p className="text-sm text-text-secondary line-clamp-2">{notification.content}</p>
+                              <span className="text-sm text-text-tertiary mt-1 inline-block">{notification.time}</span>
                             </div>
                           </div>
                         </div>
@@ -278,7 +292,7 @@ export function Header() {
             ) : (
               <Button
                 onClick={handleLogin}
-                className="hidden md:flex text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6"
+                className="hidden md:flex text-base font-medium bg-primary hover:bg-primary/90 text-white px-6"
               >
                 로그인
               </Button>
@@ -291,14 +305,16 @@ export function Header() {
 
         {/* Mobile Search */}
         <div className="pb-3 md:hidden">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
             <Input
               type="search"
               placeholder="검색어를 입력하세요"
-              className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent"
+              value={searchKeyword}
+              onChange={handleSearchInputChange}
+              className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
             />
-          </div>
+          </form>
         </div>
       </div>
     </header>
