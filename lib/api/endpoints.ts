@@ -5,22 +5,25 @@
 // 상품 관련 엔드포인트
 export const PRODUCT_ENDPOINTS = {
   // 상품 CRUD
-  GET_PRODUCTS: '/products',
-  GET_PRODUCT: (id: string) => `/products/${id}`,
-  CREATE_PRODUCT: '/products',
-  UPDATE_PRODUCT: (id: string) => `/products/${id}`,
-  DELETE_PRODUCT: (id: string) => `/products/${id}`,
+  GET_PRODUCTS: '/api/v1/products',
+  GET_PRODUCT: (id: string) => `/api/v1/products/${id}`,
+  CREATE_PRODUCT: '/api/v1/products',
+  UPDATE_PRODUCT: (id: string) => `/api/v1/products/${id}`,
+  DELETE_PRODUCT: (id: string) => `/api/v1/products/${id}`,
   
   // 상품 프리뷰 조회 (무한 스크롤)
   GET_PRODUCT_PREVIEWS: '/api/v1/products/previews',
   
   // 상품 검색 및 필터
-  SEARCH_PRODUCTS: '/products/search',
-  GET_PRODUCTS_BY_CATEGORY: (categoryId: string) => `/products/category/${categoryId}`,
-  GET_PRODUCTS_BY_SUBCATEGORY: (subCategoryId: string) => `/products/subcategory/${subCategoryId}`,
+  SEARCH_PRODUCTS: '/api/v1/products/search',
+  GET_PRODUCTS_BY_CATEGORY: (categoryId: string) => `/api/v1/products/category/${categoryId}`,
+  GET_PRODUCTS_BY_SUBCATEGORY: (subCategoryId: string) => `/api/v1/products/subcategory/${subCategoryId}`,
   
   // 상품 통계
-  GET_PRODUCT_STATS: '/products/stats',
+  GET_PRODUCT_STATS: '/api/v1/products/stats',
+  
+  // 상품 재고 조회
+  GET_PRODUCT_STOCK: (productId: string) => `/api/v1/products/${productId}/stocks`,
 } as const
 
 // 카테고리 관련 엔드포인트

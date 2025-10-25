@@ -4,189 +4,202 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getProduct, getProductStock } from "@/lib/api/products"
+import { getCategoryHierarchy } from "@/lib/api/categories"
+import { Product, SkuStockResponse } from "@/types/api/product"
+import { Category } from "@/types/api/category"
 
-// Mock product data
-const productData: Record<string, any> = {
-  "1": {
-    id: "1",
-    images: ["/modern-minimalist-sofa.png", "/sofa-angle-2.jpg", "/sofa-detail.jpg", "/sofa-fabric-close-up.jpg"],
-    brand: "모던하우스",
-    name: "클래식 3인용 패브릭 소파",
-    price: 389000,
-    originalPrice: 590000,
-    discountRate: 34,
-    rating: 4.8,
-    reviewCount: 1247,
-    isFreeShipping: true,
-    deliveryInfo: "오늘출발 (17시 이전 주문시)",
-    category: {
-      main: "가구",
-      sub: "거실가구",
-      detail: "소파",
-    },
-    productType: "options",
-    options: [
-      { name: "색상-블랙", additionalPrice: 0, stock: 15 },
-      { name: "색상-화이트", additionalPrice: 0, stock: 8 },
-      { name: "색상-그레이", additionalPrice: 0, stock: 0 },
-      { name: "색상-베이지", additionalPrice: 5000, stock: 12 },
-      { name: "색상-네이비", additionalPrice: 5000, stock: 20 },
-    ],
-    seller: {
-      id: "seller_modern_house",
-      name: "모던하우스",
-    },
-    description: `편안한 좌석감과 세련된 디자인이 돋보이는 3인용 패브릭 소파입니다.
-    
-고급 패브릭 소재로 제작되어 부드러운 촉감과 내구성을 동시에 갖추었습니다. 넉넉한 사이즈로 온 가족이 편안하게 앉을 수 있으며, 5가지 컬러 옵션으로 다양한 인테리어 스타일에 매치할 수 있습니다.
-
-• 크기: 가로 210cm x 세로 85cm x 높이 80cm
-• 소재: 프리미엄 패브릭, 고밀도 우레탄폼
-• 컬러: 그레이, 베이지, 네이비, 브라운, 아이보리
-• 무게: 약 45kg
-• 원산지: 국내제작
-
-조립이 간편하며, 다리 부분은 원목으로 제작되어 안정감이 뛰어납니다.`,
-  },
-  f1: {
-    id: "f1",
-    images: ["/modern-minimalist-sofa.png", "/sofa-angle-2.jpg", "/sofa-detail.jpg"],
-    brand: "모던하우스",
-    name: "클래식 3인용 패브릭 소파",
-    price: 389000,
-    originalPrice: 590000,
-    discountRate: 34,
-    rating: 4.8,
-    reviewCount: 1247,
-    isFreeShipping: true,
-    deliveryInfo: "오늘출발 (17시 이전 주문시)",
-    category: {
-      main: "가구",
-      sub: "거실가구",
-      detail: "소파",
-    },
-    productType: "single",
-    stock: 50,
-    seller: {
-      id: "seller_modern_house",
-      name: "모던하우스",
-    },
-    description: "편안한 좌석감과 세련된 디자인이 돋보이는 3인용 패브릭 소파입니다.",
-  },
+// UI에서 사용하는 확장된 상품 타입
+interface ExtendedProduct extends Product {
+  productType?: "single" | "options"
+  stock?: number
+  deliveryInfo?: string
+  // API 응답 필드들
+  imageUrl?: string
+  basePrice?: number
+  shippingPrice?: number
+  category?: {
+    main: string
+    sub: string
+    detail: string
+  }
+  seller?: {
+    id: string
+    name: string
+  }
+  options?: Array<{
+    name: string
+    additionalPrice: number
+    stock: number
+  }>
 }
 
-// Mock reviews
-const reviews = [
-  {
-    id: 1,
-    author: "김**",
-    rating: 5,
-    date: "2025.01.10",
-    content: "색상도 예쁘고 앉았을 때 푹신해서 너무 좋아요. 가성비 최고입니다!",
-    images: ["/sofa-review-1.jpg"],
-  },
-  {
-    id: 2,
-    author: "이**",
-    rating: 5,
-    date: "2025.01.08",
-    content: "배송도 빠르고 조립도 쉬웠어요. 거실 분위기가 확 바뀌었습니다.",
-    images: [],
-  },
-  {
-    id: 3,
-    author: "박**",
-    rating: 4,
-    date: "2025.01.05",
-    content: "전체적으로 만족스럽습니다. 다만 생각보다 크기가 커서 공간 확인 필수!",
-    images: ["/sofa-review-2.jpg"],
-  },
-]
 
-// Related products
-const relatedProducts = [
-  {
-    id: "2",
-    image: "/wooden-dining-table.png",
-    brand: "우드스토리",
-    name: "원목 식탁 4인용",
-    price: 298000,
-    discountRate: 34,
-  },
-  {
-    id: "3",
-    image: "/modern-pendant-lamp.jpg",
-    brand: "라이팅플러스",
-    name: "북유럽 펜던트 조명",
-    price: 89000,
-    discountRate: 31,
-  },
-  {
-    id: "4",
-    image: "/storage-cabinet-white.jpg",
-    brand: "심플라이프",
-    name: "모던 수납장 화이트 3단",
-    price: 159000,
-    discountRate: 28,
-  },
-  {
-    id: "5",
-    image: "/cozy-throw-blanket.jpg",
-    brand: "코지홈",
-    name: "프리미엄 극세사 블랭킷",
-    price: 29900,
-    discountRate: 40,
-  },
-]
-
-export default function ProductDetailPage({ params }: { params: { productId: string } }) {
+export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const router = useRouter()
-  const product = productData[params.productId] || productData["1"]
+  const resolvedParams = use(params)
+  const [product, setProduct] = useState<ExtendedProduct | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [selectedOption, setSelectedOption] = useState<string>("")
-  const [currentPrice, setCurrentPrice] = useState(product.price)
-  const [currentStock, setCurrentStock] = useState(product.productType === "single" ? product.stock : 0)
+  const [currentPrice, setCurrentPrice] = useState(0)
+  const [currentStock, setCurrentStock] = useState(0)
+  const [stockData, setStockData] = useState<SkuStockResponse[]>([])
+  const [selectedSku, setSelectedSku] = useState<SkuStockResponse | null>(null)
+  const [categoryHierarchy, setCategoryHierarchy] = useState<Category[]>([])
 
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [reviewRating, setReviewRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
   const [reviewContent, setReviewContent] = useState("")
   const [reviewImages, setReviewImages] = useState<string[]>([])
-  const [userReviews, setUserReviews] = useState(reviews)
+  const [userReviews, setUserReviews] = useState<any[]>([])
+
+  // API에서 상품 데이터 가져오기
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // 상품 정보와 재고 정보를 먼저 가져오기
+        const [productResponse, stockResponse] = await Promise.all([
+          getProduct(resolvedParams.productId),
+          getProductStock(resolvedParams.productId).catch(() => ({ data: [] })) // 재고 API 실패 시 빈 배열로 fallback
+        ])
+        
+        // API 응답 구조에 따라 데이터 추출
+        const productData = (productResponse.data || productResponse) as any
+        const stockData = (stockResponse.data || stockResponse) || []
+        
+        // 카테고리 계층 구조 가져오기
+        const categoryResponse = await getCategoryHierarchy(productData.categoryId || 1).catch(() => [])
+        
+        // API 응답 구조 확인을 위한 로깅
+        console.log('Product data:', productData)
+        console.log('Stock data:', stockData)
+        
+        // API 응답을 UI에서 사용할 수 있는 형태로 변환
+        const transformedProduct: ExtendedProduct = {
+          ...productData,
+          // 이미지 배열 처리 - API에서 imageUrl을 받으면 images 배열로 변환
+          images: productData.images || (productData.imageUrl ? [productData.imageUrl] : []),
+          thumbnail: productData.thumbnail || productData.imageUrl || '',
+          // 기존 UI에서 사용하는 추가 필드들
+          productType: stockData.length > 1 ? "options" as const : "single" as const,
+          stock: productData.stockQuantity || 0,
+          deliveryInfo: productData.shippingPrice === 0 ? "무료배송" : `배송비 ${productData.shippingPrice?.toLocaleString()}원`,
+          category: {
+            main: "카테고리", // 실제로는 categoryId로 조회한 정보
+            sub: "서브카테고리",
+            detail: "상세카테고리"
+          },
+          seller: {
+            id: "seller_id", // 실제로는 API에서 제공
+            name: "판매자명"
+          },
+          options: stockData.map(sku => ({
+            name: sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', '),
+            additionalPrice: sku.priceAdjustment,
+            stock: sku.stockQuantity
+          }))
+        }
+        
+        setProduct(transformedProduct)
+        setStockData(stockData)
+        setCategoryHierarchy(categoryResponse)
+        // 할인된 가격 계산
+        const originalPrice = productData.basePrice || productData.price || 0
+        const discountRate = productData.discountRate || 0
+        const discountedPrice = originalPrice * (1 - discountRate / 100)
+        setCurrentPrice(discountedPrice)
+        
+        // 첫 번째 SKU를 기본 선택으로 설정
+        if (stockData && stockData.length > 0) {
+          setSelectedSku(stockData[0])
+          setCurrentStock(stockData[0].stockQuantity || 0)
+        } else {
+          // 재고 데이터가 없는 경우 기본 상품 재고 사용
+          setSelectedSku(null)
+          setCurrentStock(productData.stockQuantity || 0)
+        }
+      } catch (err) {
+        console.error('상품 조회 실패:', err)
+        setError('상품을 불러오는데 실패했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProduct()
+  }, [resolvedParams.productId])
 
   useEffect(() => {
-    if (product.productType === "options" && selectedOption) {
-      const option = product.options.find((opt: any) => opt.name === selectedOption)
+    if (product && product.productType === "options" && selectedOption) {
+      const option = product.options?.find((opt: any) => opt.name === selectedOption)
       if (option) {
-        setCurrentPrice(product.price + option.additionalPrice)
+        // 할인된 기본 가격과 추가 가격을 안전하게 계산
+        const originalPrice = product.basePrice || product.price || 0
+        const discountRate = product.discountRate || 0
+        const discountedBasePrice = originalPrice * (1 - discountRate / 100)
+        const additionalPrice = option.additionalPrice || 0
+        const totalPrice = discountedBasePrice + additionalPrice
+        
+        console.log('Price calculation:', {
+          originalPrice,
+          discountRate,
+          discountedBasePrice,
+          additionalPrice,
+          totalPrice,
+          productBasePrice: product.basePrice,
+          productPrice: product.price,
+          optionAdditionalPrice: option.additionalPrice
+        })
+        
+        setCurrentPrice(totalPrice)
         setCurrentStock(option.stock)
+        
+        // 선택된 SKU 찾기
+        const selectedSkuData = stockData && stockData.length > 0 ? stockData.find(sku => 
+          sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ') === selectedOption
+        ) : null
+        setSelectedSku(selectedSkuData || null)
       }
-    } else if (product.productType === "single") {
-      setCurrentPrice(product.price)
-      setCurrentStock(product.stock)
+    } else if (product && product.productType === "single") {
+      // 단일 상품도 할인된 가격 사용
+      const originalPrice = product.basePrice || product.price || 0
+      const discountRate = product.discountRate || 0
+      const discountedPrice = originalPrice * (1 - discountRate / 100)
+      setCurrentPrice(discountedPrice)
+      setCurrentStock(product.stockQuantity || 0)
+      setSelectedSku(stockData && stockData.length > 0 ? stockData[0] : null)
     }
-  }, [selectedOption, product])
+  }, [selectedOption, product, stockData])
 
   const handleAddToCart = () => {
+    if (!product) return
+    
     if (product.productType === "options" && !selectedOption) {
       alert("옵션을 선택해주세요.")
       return
     }
 
-    if (currentStock === 0) {
+    if (selectedSku?.stockQuantity === 0) {
       alert("품절된 상품입니다.")
       return
     }
 
     const cartItem = {
-      id: `${product.id}-${selectedOption || "single"}-${Date.now()}`,
+      id: `${product.id}-${selectedSku?.skuId || "single"}-${Date.now()}`,
       productId: product.id,
+      skuId: selectedSku?.skuId,
       name: product.name,
       brand: product.brand,
       image: product.images[0],
@@ -207,19 +220,22 @@ export default function ProductDetailPage({ params }: { params: { productId: str
   }
 
   const handleBuyNow = () => {
+    if (!product) return
+    
     if (product.productType === "options" && !selectedOption) {
       alert("옵션을 선택해주세요.")
       return
     }
 
-    if (currentStock === 0) {
+    if (selectedSku?.stockQuantity === 0) {
       alert("품절된 상품입니다.")
       return
     }
 
     const checkoutItem = {
-      id: `${product.id}-${selectedOption || "single"}-${Date.now()}`,
+      id: `${product.id}-${selectedSku?.skuId || "single"}-${Date.now()}`,
       productId: product.id,
+      skuId: selectedSku?.skuId,
       name: product.name,
       brand: product.brand,
       image: product.images[0],
@@ -234,6 +250,8 @@ export default function ProductDetailPage({ params }: { params: { productId: str
   }
 
   const handleChatWithSeller = () => {
+    if (!product) return
+    
     const user = localStorage.getItem("ohouse_user")
     if (!user) {
       alert("로그인이 필요한 서비스입니다.")
@@ -241,7 +259,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
       return
     }
 
-    router.push(`/community/messages/${product.seller.id}`)
+    router.push(`/community/messages/${product.seller?.id}`)
   }
 
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,6 +306,54 @@ export default function ProductDetailPage({ params }: { params: { productId: str
     alert("리뷰가 등록되었습니다.")
   }
 
+  // 로딩 상태
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[1256px] px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <p className="text-text-secondary">상품 정보를 불러오는 중...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // 에러 상태
+  if (error && !product) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[1256px] px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <p className="mb-4 text-lg text-red-500">{error}</p>
+              <Button onClick={() => window.location.reload()}>다시 시도</Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // 상품이 없는 경우
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[1256px] px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <p className="mb-4 text-lg text-text-secondary">상품을 찾을 수 없습니다.</p>
+              <Button onClick={() => router.push('/store')}>쇼핑몰로 돌아가기</Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-[1256px] px-4 py-8">
@@ -305,12 +371,31 @@ export default function ProductDetailPage({ params }: { params: { productId: str
         {/* Category Breadcrumb */}
         <div className="mb-6 flex items-center gap-2 text-sm text-text-secondary">
           <span className="hover:text-foreground cursor-pointer">홈</span>
-          <ChevronRight className="h-4 w-4" />
-          <span className="hover:text-foreground cursor-pointer">{product.category.main}</span>
-          <ChevronRight className="h-4 w-4" />
-          <span className="hover:text-foreground cursor-pointer">{product.category.sub}</span>
-          <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground font-medium">{product.category.detail}</span>
+          {categoryHierarchy.length > 0 ? (
+            categoryHierarchy.map((category, index) => (
+              <div key={category.id} className="flex items-center gap-2">
+                <ChevronRight className="h-4 w-4" />
+                <span 
+                  className={`cursor-pointer hover:text-foreground ${
+                    index === categoryHierarchy.length - 1 
+                      ? "text-foreground font-medium" 
+                      : "hover:text-foreground"
+                  }`}
+                >
+                  {category.name}
+                </span>
+              </div>
+            ))
+          ) : (
+            <>
+              <ChevronRight className="h-4 w-4" />
+              <span className="hover:text-foreground cursor-pointer">{product.category?.main || "카테고리"}</span>
+              <ChevronRight className="h-4 w-4" />
+              <span className="hover:text-foreground cursor-pointer">{product.category?.sub || "서브카테고리"}</span>
+              <ChevronRight className="h-4 w-4" />
+              <span className="text-foreground font-medium">{product.category?.detail || "상세카테고리"}</span>
+            </>
+          )}
         </div>
 
         {/* Product Main Section */}
@@ -320,7 +405,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
             {/* Main Image */}
             <div className="mb-4 aspect-square overflow-hidden rounded-lg bg-background-section">
               <img
-                src={product.images[selectedImage] || "/placeholder.svg"}
+                src={product.images?.[selectedImage] || product.thumbnail || "/placeholder.svg"}
                 alt={product.name}
                 className="h-full w-full object-cover"
               />
@@ -328,7 +413,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
 
             {/* Thumbnail Images */}
             <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image: string, index: number) => (
+              {(product.images || [product.thumbnail]).map((image: string, index: number) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
@@ -366,27 +451,31 @@ export default function ProductDetailPage({ params }: { params: { productId: str
             {/* Price */}
             <div className="mb-6 border-y border-divider py-6">
               <div className="mb-2 flex items-center gap-3">
-                <span className="text-3xl font-bold text-secondary">{product.discountRate}%</span>
+                {product.discountRate && product.discountRate > 0 && (
+                  <span className="text-3xl font-bold text-secondary">{product.discountRate}%</span>
+                )}
                 <span className="text-3xl font-bold text-foreground">{currentPrice.toLocaleString()}원</span>
               </div>
-              <div className="text-base text-text-secondary line-through">
-                {product.originalPrice.toLocaleString()}원
-              </div>
+              {product.basePrice && product.basePrice > currentPrice && (
+                <div className="text-base text-text-secondary line-through">
+                  {product.basePrice.toLocaleString()}원
+                </div>
+              )}
             </div>
 
             {/* Delivery Info */}
             <div className="mb-6">
               <div className="mb-2 text-sm font-medium text-foreground">배송</div>
               <div className="flex items-center gap-2 text-sm">
-                {product.isFreeShipping && (
+                {product.shippingPrice === 0 && (
                   <span className="rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary">무료배송</span>
                 )}
-                <span className="text-text-secondary">{product.deliveryInfo}</span>
+                <span className="text-text-secondary">{product.deliveryInfo || (product.shippingPrice === 0 ? "무료배송" : `배송비 ${product.shippingPrice?.toLocaleString()}원`)}</span>
               </div>
             </div>
 
             {/* Option Selection */}
-            {product.productType === "options" && (
+            {product.productType === "options" && stockData && stockData.length > 0 && (
               <div className="mb-6">
                 <div className="mb-3 text-sm font-medium text-foreground">옵션 선택</div>
                 <Select value={selectedOption} onValueChange={setSelectedOption}>
@@ -394,40 +483,43 @@ export default function ProductDetailPage({ params }: { params: { productId: str
                     <SelectValue placeholder="옵션을 선택해주세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    {product.options.map((option: any) => (
-                      <SelectItem key={option.name} value={option.name} disabled={option.stock === 0}>
-                        <div className="flex items-center justify-between w-full gap-4">
-                          <span>{option.name}</span>
-                          <div className="flex items-center gap-2">
-                            {option.additionalPrice > 0 && (
-                              <span className="text-xs text-text-secondary">
-                                (+{option.additionalPrice.toLocaleString()}원)
-                              </span>
-                            )}
-                            {option.stock === 0 ? (
-                              <span className="text-xs text-red-500 font-medium">품절</span>
-                            ) : option.stock < 5 ? (
-                              <span className="text-xs text-orange-500 font-medium">재고 {option.stock}개</span>
-                            ) : (
-                              <span className="text-xs text-green-600 font-medium">재고 {option.stock}개</span>
-                            )}
+                    {stockData.map((sku) => {
+                      const optionText = sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ')
+                      return (
+                        <SelectItem key={sku.skuId} value={optionText} disabled={sku.stockQuantity === 0}>
+                          <div className="flex items-center justify-between w-full gap-4">
+                            <span>{optionText}</span>
+                            <div className="flex items-center gap-2">
+                              {sku.priceAdjustment > 0 && (
+                                <span className="text-xs text-text-secondary">
+                                  (+{sku.priceAdjustment.toLocaleString()}원)
+                                </span>
+                              )}
+                              {sku.stockQuantity === 0 ? (
+                                <span className="text-xs text-red-500 font-medium">품절</span>
+                              ) : sku.stockQuantity < 5 ? (
+                                <span className="text-xs text-orange-500 font-medium">재고 {sku.stockQuantity}개</span>
+                              ) : (
+                                <span className="text-xs text-green-600 font-medium">재고 {sku.stockQuantity}개</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </SelectItem>
-                    ))}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
 
-                {selectedOption && (
+                {selectedOption && selectedSku && (
                   <div className="mt-3 rounded-lg bg-background-section p-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-foreground">{selectedOption}</span>
                       <span
                         className={`font-medium ${
-                          currentStock === 0 ? "text-red-500" : currentStock < 5 ? "text-orange-500" : "text-green-600"
+                          selectedSku.stockQuantity === 0 ? "text-red-500" : selectedSku.stockQuantity < 5 ? "text-orange-500" : "text-green-600"
                         }`}
                       >
-                        {currentStock === 0 ? "품절" : `재고 ${currentStock}개`}
+                        {selectedSku.stockQuantity === 0 ? "품절" : `재고 ${selectedSku.stockQuantity}개`}
                       </span>
                     </div>
                   </div>
@@ -435,16 +527,16 @@ export default function ProductDetailPage({ params }: { params: { productId: str
               </div>
             )}
 
-            {product.productType === "single" && (
+            {product.productType === "single" && selectedSku && (
               <div className="mb-6">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-foreground font-medium">재고:</span>
                   <span
                     className={`font-medium ${
-                      currentStock === 0 ? "text-red-500" : currentStock < 10 ? "text-orange-500" : "text-green-600"
+                      selectedSku.stockQuantity === 0 ? "text-red-500" : selectedSku.stockQuantity < 10 ? "text-orange-500" : "text-green-600"
                     }`}
                   >
-                    {currentStock === 0 ? "품절" : `${currentStock}개`}
+                    {selectedSku.stockQuantity === 0 ? "품절" : `${selectedSku.stockQuantity}개`}
                   </span>
                 </div>
               </div>
@@ -457,15 +549,15 @@ export default function ProductDetailPage({ params }: { params: { productId: str
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-divider text-foreground hover:bg-background-section"
-                  disabled={currentStock === 0}
+                  disabled={selectedSku?.stockQuantity === 0}
                 >
                   -
                 </button>
                 <span className="w-12 text-center font-medium text-foreground">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
+                  onClick={() => setQuantity(Math.min(selectedSku?.stockQuantity || 0, quantity + 1))}
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-divider text-foreground hover:bg-background-section"
-                  disabled={currentStock === 0}
+                  disabled={selectedSku?.stockQuantity === 0}
                 >
                   +
                 </button>
@@ -490,7 +582,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
                   size="lg"
                   className="flex-1 border-primary text-primary hover:bg-primary/10 bg-transparent"
                   onClick={handleAddToCart}
-                  disabled={currentStock === 0}
+                  disabled={selectedSku?.stockQuantity === 0}
                 >
                   장바구니
                 </Button>
@@ -498,9 +590,9 @@ export default function ProductDetailPage({ params }: { params: { productId: str
                   size="lg"
                   className="flex-1 bg-primary hover:bg-primary-dark text-white"
                   onClick={handleBuyNow}
-                  disabled={currentStock === 0}
+                  disabled={selectedSku?.stockQuantity === 0}
                 >
-                  {currentStock === 0 ? "품절" : "바로구매"}
+                  {selectedSku?.stockQuantity === 0 ? "품절" : "바로구매"}
                 </Button>
               </div>
 
@@ -521,7 +613,9 @@ export default function ProductDetailPage({ params }: { params: { productId: str
         <section className="mt-16">
           <h2 className="mb-6 text-2xl font-bold text-foreground">상품 상세</h2>
           <Card className="p-8">
-            <div className="whitespace-pre-line text-sm text-foreground leading-relaxed">{product.description}</div>
+            <div className="whitespace-pre-line text-sm text-foreground leading-relaxed">
+              {product.description || "상품 상세 정보가 없습니다."}
+            </div>
           </Card>
         </section>
 
@@ -529,7 +623,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
         <section className="mt-16">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-foreground">
-              리뷰 <span className="text-primary">({product.reviewCount.toLocaleString()})</span>
+              리뷰 <span className="text-primary">({(product.reviewCount || 0).toLocaleString()})</span>
             </h2>
             <Button variant="outline" size="sm" onClick={() => setShowReviewForm(!showReviewForm)}>
               {showReviewForm ? "취소" : "리뷰 작성하기"}
@@ -655,7 +749,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
                 <p className="mb-3 text-sm text-foreground leading-relaxed">{review.content}</p>
                 {review.images.length > 0 && (
                   <div className="flex gap-2">
-                    {review.images.map((image, index) => (
+                    {review.images.map((image: string, index: number) => (
                       <img
                         key={index}
                         src={image || "/placeholder.svg"}
@@ -668,41 +762,8 @@ export default function ProductDetailPage({ params }: { params: { productId: str
               </Card>
             ))}
           </div>
-
-          <div className="mt-6 flex justify-center">
-            <Button variant="outline">리뷰 더보기</Button>
-          </div>
         </section>
 
-        {/* Related Products */}
-        <section className="mt-16">
-          <h2 className="mb-6 text-2xl font-bold text-foreground">함께 보면 좋은 상품</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-            {relatedProducts.map((relatedProduct) => (
-              <a
-                key={relatedProduct.id}
-                href={`/store/products/${relatedProduct.id}`}
-                className="group block overflow-hidden rounded-lg bg-background transition-all hover:shadow-lg"
-              >
-                <div className="aspect-square overflow-hidden bg-background-section">
-                  <img
-                    src={relatedProduct.image || "/placeholder.svg"}
-                    alt={relatedProduct.name}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-3">
-                  <div className="mb-1 text-xs text-text-secondary">{relatedProduct.brand}</div>
-                  <h3 className="mb-2 line-clamp-2 text-sm font-medium text-foreground">{relatedProduct.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-secondary">{relatedProduct.discountRate}%</span>
-                    <span className="text-sm font-bold text-foreground">{relatedProduct.price.toLocaleString()}원</span>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </section>
       </main>
     </div>
   )
