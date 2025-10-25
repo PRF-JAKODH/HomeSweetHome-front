@@ -21,6 +21,7 @@ export default function StorePage() {
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
+  const [showScrollToTop, setShowScrollToTop] = useState(false)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -50,6 +51,14 @@ export default function StorePage() {
     }
   }
 
+  // 최상단으로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
+
   // 최상단 카테고리 조회
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
   
@@ -74,6 +83,19 @@ export default function StorePage() {
 
   useEffect(() => {
     setIsClient(true)
+  }, [])
+
+  // 스크롤 위치 감지
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+      setShowScrollToTop(scrollTop > 300) // 300px 이상 스크롤 시 버튼 표시
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   // 드롭다운 외부 클릭 시 닫기
@@ -484,6 +506,19 @@ export default function StorePage() {
           </div>
         </div>
       </main>
+
+      {/* 스크롤 투 탑 버튼 */}
+      {showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 bg-primary hover:bg-primary-dark text-white p-3 rounded-full shadow-lg transition-all duration-300 hover:shadow-xl"
+          aria-label="맨 위로 이동"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
