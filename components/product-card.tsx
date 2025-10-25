@@ -15,6 +15,7 @@ interface ProductCardProps {
   reviewCount: number
   isLiked?: boolean
   isFreeShipping?: boolean
+  shippingPrice?: number
 }
 
 export function ProductCard({
@@ -29,10 +30,11 @@ export function ProductCard({
   reviewCount,
   isLiked = false,
   isFreeShipping = false,
+  shippingPrice = 0,
 }: ProductCardProps) {
   return (
     <a href={`/store/products/${id}`} className="block">
-      <Card className="group overflow-hidden border-transparent hover:shadow-lg transition-all duration-200">
+      <Card className="group overflow-hidden border-transparent hover:shadow-lg transition-all duration-200 h-full flex flex-col">
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden bg-background-section">
           <img
@@ -43,7 +45,7 @@ export function ProductCard({
 
           {/* Discount Badge */}
           {discountRate && (
-            <div className="absolute left-2 top-2 rounded bg-secondary px-2 py-1 text-xs font-bold text-white">
+            <div className="absolute left-2 top-2 rounded bg-primary px-3 py-1.5 text-sm font-bold text-white">
               {discountRate}%
             </div>
           )}
@@ -75,7 +77,7 @@ export function ProductCard({
         </div>
 
         {/* Product Info */}
-        <div className="p-3">
+        <div className="p-3 flex flex-col flex-grow">
           {/* Brand */}
           <div className="mb-1 text-xs font-medium text-text-secondary">{brand}</div>
 
@@ -84,12 +86,12 @@ export function ProductCard({
 
           {/* Price */}
           <div className="mb-2 flex items-center gap-2">
-            {discountRate && <span className="text-base font-bold text-secondary">{discountRate}%</span>}
-            <span className="text-base font-bold text-foreground">{price.toLocaleString()}원</span>
+            {discountRate && <span className="text-base font-bold text-primary">{discountRate}%</span>}
+            <span className="text-base font-bold text-foreground">{price?.toLocaleString() || '0'}원</span>
           </div>
 
           {originalPrice && (
-            <div className="mb-2 text-xs text-text-secondary line-through">{originalPrice.toLocaleString()}원</div>
+            <div className="mb-2 text-xs text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}원</div>
           )}
 
           {/* Rating & Reviews */}
@@ -101,12 +103,16 @@ export function ProductCard({
             <span className="text-text-secondary">리뷰 {reviewCount.toLocaleString()}</span>
           </div>
 
-          {/* Free Shipping Badge */}
-          {isFreeShipping && (
-            <div className="mt-2 inline-block rounded bg-background-section px-2 py-1 text-xs text-text-secondary">
-              무료배송
-            </div>
-          )}
+          {/* Shipping Info */}
+          <div className="mt-1 mt-auto">
+            {isFreeShipping ? (
+              <div className="inline-block rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                무료배송
+              </div>
+            ) : (
+              <span className="text-xs text-text-secondary">배송비 {shippingPrice.toLocaleString()}원</span>
+            )}
+          </div>
         </div>
       </Card>
     </a>
