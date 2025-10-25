@@ -4,12 +4,13 @@ import { Search, ShoppingCart, Menu, Bell, User, MessageCircle } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 
 export function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const [user, setUser] = useState<any>(null)
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
@@ -147,10 +148,24 @@ export function Header() {
 
             {/* Desktop Navigation */}
             <nav className="hidden items-center gap-6 md:flex">
-              <a href="/store" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <a 
+                href="/store" 
+                className={`text-sm font-medium transition-colors ${
+                  pathname?.startsWith("/store") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
                 스토어
               </a>
-              <a href="/community" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <a 
+                href="/community" 
+                className={`text-sm font-medium transition-colors ${
+                  pathname?.startsWith("/community") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
                 커뮤니티
               </a>
             </nav>
