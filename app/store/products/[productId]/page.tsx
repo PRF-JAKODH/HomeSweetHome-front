@@ -877,7 +877,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     <span className="font-medium text-foreground">{review.username}</span>
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
-                        <span key={i} className={`text-sm ${i < review.rating ? "text-warning" : "text-divider"}`}>
+                        <span key={i} className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}>
                           ★
                         </span>
                       ))}
