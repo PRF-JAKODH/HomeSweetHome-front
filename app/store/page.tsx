@@ -17,12 +17,17 @@ export default function StorePage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
+  
+  // 정렬 타입 변경 핸들러
+  const handleSortTypeChange = (newSortType: ProductSortType) => {
+    setSortType(newSortType)
+  }
 
   // 최상단 카테고리 조회
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
   
   // 선택된 카테고리의 하위 카테고리 조회
-  const { data: subCategories = [], isLoading: subCategoriesLoading } = useCategoriesByParent(selectedMainCategory!)
+  const { data: subCategories = [], isLoading: subCategoriesLoading } = useCategoriesByParent(selectedMainCategory || 0)
   
   // 선택된 하위 카테고리의 하위 카테고리 조회 (3레벨)
   const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
@@ -30,6 +35,7 @@ export default function StorePage() {
 
   // 상품 조회 (무한 스크롤)
   const currentCategoryId = selectedSubSubCategory || selectedSubCategory || selectedMainCategory
+  
   const { 
     products, 
     isLoading: productsLoading, 
@@ -249,7 +255,7 @@ export default function StorePage() {
                     variant={sortType === 'POPULAR' ? 'default' : 'ghost'} 
                     size="sm" 
                     className="text-sm"
-                    onClick={() => setSortType('POPULAR')}
+                    onClick={() => handleSortTypeChange('POPULAR')}
                   >
                     인기순
                   </Button>
@@ -257,23 +263,23 @@ export default function StorePage() {
                     variant={sortType === 'LATEST' ? 'default' : 'ghost'} 
                     size="sm" 
                     className="text-sm"
-                    onClick={() => setSortType('LATEST')}
+                    onClick={() => handleSortTypeChange('LATEST')}
                   >
                     최신순
                   </Button>
                   <Button 
-                    variant={sortType === 'PRICE_ASC' ? 'default' : 'ghost'} 
+                    variant={sortType === 'PRICE_LOW' ? 'default' : 'ghost'} 
                     size="sm" 
                     className="text-sm"
-                    onClick={() => setSortType('PRICE_ASC')}
+                    onClick={() => handleSortTypeChange('PRICE_LOW')}
                   >
                     낮은가격순
                   </Button>
                   <Button 
-                    variant={sortType === 'PRICE_DESC' ? 'default' : 'ghost'} 
+                    variant={sortType === 'PRICE_HIGH' ? 'default' : 'ghost'} 
                     size="sm" 
                     className="text-sm"
-                    onClick={() => setSortType('PRICE_DESC')}
+                    onClick={() => handleSortTypeChange('PRICE_HIGH')}
                   >
                     높은가격순
                   </Button>
@@ -292,7 +298,7 @@ export default function StorePage() {
                     <p className="text-destructive mb-4">상품을 불러오는데 실패했습니다.</p>
                     <Button onClick={() => window.location.reload()}>다시 시도</Button>
                   </div>
-                ) : products.length === 0 ? (
+                ) : !productsLoading && !productsError && products.length === 0 ? (
                   <div className="col-span-full text-center py-12">
                     <p className="text-muted-foreground">해당 카테고리에 상품이 없습니다.</p>
                   </div>
