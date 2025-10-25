@@ -23,6 +23,8 @@ interface ExtendedProduct extends Product {
   imageUrl?: string
   basePrice?: number
   shippingPrice?: number
+  discountedPrice?: number // 서버에서 계산된 할인된 가격
+  detailImageUrls?: string[] // 상세 이미지 URL 배열
   category?: {
     main: string
     sub: string
@@ -85,12 +87,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         // API 응답 구조 확인을 위한 로깅
         console.log('Product data:', productData)
         console.log('Stock data:', stockData)
+        console.log('detailImageUrls:', productData.detailImageUrls)
+        console.log('images:', productData.images)
         
         // API 응답을 UI에서 사용할 수 있는 형태로 변환
         const transformedProduct: ExtendedProduct = {
           ...productData,
-          // 이미지 배열 처리 - API에서 imageUrl을 받으면 images 배열로 변환
-          images: productData.images || (productData.imageUrl ? [productData.imageUrl] : []),
+          // 이미지 배열 처리 - API에서 imageUrl과 detailImageUrls을 받으면 images 배열로 변환
+          images: (() => {
+            const baseImages = productData.images || (productData.imageUrl ? [productData.imageUrl] : [])
+            const detailImages = productData.detailImageUrls || []
+            const finalImages = [...baseImages, ...detailImages]
+            console.log('Final images array:', finalImages)
+            return finalImages
+          })(),
           thumbnail: productData.thumbnail || productData.imageUrl || '',
           // 기존 UI에서 사용하는 추가 필드들
           productType: stockData.length > 1 ? "options" as const : "single" as const,
@@ -115,11 +125,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         setProduct(transformedProduct)
         setStockData(stockData)
         setCategoryHierarchy(categoryResponse)
-        // 할인된 가격 계산
-        const originalPrice = productData.basePrice || productData.price || 0
-        const discountRate = productData.discountRate || 0
-        const discountedPrice = originalPrice * (1 - discountRate / 100)
-        setCurrentPrice(discountedPrice)
+        // 서버에서 계산된 할인된 가격 사용 (discountedPrice가 없으면 기존 로직 사용)
+        const serverDiscountedPrice = productData.discountedPrice
+        if (serverDiscountedPrice !== undefined && serverDiscountedPrice !== null) {
+          setCurrentPrice(serverDiscountedPrice)
+        } else {
+          // fallback: 기존 클라이언트 계산 로직
+          const originalPrice = productData.basePrice || productData.price || 0
+          const discountRate = productData.discountRate || 0
+          const discountedPrice = originalPrice * (1 - discountRate / 100)
+          setCurrentPrice(discountedPrice)
+        }
         
         // 첫 번째 SKU를 기본 선택으로 설정
         if (stockData && stockData.length > 0) {
@@ -145,17 +161,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     if (product && product.productType === "options" && selectedOption) {
       const option = product.options?.find((opt: any) => opt.name === selectedOption)
       if (option) {
-        // 할인된 기본 가격과 추가 가격을 안전하게 계산
-        const originalPrice = product.basePrice || product.price || 0
-        const discountRate = product.discountRate || 0
-        const discountedBasePrice = originalPrice * (1 - discountRate / 100)
+        // 서버에서 제공하는 discountedPrice를 우선 사용, 없으면 클라이언트 계산
+        const serverDiscountedPrice = (product as any).discountedPrice
+        let basePrice = 0
+        
+        if (serverDiscountedPrice !== undefined && serverDiscountedPrice !== null) {
+          basePrice = serverDiscountedPrice
+        } else {
+          // fallback: 클라이언트 계산
+          const originalPrice = product.basePrice || product.price || 0
+          const discountRate = product.discountRate || 0
+          basePrice = originalPrice * (1 - discountRate / 100)
+        }
+        
         const additionalPrice = option.additionalPrice || 0
-        const totalPrice = discountedBasePrice + additionalPrice
+        const totalPrice = basePrice + additionalPrice
         
         console.log('Price calculation:', {
-          originalPrice,
-          discountRate,
-          discountedBasePrice,
+          serverDiscountedPrice,
+          basePrice,
           additionalPrice,
           totalPrice,
           productBasePrice: product.basePrice,
@@ -173,11 +197,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         setSelectedSku(selectedSkuData || null)
       }
     } else if (product && product.productType === "single") {
-      // 단일 상품도 할인된 가격 사용
-      const originalPrice = product.basePrice || product.price || 0
-      const discountRate = product.discountRate || 0
-      const discountedPrice = originalPrice * (1 - discountRate / 100)
-      setCurrentPrice(discountedPrice)
+      // 서버에서 제공하는 discountedPrice를 우선 사용, 없으면 클라이언트 계산
+      const serverDiscountedPrice = (product as any).discountedPrice
+      if (serverDiscountedPrice !== undefined && serverDiscountedPrice !== null) {
+        setCurrentPrice(serverDiscountedPrice)
+      } else {
+        // fallback: 클라이언트 계산
+        const originalPrice = product.basePrice || product.price || 0
+        const discountRate = product.discountRate || 0
+        const discountedPrice = originalPrice * (1 - discountRate / 100)
+        setCurrentPrice(discountedPrice)
+      }
       setCurrentStock(product.stockQuantity || 0)
       setSelectedSku(stockData && stockData.length > 0 ? stockData[0] : null)
     }
@@ -360,12 +390,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         {/* Back Button */}
         <button
           onClick={() => router.back()}
-          className="mb-6 flex items-center gap-2 text-sm text-text-secondary hover:text-foreground"
+          className="mb-6 flex items-center gap-2 text-sm text-text-secondary hover:text-foreground transition-all duration-200 hover:bg-background-section px-3 py-2 rounded-lg hover:shadow-sm group"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          뒤로가기
+          <span className="transition-colors duration-200">뒤로가기</span>
         </button>
 
         {/* Category Breadcrumb */}
@@ -443,9 +473,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             <div className="mb-6 flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <span className="text-warning text-lg">★</span>
-                <span className="font-bold text-foreground">{product.rating}</span>
+                <span className="font-bold text-foreground">{product.rating || 0}</span>
               </div>
-              <span className="text-sm text-text-secondary">리뷰 {product.reviewCount.toLocaleString()}개</span>
+              <span className="text-sm text-text-secondary">리뷰 {(product.reviewCount || 0).toLocaleString()}개</span>
             </div>
 
             {/* Price */}

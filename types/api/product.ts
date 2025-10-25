@@ -14,6 +14,7 @@ export interface Product {
   originalPrice?: number
   discountRate?: number
   images: string[]
+  detailImageUrls?: string[] // 상세 이미지 URL 배열 추가
   thumbnail: string
   rating: number
   reviewCount: number
@@ -85,9 +86,11 @@ export interface ProductPreviewResponse {
   sellerId: number
   name: string
   imageUrl: string
+  detailImageUrls?: string[] // 상세 이미지 URL 배열 추가
   brand: string
   basePrice: number
   discountRate: number
+  discountedPrice?: number // 서버에서 계산된 할인된 가격 추가
   description: string
   shippingPrice: number
   status: string
