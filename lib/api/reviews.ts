@@ -16,7 +16,7 @@ export const getProductReviews = async (
   }
   params.append('limit', limit.toString())
 
-  const response = await apiClient.get(`/api/v1/product/reviews/${productId}?${params}`)
+  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`/api/v1/product/reviews/${productId}?${params}`)
   return response
 }
 
@@ -35,7 +35,7 @@ export const createProductReview = async (
     formData.append('image', reviewData.image)
   }
 
-  const response = await apiClient.post(
+  const response = await apiClient.post<ProductReviewResponse>(
     `/api/v1/product/reviews/${productId}`,
     formData,
     {
@@ -44,7 +44,7 @@ export const createProductReview = async (
       },
     }
   )
-  return response.data
+  return response
 }
 
 /**
@@ -58,6 +58,6 @@ export const deleteProductReview = async (reviewId: number): Promise<void> => {
  * 상품 리뷰 통계 조회
  */
 export const getProductReviewStatistics = async (productId: string): Promise<ProductReviewStatisticsResponse> => {
-  const response = await apiClient.get(`/api/v1/product/reviews/${productId}/statistics`)
+  const response = await apiClient.get<ProductReviewStatisticsResponse>(`/api/v1/product/reviews/${productId}/statistics`)
   return response
 }
