@@ -11,6 +11,9 @@ export const PRODUCT_ENDPOINTS = {
   UPDATE_PRODUCT: (id: string) => `/products/${id}`,
   DELETE_PRODUCT: (id: string) => `/products/${id}`,
   
+  // 상품 프리뷰 조회 (무한 스크롤)
+  GET_PRODUCT_PREVIEWS: '/api/v1/products/previews',
+  
   // 상품 검색 및 필터
   SEARCH_PRODUCTS: '/products/search',
   GET_PRODUCTS_BY_CATEGORY: (categoryId: string) => `/products/category/${categoryId}`,

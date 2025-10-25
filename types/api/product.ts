@@ -2,7 +2,7 @@
  * 상품 관련 타입 정의
  */
 
-import { ApiResponse, PaginatedResponse, FilterOptions } from './common'
+import { ApiResponse, PaginatedResponse, FilterOptions, ScrollResponse } from './common'
 
 // 상품 기본 정보
 export interface Product {
@@ -75,6 +75,40 @@ export type UpdateProductResponse = ApiResponse<Product>
 
 // 상품 삭제 응답
 export type DeleteProductResponse = ApiResponse<{ id: string }>
+
+// 상품 정렬 타입
+export type ProductSortType = 'LATEST' | 'POPULAR' | 'PRICE_ASC' | 'PRICE_DESC' | 'RATING'
+
+// 상품 프리뷰 응답 (무한 스크롤용)
+export interface ProductPreviewResponse {
+  id: number
+  categoryId: number
+  sellerId: number
+  name: string
+  imageUrl: string
+  brand: string
+  basePrice: number
+  discountRate: number
+  description: string
+  shippingPrice: number
+  status: string
+  averageRating: number
+  reviewCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+// 상품 프리뷰 조회 요청 파라미터
+export interface GetProductPreviewsRequest {
+  cursorId?: number
+  categoryId?: number
+  limit?: number
+  keyword?: string
+  sortType?: ProductSortType
+}
+
+// 상품 프리뷰 조회 응답
+export type GetProductPreviewsResponse = ScrollResponse<ProductPreviewResponse>
 
 // 상품 통계
 export interface ProductStats {

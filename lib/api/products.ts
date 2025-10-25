@@ -15,8 +15,11 @@ import {
   UpdateProductResponse,
   DeleteProductResponse,
   ProductStats,
-  ApiResponse,
+  ProductPreviewResponse,
+  GetProductPreviewsRequest,
+  GetProductPreviewsResponse,
 } from '@/types/api/product'
+import { ApiResponse } from '@/types/api/common'
 
 // 상품 목록 조회
 export const getProducts = async (params?: GetProductsRequest): Promise<GetProductsResponse> => {
@@ -65,6 +68,11 @@ export const getProductsBySubCategory = async (subCategoryId: string, params?: O
   return apiClient.get<GetProductsResponse['data']>(PRODUCT_ENDPOINTS.GET_PRODUCTS_BY_SUBCATEGORY(subCategoryId), {
     params,
   })
+}
+
+// 상품 프리뷰 조회 (무한 스크롤)
+export const getProductPreviews = async (params: GetProductPreviewsRequest = {}): Promise<GetProductPreviewsResponse> => {
+  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params })
 }
 
 // 상품 통계 조회
