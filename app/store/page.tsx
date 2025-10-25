@@ -142,7 +142,7 @@ export default function StorePage() {
                           handleMainCategoryChange(category.id)
                           toggleCategory(category.id)
                         }}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between ${
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between font-medium text-base ${
                           selectedMainCategory === category.id
                             ? "bg-primary text-white"
                             : "bg-background text-foreground hover:bg-background-section"
@@ -173,7 +173,7 @@ export default function StorePage() {
                                       handleSubCategoryChange(subCategory.id)
                                       toggleCategory(subCategory.id)
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-all flex items-center justify-between ${
+                                    className={`w-full text-left px-3 py-2 rounded-md text-base transition-all flex items-center justify-between font-medium ${
                                       selectedSubCategory === subCategory.id
                                         ? "bg-primary/20 text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -199,7 +199,7 @@ export default function StorePage() {
                                           <button
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
-                                            className={`w-full text-left px-2 py-1 rounded text-xs transition-all ${
+                                            className={`w-full text-left px-2 py-1 rounded text-sm transition-all font-medium ${
                                               selectedSubCategory === subSubCategory.id
                                                 ? "bg-primary/20 text-primary"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-background-section"
@@ -254,13 +254,6 @@ export default function StorePage() {
                     <p className="text-muted-foreground">상품 데이터를 불러오는 중...</p>
                   </div>
                 )}
-              </div>
-
-              {/* Load More */}
-              <div className="mt-12 flex justify-center">
-                <Button variant="outline" size="lg" className="min-w-[200px] bg-transparent">
-                  더보기
-                </Button>
               </div>
             </div>
           </div>
