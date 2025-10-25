@@ -16,7 +16,6 @@ export const useTopCategories = () => {
     queryKey: ['categories', 'top'],
     queryFn: getTopCategories,
     staleTime: 15 * 60 * 1000, // 15분
-    cacheTime: 60 * 60 * 1000, // 1시간
   })
 }
 
@@ -27,7 +26,6 @@ export const useCategoriesByParent = (parentId: number) => {
     queryFn: () => getCategoriesByParent(parentId),
     enabled: !!parentId,
     staleTime: 10 * 60 * 1000, // 10분
-    cacheTime: 30 * 60 * 1000, // 30분
   })
 }
 
@@ -38,6 +36,5 @@ export const useCategoryHierarchy = (categoryId: number) => {
     queryFn: () => getCategoryHierarchy(categoryId),
     enabled: !!categoryId,
     staleTime: 10 * 60 * 1000, // 10분
-    cacheTime: 30 * 60 * 1000, // 30분
   })
 }
