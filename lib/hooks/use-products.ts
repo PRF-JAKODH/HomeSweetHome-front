@@ -1,10 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import {
-  ProductPreviewResponse,
-  GetProductPreviewsRequest,
-  ProductSortType,
-} from '@/types/api/product'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { ProductSortType } from '@/types/api/product'
 import { getProductPreviews } from '@/lib/api/products'
 
 export const useInfiniteProductPreviews = (
@@ -13,68 +8,43 @@ export const useInfiniteProductPreviews = (
   limit: number = 10,
   keyword?: string
 ) => {
-  const [allProducts, setAllProducts] = useState<ProductPreviewResponse[]>([])
-  const [cursorId, setCursorId] = useState<number | null>(null)
-  const [hasNext, setHasNext] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-
-  const { data, isLoading, error, refetch } = useQuery({
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ['product-previews', categoryId, sortType, limit, keyword],
-    queryFn: () =>
+    queryFn: ({ pageParam }) =>
       getProductPreviews({
         categoryId,
         limit,
         sortType,
-        cursorId: cursorId ?? undefined,
+        cursorId: pageParam,
         keyword: keyword || undefined,
       }),
-    staleTime: 2 * 60 * 1000,
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasNext ? lastPage.nextCursorId : undefined
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
 
-  useEffect(() => {
-    if (!data) return
-
-    if (cursorId === null) {
-      // 첫 로드
-      setAllProducts(data.contents)
-    } else {
-      // 추가 로드
-      setAllProducts(prev => [...prev, ...data.contents])
-    }
-
-    setCursorId(data.nextCursorId)
-    setHasNext(data.hasNext)
-    setIsLoadingMore(false)
-  }, [data])
-
-  const loadMore = useCallback(() => {
-    if (hasNext && !isLoadingMore && data?.nextCursorId) {
-      setIsLoadingMore(true)
-      setCursorId(data.nextCursorId)
-    }
-  }, [hasNext, isLoadingMore, data?.nextCursorId])
-
-  const reset = useCallback(() => {
-    setAllProducts([])
-    setCursorId(null)
-    setHasNext(true)
-    setIsLoadingMore(false)
-  }, [])
-
-  useEffect(() => {
-    reset()
-    refetch()
-  }, [categoryId, sortType, keyword, reset, refetch])
+  // 모든 페이지의 상품을 평탄화
+  const products = data?.pages.flatMap((page) => page.contents) ?? []
 
   return {
-    products: allProducts,
+    products,
     isLoading,
-    isLoadingMore,
-    hasNext,
+    isLoadingMore: isFetchingNextPage,
+    hasNext: hasNextPage ?? false,
     error,
-    loadMore,
-    reset,
+    loadMore: fetchNextPage,
     refetch,
   }
 }

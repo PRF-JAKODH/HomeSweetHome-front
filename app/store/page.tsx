@@ -2,11 +2,10 @@
 
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
-import { Category } from "@/types/api/category"
 import { ProductSortType } from "@/types/api/product"
 import { useSearchParams } from "next/navigation"
 
@@ -19,6 +18,9 @@ export default function StorePage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
+  
+  // 무한 스크롤을 위한 observer ref
+  const observerTarget = useRef<HTMLDivElement>(null)
   
   // URL에서 검색 키워드 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
@@ -54,6 +56,41 @@ export default function StorePage() {
     setIsClient(true)
   }, [])
 
+  // 무한 스크롤 Intersection Observer 설정
+// 무한 스크롤 Intersection Observer 설정
+useEffect(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      console.log('Observer triggered:', {
+        isIntersecting: entries[0].isIntersecting,
+        hasNext,
+        isLoadingMore
+      })
+      
+      if (entries[0].isIntersecting && hasNext && !isLoadingMore) {
+        console.log('Calling loadMore()')
+        loadMore()
+      }
+    },
+    {
+      threshold: 0.1,
+      rootMargin: '100px',
+    }
+  )
+
+  const currentTarget = observerTarget.current
+  console.log('Observer target:', currentTarget)
+  
+  if (currentTarget) {
+    observer.observe(currentTarget)
+  }
+
+  return () => {
+    if (currentTarget) {
+      observer.unobserve(currentTarget)
+    }
+  }
+}, [hasNext, isLoadingMore, loadMore])
 
   const handleMainCategoryChange = (categoryId: number) => {
     setSelectedMainCategory(categoryId)
@@ -257,11 +294,6 @@ export default function StorePage() {
                       : categoryPath ? `${categoryPath} 상품` : '전체 상품'
                     }
                   </h2>
-                  {!productsLoading && (
-                    <span className="text-lg text-text-secondary">
-                      ({products.length.toLocaleString()}개)
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button 
@@ -344,6 +376,26 @@ export default function StorePage() {
                 )}
               </div>
 
+              {/* 무한 스크롤 트리거 & 로딩 인디케이터 */}
+              {/* 무한 스크롤 트리거 & 로딩 인디케이터 */}
+              <div ref={observerTarget} className="col-span-full py-8">
+                {isLoadingMore && (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2">더 불러오는 중...</p>
+                  </div>
+                )}
+                {!hasNext && !isLoadingMore && (
+                  <p className="text-center text-muted-foreground">
+                    모든 상품을 불러왔습니다.
+                  </p>
+                )}
+                {hasNext && !isLoadingMore && (
+                  <p className="text-center text-muted-foreground text-sm">
+                    스크롤하여 더 보기...
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
