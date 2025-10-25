@@ -484,9 +484,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 {product.discountRate && product.discountRate > 0 && (
                   <span className="text-3xl font-bold text-secondary">{product.discountRate}%</span>
                 )}
-                <span className="text-3xl font-bold text-foreground">{currentPrice.toLocaleString()}원</span>
+                <span className="text-3xl font-bold text-foreground">
+                  {(product.discountedPrice || currentPrice).toLocaleString()}원
+                </span>
               </div>
-              {product.basePrice && product.basePrice > currentPrice && (
+              {product.basePrice && product.basePrice > (product.discountedPrice || currentPrice) && (
                 <div className="text-base text-text-secondary line-through">
                   {product.basePrice.toLocaleString()}원
                 </div>
@@ -599,7 +601,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-secondary">총 상품금액</span>
                 <span className="text-2xl font-bold text-foreground">
-                  {(currentPrice * quantity).toLocaleString()}원
+                  {product.productType === "options" && !selectedOption ? 
+                    "0원" : 
+                    (currentPrice * quantity).toLocaleString() + "원"
+                  }
                 </span>
               </div>
             </div>
@@ -612,17 +617,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   size="lg"
                   className="flex-1 border-primary text-primary hover:bg-primary/10 bg-transparent"
                   onClick={handleAddToCart}
-                  disabled={selectedSku?.stockQuantity === 0}
+                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)}
                 >
                   장바구니
                 </Button>
                 <Button
                   size="lg"
-                  className="flex-1 bg-primary hover:bg-primary-dark text-white"
+                  className={`flex-1 ${
+                    selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                      : "bg-primary hover:bg-primary-dark text-white"
+                  }`}
                   onClick={handleBuyNow}
-                  disabled={selectedSku?.stockQuantity === 0}
+                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)}
                 >
-                  {selectedSku?.stockQuantity === 0 ? "품절" : "바로구매"}
+                  {selectedSku?.stockQuantity === 0 ? "품절" : 
+                   (product.productType === "options" && !selectedOption) ? "옵션을 선택해주세요" : "바로구매"}
                 </Button>
               </div>
 
