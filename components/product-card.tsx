@@ -40,12 +40,6 @@ export function ProductCard({
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
 
-          {/* Discount Badge */}
-          {discountRate && (
-            <div className="absolute left-2 top-2 rounded bg-primary px-3 py-1.5 text-sm font-bold text-white">
-              {discountRate}%
-            </div>
-          )}
 
         </div>
 
