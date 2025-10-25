@@ -348,7 +348,7 @@ export default function StorePage() {
                   <h2 className="text-2xl font-semibold text-foreground">
                     {searchKeyword 
                       ? `"${searchKeyword}" 검색 결과` 
-                      : categoryPath ? `${categoryPath} 상품` : '전체 상품'
+                      : categoryPath ? `${categoryPath} 상품` : '전체'
                     }
                   </h2>
                 </div>
