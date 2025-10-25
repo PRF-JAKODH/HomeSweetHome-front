@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import { ProductReviewCreateRequest, ProductReviewResponse } from '@/types/api/review'
+import { ProductReviewCreateRequest, ProductReviewResponse, ProductReviewStatisticsResponse } from '@/types/api/review'
 import { ScrollResponse } from '@/types/api/common'
 
 /**
@@ -52,4 +52,12 @@ export const createProductReview = async (
  */
 export const deleteProductReview = async (reviewId: number): Promise<void> => {
   await apiClient.delete(`/api/v1/product/reviews/${reviewId}`)
+}
+
+/**
+ * 상품 리뷰 통계 조회
+ */
+export const getProductReviewStatistics = async (productId: string): Promise<ProductReviewStatisticsResponse> => {
+  const response = await apiClient.get(`/api/v1/product/reviews/${productId}/statistics`)
+  return response
 }

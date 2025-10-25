@@ -11,10 +11,10 @@ import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getProduct, getProductStock } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
-import { getProductReviews } from "@/lib/api/reviews"
+import { getProductReviews, getProductReviewStatistics } from "@/lib/api/reviews"
 import { Product, SkuStockResponse } from "@/types/api/product"
 import { Category } from "@/types/api/category"
-import { ProductReviewResponse } from "@/types/api/review"
+import { ProductReviewResponse, ProductReviewStatisticsResponse } from "@/types/api/review"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -67,6 +67,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [userReviews, setUserReviews] = useState<ProductReviewResponse[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
+  const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
 
   // 옵션 그룹 추출 함수
   const getOptionGroups = () => {
@@ -202,7 +203,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         const reviews = reviewsResponse?.contents || []
         console.log('최종 리뷰 데이터:', reviews)
         setUserReviews(reviews)
-        setReviewsTotalCount((reviewsResponse as any)?.totalCount || 0)
+        // totalCount는 통계 API에서 가져오므로 여기서는 설정하지 않음
       } catch (err) {
         console.error('리뷰 조회 실패:', err)
         // 리뷰 조회 실패 시 빈 배열로 초기화
@@ -214,6 +215,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
     if (resolvedParams.productId) {
       fetchReviews()
+    }
+  }, [resolvedParams.productId])
+
+  // 리뷰 통계 데이터 가져오기
+  useEffect(() => {
+    const fetchReviewStatistics = async () => {
+      try {
+        const statisticsResponse = await getProductReviewStatistics(resolvedParams.productId)
+        console.log('리뷰 통계:', statisticsResponse)
+        setReviewStatistics(statisticsResponse)
+        setReviewsTotalCount(statisticsResponse.totalCount)
+      } catch (err) {
+        console.error('리뷰 통계 조회 실패:', err)
+        setReviewStatistics(null)
+      }
+    }
+
+    if (resolvedParams.productId) {
+      fetchReviewStatistics()
     }
   }, [resolvedParams.productId])
 
@@ -760,13 +780,52 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
         {/* Reviews */}
         <section className="mt-16">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-foreground">
-              리뷰 <span className="text-primary">({(product.reviewCount || 0).toLocaleString()})</span>
-            </h2>
-            <Button variant="outline" size="sm" onClick={() => setShowReviewForm(!showReviewForm)}>
-              {showReviewForm ? "취소" : "리뷰 작성하기"}
-            </Button>
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-foreground">
+                리뷰 <span className="text-primary">({reviewsTotalCount > 0 ? reviewsTotalCount.toLocaleString() : (product.reviewCount || 0).toLocaleString()})</span>
+              </h2>
+              <Button variant="outline" size="sm" onClick={() => setShowReviewForm(!showReviewForm)}>
+                {showReviewForm ? "취소" : "리뷰 남기기"}
+              </Button>
+            </div>
+
+            <div className="flex gap-8 items-center mt-4 p-4 border rounded-lg bg-background">
+              {/* Left side: Average Rating and Stars */}
+              <div className="flex flex-col items-center min-w-[120px]">
+                {reviewStatistics && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <span key={i} className="text-2xl text-yellow-400">★</span>
+                      ))}
+                    </div>
+                    <span className="text-3xl font-bold text-foreground">{reviewStatistics.averageRating.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right side: Rating Distribution Bar Chart */}
+              <div className="flex-1 space-y-2">
+                {reviewStatistics && [5, 4, 3, 2, 1].map((rating) => {
+                  const count = reviewStatistics.ratingCounts[rating] || 0;
+                  const totalReviewsForPercentage = reviewStatistics.totalCount > 0 ? reviewStatistics.totalCount : 1;
+                  const percentage = (count / totalReviewsForPercentage) * 100;
+                  return (
+                    <div key={rating} className="flex items-center gap-2">
+                      <span className="w-8 text-sm text-text-secondary">{rating}점</span>
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <span className="w-10 text-right text-sm text-foreground">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {showReviewForm && (
@@ -870,26 +929,37 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           )}
 
           <div className="space-y-4">
-            {userReviews.map((review) => (
-              <Card key={review.reviewId} className="p-6">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">{review.username}</span>
-                    <div className="flex items-center gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <span key={i} className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}>
-                          ★
-                        </span>
-                      ))}
+            {                userReviews.map((review) => (
+                  <Card key={review.reviewId} className="p-6">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* 사용자 프로필 이미지 */}
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            <img
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(review.username)}&background=random&color=fff&size=40`}
+                              alt={review.username}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground block">{review.username}</span>
+                            <div className="flex items-center gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i} className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}>
+                                  ★
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-sm text-text-secondary">
+                        {new Date(review.createdAt).toLocaleDateString("ko-KR")}
+                      </span>
                     </div>
-                  </div>
-                  <span className="text-sm text-text-secondary">
-                    {new Date(review.createdAt).toLocaleDateString("ko-KR")}
-                  </span>
-                </div>
-                <p className="mb-3 text-sm text-foreground leading-relaxed">{review.comment}</p>
                 {review.imageUrl && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-3">
                     <img
                       src={review.imageUrl}
                       alt="리뷰 이미지"
@@ -897,6 +967,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     />
                   </div>
                 )}
+                <p className="mb-3 text-sm text-foreground leading-relaxed">{review.comment}</p>
               </Card>
             ))}
           </div>

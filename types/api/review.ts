@@ -24,3 +24,10 @@ export interface ProductReviewListResponse {
   totalCount: number
   averageRating: number
 }
+
+export interface ProductReviewStatisticsResponse {
+  productId: number
+  totalCount: number
+  averageRating: number
+  ratingCounts: Record<number, number> // Map<Integer, Long> -> Record<number, number>
+}
