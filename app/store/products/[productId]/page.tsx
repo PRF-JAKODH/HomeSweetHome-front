@@ -845,7 +845,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       onMouseLeave={() => setHoveredRating(0)}
                       className="text-3xl transition-colors"
                     >
-                      <span className={star <= (hoveredRating || reviewRating) ? "text-warning" : "text-divider"}>
+                      <span className={star <= (hoveredRating || reviewRating) ? "text-yellow-400" : "text-gray-300"}>
                         ★
                       </span>
                     </button>
