@@ -50,7 +50,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [error, setError] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
-  const [selectedOption, setSelectedOption] = useState<string>("")
+  const [selectedSkus, setSelectedOptions] = useState<Record<string, string>>({})
   const [currentPrice, setCurrentPrice] = useState(0)
   const [currentStock, setCurrentStock] = useState(0)
   const [stockData, setStockData] = useState<SkuStockResponse[]>([])
@@ -63,6 +63,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewContent, setReviewContent] = useState("")
   const [reviewImages, setReviewImages] = useState<string[]>([])
   const [userReviews, setUserReviews] = useState<any[]>([])
+
+  // 옵션 그룹 추출 함수
+  const getOptionGroups = () => {
+    if (!stockData || stockData.length === 0) return {}
+    
+    const groups: Record<string, string[]> = {}
+    stockData.forEach(sku => {
+      sku.options.forEach(option => {
+        if (!groups[option.groupName]) {
+          groups[option.groupName] = []
+        }
+        if (!groups[option.groupName].includes(option.valueName)) {
+          groups[option.groupName].push(option.valueName)
+        }
+      })
+    })
+    return groups
+  }
+
+  // 선택된 옵션으로 SKU 찾기
+  const findSelectedSku = () => {
+    if (!stockData || stockData.length === 0) return null
+    
+    return stockData.find(sku => {
+      return sku.options.every(option => 
+        selectedSkus[option.groupName] === option.valueName
+      )
+    }) || null
+  }
 
   // API에서 상품 데이터 가져오기
   useEffect(() => {
@@ -158,9 +187,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   }, [resolvedParams.productId])
 
   useEffect(() => {
-    if (product && product.productType === "options" && selectedOption) {
-      const option = product.options?.find((opt: any) => opt.name === selectedOption)
-      if (option) {
+    if (product && product.productType === "options") {
+      const selectedSkuData = findSelectedSku()
+      setSelectedSku(selectedSkuData)
+      
+      if (selectedSkuData) {
         // 서버에서 제공하는 discountedPrice를 우선 사용, 없으면 클라이언트 계산
         const serverDiscountedPrice = (product as any).discountedPrice
         let basePrice = 0
@@ -174,27 +205,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           basePrice = originalPrice * (1 - discountRate / 100)
         }
         
-        const additionalPrice = option.additionalPrice || 0
+        const additionalPrice = selectedSkuData.priceAdjustment || 0
         const totalPrice = basePrice + additionalPrice
         
-        console.log('Price calculation:', {
-          serverDiscountedPrice,
-          basePrice,
-          additionalPrice,
-          totalPrice,
-          productBasePrice: product.basePrice,
-          productPrice: product.price,
-          optionAdditionalPrice: option.additionalPrice
-        })
-        
         setCurrentPrice(totalPrice)
-        setCurrentStock(option.stock)
-        
-        // 선택된 SKU 찾기
-        const selectedSkuData = stockData && stockData.length > 0 ? stockData.find(sku => 
-          sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ') === selectedOption
-        ) : null
-        setSelectedSku(selectedSkuData || null)
+        setCurrentStock(selectedSkuData.stockQuantity)
       }
     } else if (product && product.productType === "single") {
       // 서버에서 제공하는 discountedPrice를 우선 사용, 없으면 클라이언트 계산
@@ -211,12 +226,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       setCurrentStock(product.stockQuantity || 0)
       setSelectedSku(stockData && stockData.length > 0 ? stockData[0] : null)
     }
-  }, [selectedOption, product, stockData])
+  }, [selectedSkus, product, stockData])
+
+  // 수량이 재고를 초과하지 않도록 제한
+  useEffect(() => {
+    if (selectedSku && quantity > selectedSku.stockQuantity) {
+      setQuantity(selectedSku.stockQuantity)
+    }
+  }, [selectedSku, quantity])
 
   const handleAddToCart = () => {
     if (!product) return
     
-    if (product.productType === "options" && !selectedOption) {
+    if (product.productType === "options" && !selectedSku) {
       alert("옵션을 선택해주세요.")
       return
     }
@@ -236,7 +258,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       price: currentPrice,
       quantity: quantity,
       selected: true,
-      option: product.productType === "options" ? selectedOption : null,
+      option: product.productType === "options" ? selectedSku : null,
     }
 
     const storedCart = localStorage.getItem("ohouse_cart")
@@ -252,7 +274,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const handleBuyNow = () => {
     if (!product) return
     
-    if (product.productType === "options" && !selectedOption) {
+    if (product.productType === "options" && !selectedSku) {
       alert("옵션을 선택해주세요.")
       return
     }
@@ -272,7 +294,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       price: currentPrice,
       quantity: quantity,
       selected: true,
-      option: product.productType === "options" ? selectedOption : null,
+      option: product.productType === "options" ? selectedSku : null,
     }
 
     localStorage.setItem("ohouse_checkout_items", JSON.stringify([checkoutItem]))
@@ -512,38 +534,44 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             {/* Option Selection */}
             {product.productType === "options" && stockData && stockData.length > 0 && (
               <div className="mb-6">
-                <Select value={selectedOption} onValueChange={setSelectedOption}>
-                  <SelectTrigger className="w-full h-12 text-base">
-                    <SelectValue placeholder="옵션을 선택해주세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stockData.map((sku) => {
-                      const optionText = sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ')
-                      return (
-                        <SelectItem key={sku.skuId} value={optionText} disabled={sku.stockQuantity === 0}>
-                          <div className="flex items-center justify-between w-full gap-4">
-                            <span>{optionText}</span>
-                            <div className="flex items-center gap-2">
-                              {sku.priceAdjustment > 0 && (
-                                <span className="text-xs text-text-secondary">
-                                  (+{sku.priceAdjustment.toLocaleString()}원)
-                                </span>
-                              )}
-                              {sku.stockQuantity === 0 ? (
-                                <span className="text-xs text-red-500 font-medium">품절</span>
-                              ) : sku.stockQuantity < 5 ? (
-                                <span className="text-xs text-orange-500 font-medium">재고 {sku.stockQuantity}개</span>
-                              ) : (
-                                <span className="text-xs text-green-600 font-medium">재고 {sku.stockQuantity}개</span>
-                              )}
-                            </div>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-
+                {Object.entries(getOptionGroups()).map(([groupName, values]) => (
+                  <div key={groupName} className="mb-4">
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-foreground">{groupName}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {values.map(value => {
+                        const isSelected = selectedSkus[groupName] === value
+                        const isAvailable = stockData.some(sku => 
+                          sku.options.some(opt => opt.groupName === groupName && opt.valueName === value) &&
+                          sku.stockQuantity > 0
+                        )
+                        
+                        return (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              setSelectedOptions(prev => ({
+                                ...prev,
+                                [groupName]: value
+                              }))
+                            }}
+                            disabled={!isAvailable}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                              isSelected
+                                ? 'border-primary bg-primary text-white'
+                                : isAvailable
+                                ? 'border-gray-300 bg-white text-foreground hover:border-primary hover:bg-primary/5'
+                                : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {value}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -563,18 +591,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             )}
 
             {/* Selected Option Box */}
-            {selectedOption && selectedSku && (
+            {selectedSku && (
               <div className="mb-6 rounded-lg bg-gray-100 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground">{selectedOption}</div>
-                    <div className="text-xs text-text-secondary">
-                      {selectedSku.stockQuantity === 0 ? "품절" : `재고 ${selectedSku.stockQuantity}개`}
+                    <div className="text-sm font-medium text-foreground">
+                      {selectedSku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ')}
                     </div>
                   </div>
                   <button
                     onClick={() => {
-                      setSelectedOption("")
+                      setSelectedOptions({})
                       setSelectedSku(null)
                       setQuantity(1)
                     }}
@@ -585,28 +612,49 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     </svg>
                   </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center border border-divider rounded-lg bg-white">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="flex h-10 w-10 items-center justify-center text-foreground hover:bg-background-section transition-colors"
-                      disabled={selectedSku?.stockQuantity === 0}
-                    >
-                      -
-                    </button>
-                    <span className="w-12 text-center font-medium text-foreground border-x border-divider flex items-center justify-center h-10">
-                      {quantity}
-                    </span>
-                    <button
-                      onClick={() => setQuantity(Math.min(selectedSku?.stockQuantity || 0, quantity + 1))}
-                      className="flex h-10 w-10 items-center justify-center text-foreground hover:bg-background-section transition-colors"
-                      disabled={selectedSku?.stockQuantity === 0}
-                    >
-                      +
-                    </button>
+                <div className="space-y-3">
+                  {/* 추가 금액 및 재고 정보 */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-4">
+                      {selectedSku.priceAdjustment !== 0 && (
+                        <span className="text-text-secondary">
+                          추가금액: <span className={`font-medium ${selectedSku.priceAdjustment > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            {selectedSku.priceAdjustment > 0 ? '+' : ''}{selectedSku.priceAdjustment.toLocaleString()}원
+                          </span>
+                        </span>
+                      )}
+                      <span className="text-text-secondary">
+                        재고: <span className="font-medium text-foreground">{selectedSku.stockQuantity}개</span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-lg font-bold text-foreground">
-                    {(currentPrice * quantity).toLocaleString()}원
+                  
+                  {/* 수량 조절 및 총 가격 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center border border-divider rounded-lg bg-white">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={quantity <= 1 || selectedSku?.stockQuantity === 0}
+                      >
+                        -
+                      </button>
+                      <span className="w-16 text-center font-medium text-foreground border-x border-divider flex items-center justify-center h-12">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => setQuantity(Math.min(selectedSku?.stockQuantity || 0, quantity + 1))}
+                        className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={quantity >= (selectedSku?.stockQuantity || 0) || selectedSku?.stockQuantity === 0}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-foreground">
+                        {(currentPrice * quantity).toLocaleString()}원
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -617,7 +665,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-secondary">총 상품금액</span>
                 <span className="text-2xl font-bold text-foreground">
-                  {product.productType === "options" && !selectedOption ? 
+                  {product.productType === "options" && !selectedSku ? 
                     "0원" : 
                     (currentPrice * quantity).toLocaleString() + "원"
                   }
@@ -633,22 +681,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   size="lg"
                   className="flex-1 border-primary text-primary hover:bg-primary/10 bg-transparent"
                   onClick={handleAddToCart}
-                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)}
+                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)}
                 >
                   장바구니
                 </Button>
                 <Button
                   size="lg"
                   className={`flex-1 ${
-                    selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)
+                    selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)
                       ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
                       : "bg-primary hover:bg-primary-dark text-white"
                   }`}
                   onClick={handleBuyNow}
-                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedOption)}
+                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)}
                 >
                   {selectedSku?.stockQuantity === 0 ? "품절" : 
-                   (product.productType === "options" && !selectedOption) ? "옵션을 선택해주세요" : "바로구매"}
+                   (product.productType === "options" && !selectedSku) ? "옵션을 선택해주세요" : "바로구매"}
                 </Button>
               </div>
 
