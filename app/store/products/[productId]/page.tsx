@@ -68,6 +68,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
   const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
+  const [showScrollToTop, setShowScrollToTop] = useState(false)
 
   // 옵션 그룹 추출 함수
   const getOptionGroups = () => {
@@ -85,6 +86,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       })
     })
     return groups
+  }
+
+  // 최상단으로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
   }
 
   // 선택된 옵션으로 SKU 찾기
@@ -236,6 +245,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       fetchReviewStatistics()
     }
   }, [resolvedParams.productId])
+
+  // 스크롤 위치 감지
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+      setShowScrollToTop(scrollTop > 300) // 300px 이상 스크롤 시 버튼 표시
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   useEffect(() => {
     if (product && product.productType === "options") {
@@ -477,7 +499,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
         {/* Category Breadcrumb */}
         <div className="mb-6 flex items-center gap-2 text-sm text-text-secondary">
-          <span className="hover:text-foreground cursor-pointer">홈</span>
+          <span 
+            className="hover:text-foreground cursor-pointer"
+            onClick={() => router.push('/store')}
+          >
+            홈
+          </span>
           {categoryHierarchy.length > 0 ? (
             categoryHierarchy.map((category, index) => (
               <div key={category.id} className="flex items-center gap-2">
@@ -488,6 +515,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       ? "text-foreground font-medium" 
                       : "hover:text-foreground"
                   }`}
+                  onClick={() => {
+                    if (index < categoryHierarchy.length - 1) {
+                      // 현재 카테고리로 이동
+                      router.push(`/store?category=${category.id}`)
+                    }
+                  }}
                 >
                   {category.name}
                 </span>
@@ -496,9 +529,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           ) : (
             <>
               <ChevronRight className="h-4 w-4" />
-              <span className="hover:text-foreground cursor-pointer">{product.category?.main || "카테고리"}</span>
+              <span 
+                className="hover:text-foreground cursor-pointer"
+                onClick={() => router.push('/store')}
+              >
+                {product.category?.main || "카테고리"}
+              </span>
               <ChevronRight className="h-4 w-4" />
-              <span className="hover:text-foreground cursor-pointer">{product.category?.sub || "서브카테고리"}</span>
+              <span 
+                className="hover:text-foreground cursor-pointer"
+                onClick={() => router.push('/store')}
+              >
+                {product.category?.sub || "서브카테고리"}
+              </span>
               <ChevronRight className="h-4 w-4" />
               <span className="text-foreground font-medium">{product.category?.detail || "상세카테고리"}</span>
             </>
@@ -550,9 +593,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             <div className="mb-6 flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <span className="text-warning text-lg">★</span>
-                <span className="font-bold text-foreground">{product.rating || 0}</span>
+                <span className="font-bold text-foreground">
+                  {reviewStatistics ? reviewStatistics.averageRating.toFixed(1) : (product.rating || 0)}
+                </span>
               </div>
-              <span className="text-sm text-text-secondary">리뷰 {(product.reviewCount || 0).toLocaleString()}개</span>
+              <span className="text-sm text-text-secondary">
+                리뷰 {(reviewsTotalCount > 0 ? reviewsTotalCount : (product.reviewCount || 0)).toLocaleString()}개
+              </span>
             </div>
 
             {/* Price */}
@@ -974,6 +1021,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         </section>
 
       </main>
+
+      {/* 스크롤 투 탑 버튼 */}
+      {showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 bg-primary hover:bg-primary-dark text-white p-3 rounded-full shadow-lg transition-all duration-300 hover:shadow-xl"
+          aria-label="맨 위로 이동"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }

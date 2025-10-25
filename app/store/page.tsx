@@ -26,8 +26,9 @@ export default function StorePage() {
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
   
-  // URL에서 검색 키워드 가져오기
+  // URL에서 검색 키워드와 카테고리 ID 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
+  const categoryParam = searchParams.get('category')
   
   // 정렬 타입 변경 핸들러
   const handleSortTypeChange = (newSortType: ProductSortType) => {
@@ -84,6 +85,19 @@ export default function StorePage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // URL 파라미터로 카테고리 설정
+  useEffect(() => {
+    if (categoryParam && isClient) {
+      const categoryId = parseInt(categoryParam)
+      if (!isNaN(categoryId)) {
+        setSelectedMainCategory(categoryId)
+        setSelectedSubCategory(null)
+        setSelectedSubSubCategory(null)
+        setExpandedCategories(new Set([categoryId]))
+      }
+    }
+  }, [categoryParam, isClient])
 
   // 스크롤 위치 감지
   useEffect(() => {
