@@ -385,11 +385,6 @@ useEffect(() => {
                     <p className="ml-2">더 불러오는 중...</p>
                   </div>
                 )}
-                {!hasNext && !isLoadingMore && (
-                  <p className="text-center text-muted-foreground">
-                    모든 상품을 불러왔습니다.
-                  </p>
-                )}
                 {hasNext && !isLoadingMore && (
                   <p className="text-center text-muted-foreground text-sm">
                     스크롤하여 더 보기...
