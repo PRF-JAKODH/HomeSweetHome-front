@@ -116,3 +116,20 @@ export interface ProductStats {
   averageRating: number
   totalReviews: number
 }
+
+// SKU 재고 응답
+export interface SkuStockResponse {
+  skuId: number
+  stockQuantity: number
+  priceAdjustment: number
+  options: OptionCombinationResponse[]
+}
+
+// 옵션 조합 응답
+export interface OptionCombinationResponse {
+  groupName: string
+  valueName: string
+}
+
+// 제품 재고 조회 응답
+export type GetProductStockResponse = ApiResponse<SkuStockResponse[]>

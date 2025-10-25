@@ -18,6 +18,8 @@ import {
   ProductPreviewResponse,
   GetProductPreviewsRequest,
   GetProductPreviewsResponse,
+  SkuStockResponse,
+  GetProductStockResponse,
 } from '@/types/api/product'
 import { ApiResponse } from '@/types/api/common'
 
@@ -78,4 +80,9 @@ export const getProductPreviews = async (params: GetProductPreviewsRequest = {})
 // 상품 통계 조회
 export const getProductStats = async (): Promise<ApiResponse<ProductStats>> => {
   return apiClient.get<ProductStats>(PRODUCT_ENDPOINTS.GET_PRODUCT_STATS)
+}
+
+// 상품 재고 조회
+export const getProductStock = async (productId: string): Promise<GetProductStockResponse> => {
+  return apiClient.get<SkuStockResponse[]>(PRODUCT_ENDPOINTS.GET_PRODUCT_STOCK(productId))
 }
