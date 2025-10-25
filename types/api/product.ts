@@ -2,7 +2,7 @@
  * 상품 관련 타입 정의
  */
 
-import { ApiResponse, PaginatedResponse, FilterOptions, ScrollResponse } from './common'
+import { ApiResponse, FilterOptions, ScrollResponse } from './common'
 
 // 상품 기본 정보
 export interface Product {
@@ -62,7 +62,7 @@ export interface GetProductsRequest {
 }
 
 // 상품 목록 응답
-export type GetProductsResponse = ApiResponse<PaginatedResponse<Product>>
+export type GetProductsResponse = ScrollResponse<Product>
 
 // 상품 상세 조회 응답
 export type GetProductResponse = ApiResponse<Product>
