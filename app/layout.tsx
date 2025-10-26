@@ -6,9 +6,14 @@ import { Header } from "@/components/header"
 import { QueryProvider } from "@/lib/providers/query-provider"
 
 export const metadata: Metadata = {
-  title: "홈스윗홈 - 인테리어 쇼핑의 모든 것",
+  title: "라이프스타일 슈퍼앱, 홈스윗홈",
   description: "1000만이 선택한 No.1 인테리어 필수앱",
   generator: "v0.app",
+  icons: {
+    icon: "/house-logo.png",
+    shortcut: "/house-logo.png",
+    apple: "/house-logo.png",
+  },
 }
 
 export default function RootLayout({
