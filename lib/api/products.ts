@@ -36,8 +36,29 @@ export const getProduct = async (id: string): Promise<GetProductResponse> => {
 }
 
 // 상품 생성
-export const createProduct = async (data: CreateProductRequest): Promise<CreateProductResponse> => {
-  return apiClient.post<Product>(PRODUCT_ENDPOINTS.CREATE_PRODUCT, data)
+export const createProduct = async (
+  productData: CreateProductRequest,
+  mainImage: File,
+  detailImages: File[]
+): Promise<CreateProductResponse> => {
+  const formData = new FormData()
+  
+  // 상품 데이터를 JSON으로 추가
+  formData.append('product', JSON.stringify(productData))
+  
+  // 메인 이미지 추가
+  formData.append('mainImage', mainImage)
+  
+  // 상세 이미지들 추가
+  detailImages.forEach((image, index) => {
+    formData.append('detailImages', image)
+  })
+
+  return apiClient.post<Product>(PRODUCT_ENDPOINTS.CREATE_PRODUCT, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }
 
 // 상품 수정

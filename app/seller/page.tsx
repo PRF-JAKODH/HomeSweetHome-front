@@ -510,7 +510,7 @@ export default function SellerPage() {
                   <table className="w-full">
                     <thead className="bg-background-section">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium">상품 이미지</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">이미지</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">상품명</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">카테고리</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">가격</th>

@@ -29,20 +29,30 @@ export interface Product {
   updatedAt: string
 }
 
+// 옵션 그룹
+export interface OptionGroup {
+  groupName: string
+  values: string[]
+}
+
+// SKU 정보
+export interface SkuInfo {
+  priceAdjustment: number
+  stockQuantity: number
+  optionIndexes: number[]
+}
+
 // 상품 생성 요청
 export interface CreateProductRequest {
+  categoryId: number
   name: string
-  description: string
   brand: string
-  price: number
-  originalPrice?: number
-  images: string[]
-  categoryId: string
-  subCategoryId?: string
-  stockQuantity: number
-  isFreeShipping: boolean
-  tags?: string[]
-  specifications?: Record<string, any>
+  basePrice: number
+  discountRate: number
+  description: string
+  shippingPrice: number
+  optionGroups: OptionGroup[]
+  skus: SkuInfo[]
 }
 
 // 상품 수정 요청

@@ -12,7 +12,9 @@ import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "luc
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
+import { createProduct } from "@/lib/api/products"
 import { Category } from "@/types/api/category"
+import { CreateProductRequest, OptionGroup, SkuInfo } from "@/types/api/product"
 
 
 type OptionInput = {
@@ -51,6 +53,7 @@ export default function CreateProductPage() {
   const [optionCombinations, setOptionCombinations] = useState<OptionCombination[]>([])
   const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
   const [bulkStock, setBulkStock] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 카테고리 API 훅들
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
@@ -204,7 +207,23 @@ export default function CreateProductPage() {
     setBulkStock("")
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve) => {
+      const arr = base64String.split(',')
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const file = new File([u8arr], filename, { type: mime })
+      resolve(file)
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!mainImage) {
@@ -212,12 +231,13 @@ export default function CreateProductPage() {
       return
     }
 
-    if (!selectedDetailCategory) {
+    const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
+    if (!selectedCategoryId) {
       alert("카테고리를 선택해주세요.")
       return
     }
 
-    if (!productName || !originalPrice) {
+    if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
       return
     }
@@ -232,9 +252,82 @@ export default function CreateProductPage() {
       return
     }
 
-    // Save product logic here
-    alert("상품이 등록되었습니다!")
-    router.push("/seller")
+    setIsSubmitting(true)
+    try {
+      // 메인 이미지를 File로 변환
+      const mainImageFile = await base64ToFile(mainImage, 'main-image.jpg')
+      
+      // 상세 이미지들을 File로 변환
+      const detailImageFiles: File[] = []
+      for (const image of subImages) {
+        const file = await base64ToFile(image, `detail-image-${detailImageFiles.length}.jpg`)
+        detailImageFiles.push(file)
+      }
+
+      // 상품 데이터 구성
+      let productData: CreateProductRequest
+
+      if (productType === "single") {
+        // 단일 상품
+        productData = {
+          categoryId: selectedCategoryId,
+          name: productName,
+          brand: brand,
+          basePrice: parseInt(originalPrice),
+          discountRate: parseFloat(discountRate) || 0,
+          description: description,
+          shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0,
+          optionGroups: [],
+          skus: [{
+            priceAdjustment: 0,
+            stockQuantity: parseInt(stock),
+            optionIndexes: []
+          }]
+        }
+      } else {
+        // 옵션 상품
+        const optionGroups: OptionGroup[] = optionInputs
+          .filter(opt => opt.name && opt.values)
+          .map(opt => ({
+            groupName: opt.name,
+            values: opt.values.split(',').map(v => v.trim()).filter(v => v)
+          }))
+
+        const skus: SkuInfo[] = optionCombinations.map(combo => ({
+          priceAdjustment: combo.additionalPrice,
+          stockQuantity: combo.stock,
+          optionIndexes: [] // TODO: 옵션 인덱스 계산 로직 필요
+        }))
+
+        productData = {
+          categoryId: selectedCategoryId,
+          name: productName,
+          brand: brand,
+          basePrice: parseInt(originalPrice),
+          discountRate: parseFloat(discountRate) || 0,
+          description: description,
+          shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0,
+          optionGroups,
+          skus
+        }
+      }
+
+      await createProduct(productData, mainImageFile, detailImageFiles)
+      
+      alert("상품이 등록되었습니다!")
+      router.push("/seller")
+    } catch (error: any) {
+      console.error('상품 등록 실패:', error)
+      
+      // 409 에러 (동일한 제품명) 처리
+      if (error?.response?.status === 409) {
+        alert(error?.response?.data?.message || "동일한 제품명을 사용할 수 없습니다.")
+      } else {
+        alert("상품 등록에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // 클라이언트 사이드에서만 렌더링
@@ -467,12 +560,15 @@ export default function CreateProductPage() {
             </div>
 
             <div>
-              <Label htmlFor="brand">브랜드</Label>
+              <Label htmlFor="brand">
+                브랜드 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="brand"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder="브랜드명을 입력하세요"
+                required
               />
             </div>
 
@@ -748,8 +844,12 @@ export default function CreateProductPage() {
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
               취소
             </Button>
-            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-              상품 등록
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isSubmitting ? "등록 중..." : "상품 등록"}
             </Button>
           </div>
         </form>
