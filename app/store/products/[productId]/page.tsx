@@ -9,13 +9,14 @@ import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getProduct, getProductStock } from "@/lib/api/products"
+import { getProduct, getProductStock, getProductPreviews } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
 import { getProductReviews, getProductReviewStatistics, createProductReview } from "@/lib/api/reviews"
 import { useAddToCart } from "@/lib/hooks/use-cart"
-import { Product, SkuStockResponse } from "@/types/api/product"
+import { Product, SkuStockResponse, ProductPreviewResponse } from "@/types/api/product"
 import { Category } from "@/types/api/category"
 import { ProductReviewResponse, ProductReviewStatisticsResponse } from "@/types/api/review"
+import { ProductCard } from "@/components/product-card"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -72,6 +73,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   const [showCartSuccess, setShowCartSuccess] = useState(false)
+  const [recommendedProducts, setRecommendedProducts] = useState<ProductPreviewResponse[]>([])
+  const [recommendedLoading, setRecommendedLoading] = useState(false)
 
   // 장바구니 API 훅
   const addToCartMutation = useAddToCart()
@@ -261,6 +264,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       fetchReviewStatistics()
     }
   }, [resolvedParams.productId])
+
+  // 추천 상품 데이터 가져오기
+  useEffect(() => {
+    const fetchRecommendedProducts = async () => {
+      if (!product?.categoryId) return
+      
+      try {
+        setRecommendedLoading(true)
+        const response = await getProductPreviews({
+          categoryId: Number(product.categoryId),
+          limit: 8, // 추천 상품 8개
+          sortType: 'LATEST'
+        })
+        
+        // 현재 상품을 제외한 상품들만 필터링
+        const filteredProducts = response.contents.filter(p => p.id !== Number(product.id))
+        setRecommendedProducts(filteredProducts.slice(0, 6)) // 최대 6개만 표시
+      } catch (err) {
+        console.error('추천 상품 조회 실패:', err)
+        setRecommendedProducts([])
+      } finally {
+        setRecommendedLoading(false)
+      }
+    }
+
+    if (product?.categoryId) {
+      fetchRecommendedProducts()
+    }
+  }, [product?.categoryId, product?.id])
 
   // 스크롤 위치 감지
   useEffect(() => {
@@ -903,6 +935,53 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               {product.description || "상품 상세 정보가 없습니다."}
             </div>
           </Card>
+        </section>
+
+        {/* Recommended Products */}
+        <section className="mt-16">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">추천 상품</h2>
+            <p className="text-sm text-text-secondary mt-1">같은 카테고리의 다른 상품들을 확인해보세요</p>
+          </div>
+
+          {recommendedLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-text-secondary">추천 상품을 불러오는 중...</p>
+              </div>
+            </div>
+          ) : recommendedProducts.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+              {recommendedProducts.map((recommendedProduct) => {
+                // 할인가 계산
+                const finalPrice = recommendedProduct.discountRate > 0 
+                  ? Math.round(recommendedProduct.basePrice * (1 - recommendedProduct.discountRate / 100))
+                  : recommendedProduct.basePrice
+                
+                return (
+                  <ProductCard
+                    key={recommendedProduct.id}
+                    id={recommendedProduct.id.toString()}
+                    name={recommendedProduct.name}
+                    price={finalPrice}
+                    originalPrice={recommendedProduct.discountRate > 0 ? recommendedProduct.basePrice : undefined}
+                    image={recommendedProduct.imageUrl}
+                    brand={recommendedProduct.brand}
+                    rating={recommendedProduct.averageRating}
+                    reviewCount={recommendedProduct.reviewCount}
+                    isFreeShipping={recommendedProduct.shippingPrice === 0}
+                    shippingPrice={recommendedProduct.shippingPrice}
+                    discountRate={recommendedProduct.discountRate}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-text-secondary">추천 상품이 없습니다.</p>
+            </div>
+          )}
         </section>
 
         {/* Reviews */}

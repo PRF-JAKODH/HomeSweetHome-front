@@ -26,7 +26,7 @@ export default function SellerPage() {
   const [period, setPeriod] = useState<PeriodType>("daily")
   const [status, setStatus] = useState<SettlementStatus | "all">("all")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    from: new Date(),
     to: new Date(),
   })
   const [drillDown, setDrillDown] = useState<DrillDownState>({
