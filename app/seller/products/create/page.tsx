@@ -814,20 +814,22 @@ export default function CreateProductPage() {
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  value={combo.additionalPrice}
-                                  onChange={(e) =>
-                                    updateCombination(index, "additionalPrice", Number.parseInt(e.target.value) || 0)
-                                  }
+                                  value={combo.additionalPrice || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0
+                                    updateCombination(index, "additionalPrice", value)
+                                  }}
                                   className="w-32"
                                 />
                               </td>
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  value={combo.stockQuantity}
-                                  onChange={(e) =>
-                                    updateCombination(index, "stockQuantity", Number.parseInt(e.target.value) || 0)
-                                  }
+                                  value={combo.stockQuantity || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0
+                                    updateCombination(index, "stockQuantity", value)
+                                  }}
                                   className="w-32"
                                 />
                               </td>
