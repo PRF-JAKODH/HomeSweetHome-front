@@ -592,7 +592,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             {/* Rating & Reviews */}
             <div className="mb-6 flex items-center gap-3">
               <div className="flex items-center gap-1">
-                <span className="text-warning text-lg">★</span>
+                <span className="text-sky-400 text-lg">★</span>
                 <span className="font-bold text-foreground">
                   {reviewStatistics ? reviewStatistics.averageRating.toFixed(1) : (product.rating || 0)}
                 </span>
@@ -844,7 +844,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
-                        <span key={i} className="text-2xl text-yellow-400">★</span>
+                        <span key={i} className="text-2xl text-sky-400">★</span>
                       ))}
                     </div>
                     <span className="text-3xl font-bold text-foreground">{reviewStatistics.averageRating.toFixed(1)}</span>
@@ -892,7 +892,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       onMouseLeave={() => setHoveredRating(0)}
                       className="text-3xl transition-colors"
                     >
-                      <span className={star <= (hoveredRating || reviewRating) ? "text-yellow-400" : "text-gray-300"}>
+                      <span className={star <= (hoveredRating || reviewRating) ? "text-sky-400" : "text-gray-300"}>
                         ★
                       </span>
                     </button>
@@ -993,7 +993,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                             <span className="font-medium text-foreground block">{review.username}</span>
                             <div className="flex items-center gap-1">
                               {[...Array(5)].map((_, i) => (
-                                <span key={i} className={`text-sm ${i < review.rating ? "text-yellow-400" : "text-gray-300"}`}>
+                                <span key={i} className={`text-sm ${i < review.rating ? "text-sky-400" : "text-gray-300"}`}>
                                   ★
                                 </span>
                               ))}
