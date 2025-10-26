@@ -192,11 +192,11 @@ export default function ProfilePage() {
     setEditReviewRating(review.rating)
     setEditReviewContent(review.comment)
     
-    // 기존 이미지가 Data URL 형식인지 확인
-    if (review.imageUrl && review.imageUrl.startsWith('data:')) {
+    // 기존 이미지가 있는 경우 표시
+    if (review.imageUrl) {
       setEditReviewImages([review.imageUrl])
     } else {
-      // 일반 URL이거나 이미지가 없는 경우 빈 배열로 설정
+      // 이미지가 없는 경우 빈 배열로 설정
       setEditReviewImages([])
     }
     
@@ -273,12 +273,18 @@ export default function ProfilePage() {
       let imageFile: File
       
       if (editReviewImages.length > 0 && editReviewImages[0]) {
-        try {
-          // Base64 이미지를 File 객체로 변환
-          imageFile = await base64ToFile(editReviewImages[0], 'review-image.jpg')
-        } catch (base64Error) {
-          console.error('이미지 변환 실패:', base64Error)
-          // 이미지 변환 실패 시 빈 파일로 대체
+        // 이미지가 Data URL 형식인지 확인
+        if (editReviewImages[0].startsWith('data:')) {
+          try {
+            // Base64 이미지를 File 객체로 변환
+            imageFile = await base64ToFile(editReviewImages[0], 'review-image.jpg')
+          } catch (base64Error) {
+            console.error('이미지 변환 실패:', base64Error)
+            // 이미지 변환 실패 시 빈 파일로 대체
+            imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+          }
+        } else {
+          // 일반 URL인 경우 빈 파일로 처리 (기존 이미지 유지)
           imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
         }
       } else {
@@ -296,7 +302,9 @@ export default function ProfilePage() {
       
       setMyReviews((prevReviews) =>
         prevReviews.map((review) =>
-          review.reviewId === selectedReview.reviewId ? updatedReview : review
+          review.reviewId === selectedReview.reviewId 
+            ? { ...updatedReview, productName: review.productName } // 기존 productName 보존
+            : review
         )
       )
 

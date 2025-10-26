@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import { ProductReviewCreateRequest, ProductReviewResponse, ProductReviewStatisticsResponse } from '@/types/api/review'
+import { ProductReviewCreateRequest, ProductReviewUpdateRequest, ProductReviewResponse, ProductReviewStatisticsResponse } from '@/types/api/review'
 import { ScrollResponse } from '@/types/api/common'
 
 /**
@@ -41,7 +41,7 @@ export const createProductReview = async (
       },
     }
   )
-  return response
+  return response.data || response
 }
 
 /**
@@ -97,5 +97,5 @@ export const updateProductReview = async (
       },
     }
   )
-  return response
+  return response.data || response
 }
