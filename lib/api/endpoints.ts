@@ -38,6 +38,17 @@ export const CATEGORY_ENDPOINTS = {
   GET_CATEGORY_HIERARCHY: (categoryId: number) => `/api/v1/categories/hierarchy/${categoryId}`,
 } as const
 
+// 장바구니 관련 엔드포인트
+export const CART_ENDPOINTS = {
+  // 장바구니 CRUD
+  GET_CART: '/api/v1/carts',
+  ADD_TO_CART: '/api/v1/carts',
+  UPDATE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,
+  DELETE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,
+  DELETE_CART_ITEMS: '/api/v1/carts/batch',
+  CLEAR_CART: '/api/v1/carts/clear',
+} as const
+
 // 공통 엔드포인트
 export const COMMON_ENDPOINTS = {
   HEALTH_CHECK: '/health',

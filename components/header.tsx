@@ -66,21 +66,8 @@ export function Header() {
       setUnreadCount(sampleNotifications.filter((n) => !n.read).length)
     }
 
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      setCartCount(cart.length)
-    }
-
-    const handleCartUpdate = () => {
-      const storedCart = localStorage.getItem("ohouse_cart")
-      if (storedCart) {
-        const cart = JSON.parse(storedCart)
-        setCartCount(cart.length)
-      } else {
-        setCartCount(0)
-      }
-    }
+    // 장바구니 개수는 API에서 가져오므로 로컬 스토리지 로직 제거
+    // TODO: API를 통해 장바구니 개수 조회하도록 수정 필요
 
     const handleUserTypeUpdate = () => {
       const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -89,13 +76,9 @@ export function Header() {
       }
     }
 
-    window.addEventListener("storage", handleCartUpdate)
-    window.addEventListener("cartUpdated", handleCartUpdate)
     window.addEventListener("userTypeUpdated", handleUserTypeUpdate)
 
     return () => {
-      window.removeEventListener("storage", handleCartUpdate)
-      window.removeEventListener("cartUpdated", handleCartUpdate)
       window.removeEventListener("userTypeUpdated", handleUserTypeUpdate)
     }
   }, [])

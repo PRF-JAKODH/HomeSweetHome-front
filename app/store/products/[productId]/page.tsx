@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getProduct, getProductStock } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
 import { getProductReviews, getProductReviewStatistics } from "@/lib/api/reviews"
+import { useAddToCart } from "@/lib/hooks/use-cart"
 import { Product, SkuStockResponse } from "@/types/api/product"
 import { Category } from "@/types/api/category"
 import { ProductReviewResponse, ProductReviewStatisticsResponse } from "@/types/api/review"
@@ -70,6 +71,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
 
+  // 장바구니 API 훅
+  const addToCartMutation = useAddToCart()
+
   // 옵션 그룹 추출 함수
   const getOptionGroups = () => {
     if (!stockData || stockData.length === 0) return {}
@@ -77,11 +81,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     const groups: Record<string, string[]> = {}
     stockData.forEach(sku => {
       sku.options.forEach(option => {
-        if (!groups[option.groupName]) {
-          groups[option.groupName] = []
-        }
-        if (!groups[option.groupName].includes(option.valueName)) {
-          groups[option.groupName].push(option.valueName)
+        // null 옵션은 제외
+        if (option.groupName && option.valueName) {
+          if (!groups[option.groupName]) {
+            groups[option.groupName] = []
+          }
+          if (!groups[option.groupName].includes(option.valueName)) {
+            groups[option.groupName].push(option.valueName)
+          }
         }
       })
     })
@@ -101,9 +108,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     if (!stockData || stockData.length === 0) return null
     
     return stockData.find(sku => {
-      return sku.options.every(option => 
-        selectedSkus[option.groupName] === option.valueName
-      )
+      return sku.options.every(option => {
+        // null 옵션은 항상 매치
+        if (!option.groupName || !option.valueName) {
+          return true
+        }
+        return selectedSkus[option.groupName] === option.valueName
+      })
     }) || null
   }
 
@@ -159,7 +170,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             name: "판매자명"
           },
           options: stockData.map(sku => ({
-            name: sku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', '),
+            name: sku.options
+              .filter(opt => opt.groupName && opt.valueName) // null 옵션 제외
+              .map(opt => `${opt.groupName}: ${opt.valueName}`)
+              .join(', ') || '기본 옵션',
             additionalPrice: sku.priceAdjustment,
             stock: sku.stockQuantity
           }))
@@ -308,7 +322,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     }
   }, [selectedSku, quantity])
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return
     
     if (product.productType === "options" && !selectedSku) {
@@ -321,27 +335,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       return
     }
 
-    const cartItem = {
-      id: `${product.id}-${selectedSku?.skuId || "single"}-${Date.now()}`,
-      productId: product.id,
-      skuId: selectedSku?.skuId,
-      name: product.name,
-      brand: product.brand,
-      image: product.images[0],
-      price: currentPrice,
-      quantity: quantity,
-      selected: true,
-      option: product.productType === "options" ? selectedSku : null,
+    try {
+      // 백엔드 API를 통해 장바구니에 상품 추가
+      await addToCartMutation.mutateAsync({
+        skuId: selectedSku?.skuId || 0, // SKU ID (옵션이 없는 경우 0 또는 기본값)
+        quantity: quantity
+      })
+
+      alert("장바구니에 상품이 담겼습니다.")
+    } catch (error) {
+      console.error('장바구니 추가 실패:', error)
+      alert("장바구니에 상품을 담는데 실패했습니다. 다시 시도해주세요.")
     }
-
-    const storedCart = localStorage.getItem("ohouse_cart")
-    const cart = storedCart ? JSON.parse(storedCart) : []
-    cart.push(cartItem)
-    localStorage.setItem("ohouse_cart", JSON.stringify(cart))
-
-    window.dispatchEvent(new Event("cartUpdated"))
-
-    alert("장바구니에 상품이 담겼습니다.")
   }
 
   const handleBuyNow = () => {
@@ -634,7 +639,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             </div>
 
             {/* Option Selection */}
-            {product.productType === "options" && stockData && stockData.length > 0 && (
+            {product.productType === "options" && stockData && stockData.length > 0 && Object.keys(getOptionGroups()).length > 0 && (
               <div className="mb-6">
                 {Object.entries(getOptionGroups()).map(([groupName, values]) => (
                   <div key={groupName} className="mb-4">
@@ -683,7 +688,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   <span className="text-foreground font-medium">재고:</span>
                   <span
                     className={`font-medium ${
-                      selectedSku.stockQuantity === 0 ? "text-red-500" : selectedSku.stockQuantity < 10 ? "text-orange-500" : "text-green-600"
+                      selectedSku.stockQuantity === 0 ? "text-red-500" : "text-foreground"
                     }`}
                   >
                     {selectedSku.stockQuantity === 0 ? "품절" : `${selectedSku.stockQuantity}개`}
@@ -698,7 +703,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
                     <div className="text-sm font-medium text-foreground">
-                      {selectedSku.options.map(opt => `${opt.groupName}: ${opt.valueName}`).join(', ')}
+                      {selectedSku.options
+                        .filter(opt => opt.groupName && opt.valueName) // null 옵션 제외
+                        .map(opt => `${opt.groupName}: ${opt.valueName}`)
+                        .join(', ') || '기본 옵션'}
                     </div>
                   </div>
                   <button
@@ -783,9 +791,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   size="lg"
                   className="flex-1 border-primary text-primary hover:bg-primary/10 bg-transparent"
                   onClick={handleAddToCart}
-                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)}
+                  disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku) || addToCartMutation.isPending}
                 >
-                  장바구니
+                  {addToCartMutation.isPending ? "담는 중..." : "장바구니"}
                 </Button>
                 <Button
                   size="lg"
