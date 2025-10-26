@@ -551,24 +551,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         {/* Product Main Section */}
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Image Gallery */}
-          <div>
-            {/* Main Image */}
-            <div className="mb-4 aspect-square overflow-hidden rounded-lg bg-background-section">
-              <img
-                src={product.images?.[selectedImage] || product.thumbnail || "/placeholder.svg"}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            </div>
-
-            {/* Thumbnail Images */}
-            <div className="grid grid-cols-4 gap-2">
+          <div className="flex gap-4">
+            {/* Thumbnail Images - Left Side */}
+            <div className="flex flex-col gap-2 w-20">
               {(product.images || [product.thumbnail]).map((image: string, index: number) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
                   className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-                    selectedImage === index ? "border-primary" : "border-transparent"
+                    selectedImage === index ? "border-primary" : "border-gray-200"
                   }`}
                 >
                   <img
@@ -578,6 +569,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                   />
                 </button>
               ))}
+            </div>
+
+            {/* Main Image - Right Side */}
+            <div className="flex-1 aspect-square overflow-hidden rounded-lg bg-background-section">
+              <img
+                src={product.images?.[selectedImage] || product.thumbnail || "/placeholder.svg"}
+                alt={product.name}
+                className="h-full w-full object-cover"
+              />
             </div>
           </div>
 
