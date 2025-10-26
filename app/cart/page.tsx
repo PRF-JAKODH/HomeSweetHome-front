@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useInfiniteCartItems, useAddToCart, useDeleteCartItem, useDeleteCartItems } from "@/lib/hooks/use-cart"
+import { useCart, useAddToCart, useDeleteCartItem, useDeleteCartItems } from "@/lib/hooks/use-cart"
 import { CartResponse } from "@/types/api/cart"
 
 interface CartItem {
@@ -30,20 +30,9 @@ export default function CartPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   
-  // 무한 스크롤을 위한 observer ref
-  const observerTarget = useRef<HTMLDivElement>(null)
-  // 이전 apiCartItems 참조를 추적하여 무한 루프 방지
-  const prevApiCartItemsRef = useRef<CartResponse[] | null>(null)
   
   // API 훅들
-  const { 
-    cartItems: apiCartItems, 
-    isLoading, 
-    isLoadingMore, 
-    hasNext, 
-    error, 
-    loadMore 
-  } = useInfiniteCartItems(10)
+  const { data: cartData, isLoading, error } = useCart()
   const addToCartMutation = useAddToCart()
   const deleteCartItemMutation = useDeleteCartItem()
   const deleteCartItemsMutation = useDeleteCartItems()
@@ -69,81 +58,37 @@ export default function CartPage() {
     })
   }
 
-  // API 데이터를 로컬 상태로 변환 (useRef로 무한 루프 방지)
+  // API 데이터를 로컬 상태로 변환
   useEffect(() => {
-    if (!apiCartItems) return
-    
-    // 이전 데이터와 비교하여 실제로 변경된 경우에만 처리
-    const prevItems = prevApiCartItemsRef.current
-    if (prevItems && prevItems.length === apiCartItems.length) {
-      const isSame = prevItems.every((prevItem, index) => {
-        const currentItem = apiCartItems[index]
-        return prevItem.id === currentItem.id && 
-               prevItem.quantity === currentItem.quantity &&
-               prevItem.finalPrice === currentItem.finalPrice
-      })
-      if (isSame) return
+    if (cartData?.contents) {
+      const transformedItems: CartItem[] = cartData.contents.map((item: CartResponse) => ({
+        id: item.id.toString(),
+        productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
+        skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
+        name: item.productName,
+        brand: item.brand,
+        image: item.imageUrl,
+        price: item.finalPrice, // 할인된 최종 가격 사용
+        option: (() => {
+          // null, undefined, "null: null" 문자열 등을 모두 체크
+          if (!item.optionSummary || 
+              item.optionSummary === 'null' || 
+              item.optionSummary === 'null: null' || 
+              item.optionSummary.trim() === '') {
+            return '기본 옵션'
+          }
+          return item.optionSummary
+        })(),
+        quantity: item.quantity,
+        selected: true,
+        shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
+        basePrice: item.basePrice, // API에서 원가 가져오기
+      }))
+      
+      setCartItems(transformedItems)
     }
-    
-    const transformedItems: CartItem[] = apiCartItems.map((item: CartResponse) => ({
-      id: item.id.toString(),
-      productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
-      skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
-      name: item.productName,
-      brand: item.brand,
-      image: item.imageUrl,
-      price: item.finalPrice, // 할인된 최종 가격 사용
-      option: (() => {
-        // null, undefined, "null: null" 문자열 등을 모두 체크
-        if (!item.optionSummary || 
-            item.optionSummary === 'null' || 
-            item.optionSummary === 'null: null' || 
-            item.optionSummary.trim() === '') {
-          return '기본 옵션'
-        }
-        return item.optionSummary
-      })(),
-      quantity: item.quantity,
-      selected: true,
-      shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
-      basePrice: item.basePrice, // API에서 원가 가져오기
-    }))
-    
-    // ID 기반 중복 제거
-    const uniqueItems = transformedItems.filter((item, index, self) =>
-      index === self.findIndex((i) => i.id === item.id)
-    )
-    
-    setCartItems(uniqueItems)
-    prevApiCartItemsRef.current = apiCartItems
-  }, [apiCartItems])
+  }, [cartData])
 
-  // 무한 스크롤 Intersection Observer 설정
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // 타겟이 화면에 보이고, 더 불러올 데이터가 있으면 loadMore 호출
-        if (entries[0].isIntersecting && hasNext && !isLoadingMore) {
-          loadMore()
-        }
-      },
-      {
-        threshold: 0.1, // 10%만 보여도 트리거
-        rootMargin: '100px', // 100px 전에 미리 로드
-      }
-    )
-
-    const currentTarget = observerTarget.current
-    if (currentTarget) {
-      observer.observe(currentTarget)
-    }
-
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget)
-      }
-    }
-  }, [hasNext, isLoadingMore, loadMore])
 
   const updateCart = (items: CartItem[]) => {
     setCartItems(items)
@@ -184,9 +129,25 @@ export default function CartPage() {
         skuId: skuId, // null 체크된 skuId 사용
         quantity: newQuantity // 새로운 전체 수량
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('수량 변경 실패:', error)
-      alert('수량 변경에 실패했습니다. 다시 시도해주세요.')
+      
+      // 백엔드에서 보내는 에러 메시지에 따라 적절한 알림 표시
+      let errorMessage = "수량 변경에 실패했습니다. 다시 시도해주세요."
+      
+      if (error?.response?.data?.message) {
+        const backendMessage = error.response.data.message
+        
+        if (backendMessage.includes('CART_LIMIT_EXCEEDED_ERROR')) {
+          errorMessage = "장바구니에 담을 수 있는 최대 수량은 10개입니다."
+        } else if (backendMessage.includes('CART_ITEM_TYPE_LIMIT_EXCEEDED_ERROR')) {
+          errorMessage = "장바구니에 담을 수 있는 최대 상품 종류는 10개입니다."
+        } else {
+          errorMessage = backendMessage
+        }
+      }
+      
+      alert(errorMessage)
     }
   }
 
@@ -502,26 +463,6 @@ export default function CartPage() {
                     </div>
                   </Card>
                 ))}
-                
-                {/* 무한 스크롤 트리거 */}
-                {hasNext && (
-                  <div ref={observerTarget} className="py-8">
-                    {isLoadingMore && (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* 모든 아이템 로드 완료 메시지 */}
-                {!hasNext && cartItems.length > 0 && (
-                  <div className="py-8 text-center">
-                    <p className="text-muted-foreground">
-                      모든 장바구니 아이템을 불러왔습니다.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
             

@@ -344,9 +344,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       })
 
       setShowCartSuccess(true)
-    } catch (error) {
+    } catch (error: any) {
       console.error('장바구니 추가 실패:', error)
-      alert("장바구니에 상품을 담는데 실패했습니다. 다시 시도해주세요.")
+      
+      // 백엔드에서 보내는 에러 메시지에 따라 적절한 알림 표시
+      let errorMessage = "장바구니에 상품을 담는데 실패했습니다. 다시 시도해주세요."
+      
+      if (error?.response?.data?.message) {
+        const backendMessage = error.response.data.message
+        
+        if (backendMessage.includes('CART_LIMIT_EXCEEDED_ERROR')) {
+          errorMessage = "장바구니에 담을 수 있는 최대 수량은 10개입니다."
+        } else if (backendMessage.includes('CART_ITEM_TYPE_LIMIT_EXCEEDED_ERROR')) {
+          errorMessage = "장바구니에 담을 수 있는 최대 상품 종류는 10개입니다."
+        } else {
+          errorMessage = backendMessage
+        }
+      }
+      
+      alert(errorMessage)
     }
   }
 
