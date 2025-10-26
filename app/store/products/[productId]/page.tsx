@@ -551,9 +551,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         {/* Product Main Section */}
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Image Gallery */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 h-[500px]">
             {/* Thumbnail Images - Left Side */}
-            <div className="flex flex-col gap-2 w-20">
+            <div className="flex flex-col gap-2 w-20 flex-shrink-0">
               {(product.images || [product.thumbnail]).map((image: string, index: number) => (
                 <button
                   key={index}
@@ -572,7 +572,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             </div>
 
             {/* Main Image - Right Side */}
-            <div className="flex-1 aspect-square overflow-hidden rounded-lg bg-background-section">
+            <div className="flex-1 h-full overflow-hidden rounded-lg bg-background-section">
               <img
                 src={product.images?.[selectedImage] || product.thumbnail || "/placeholder.svg"}
                 alt={product.name}
