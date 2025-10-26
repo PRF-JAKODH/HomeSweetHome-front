@@ -11,7 +11,7 @@ import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getProduct, getProductStock } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
-import { getProductReviews, getProductReviewStatistics } from "@/lib/api/reviews"
+import { getProductReviews, getProductReviewStatistics, createProductReview } from "@/lib/api/reviews"
 import { useAddToCart } from "@/lib/hooks/use-cart"
 import { Product, SkuStockResponse } from "@/types/api/product"
 import { Category } from "@/types/api/category"
@@ -67,6 +67,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewImages, setReviewImages] = useState<string[]>([])
   const [userReviews, setUserReviews] = useState<ProductReviewResponse[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [submittingReview, setSubmittingReview] = useState(false)
   const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
   const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
@@ -411,22 +412,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files) {
-      const newImages: string[] = []
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          newImages.push(reader.result as string)
-          if (newImages.length === files.length) {
-            setReviewImages([...reviewImages, ...newImages])
-          }
-        }
-        reader.readAsDataURL(file)
-      })
+    if (files && files.length > 0) {
+      const file = files[0] // 첫 번째 파일만 사용
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setReviewImages([reader.result as string]) // 기존 이미지를 대체
+      }
+      reader.readAsDataURL(file)
     }
   }
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (reviewRating === 0) {
       alert("별점을 선택해주세요.")
       return
@@ -436,25 +432,60 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       return
     }
 
-    const newReview: ProductReviewResponse = {
-      reviewId: Date.now(),
-      productId: parseInt(resolvedParams.productId),
-      userId: 1, // 임시 사용자 ID
-      productName: product?.name || "",
-      username: "나",
-      rating: reviewRating,
-      comment: reviewContent,
-      imageUrl: reviewImages[0] || "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
+    setSubmittingReview(true)
+    try {
+      let imageFile: File
+      
+      if (reviewImages.length > 0) {
+        // Base64 이미지를 File 객체로 변환
+        imageFile = await base64ToFile(reviewImages[0], 'review-image.jpg')
+      } else {
+        // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
+        imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+      }
+      
+      const reviewData = {
+        rating: reviewRating,
+        comment: reviewContent,
+        image: imageFile
+      }
 
-    setUserReviews([newReview, ...userReviews])
-    setShowReviewForm(false)
-    setReviewRating(0)
-    setReviewContent("")
-    setReviewImages([])
-    alert("리뷰가 등록되었습니다.")
+      const newReview = await createProductReview(resolvedParams.productId, reviewData)
+      
+      setUserReviews([newReview, ...userReviews])
+      setShowReviewForm(false)
+      setReviewRating(0)
+      setReviewContent("")
+      setReviewImages([])
+      alert("리뷰가 등록되었습니다.")
+    } catch (error: any) {
+      console.error('리뷰 등록 실패:', error)
+      
+      // 409 에러 (이미 리뷰 작성한 경우) 처리
+      if (error?.response?.status === 409) {
+        alert(error?.response?.data?.message || "이미 해당 상품에 대한 리뷰를 작성했습니다.")
+      } else {
+        alert("리뷰 등록에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
+
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve) => {
+      const arr = base64String.split(',')
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const file = new File([u8arr], filename, { type: mime })
+      resolve(file)
+    })
   }
 
   // 로딩 상태
@@ -963,7 +994,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
               {/* Image Upload */}
               <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택)</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택, 최대 1장)</label>
                 <div className="flex flex-wrap gap-3">
                   {reviewImages.map((image, index) => (
                     <div key={index} className="relative">
@@ -981,7 +1012,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       </button>
                     </div>
                   ))}
-                  {reviewImages.length < 5 && (
+                  {reviewImages.length < 1 && (
                     <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80">
                       <svg
                         className="mb-1 h-6 w-6 text-text-secondary"
@@ -991,11 +1022,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                      <span className="text-xs text-text-secondary">{reviewImages.length}/5</span>
+                      <span className="text-xs text-text-secondary">{reviewImages.length}/1</span>
                       <input
                         type="file"
                         accept="image/*"
-                        multiple
                         onChange={handleReviewImageUpload}
                         className="hidden"
                       />
@@ -1017,8 +1047,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 >
                   취소
                 </Button>
-                <Button onClick={handleSubmitReview} className="bg-primary hover:bg-primary-dark text-white">
-                  리뷰 등록
+                <Button 
+                  onClick={handleSubmitReview} 
+                  disabled={submittingReview}
+                  className="bg-primary hover:bg-primary-dark text-white disabled:opacity-50"
+                >
+                  {submittingReview ? "등록 중..." : "리뷰 등록"}
                 </Button>
               </div>
             </Card>

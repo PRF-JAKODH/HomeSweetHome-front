@@ -3,7 +3,7 @@ import { ScrollResponse } from './common'
 export interface ProductReviewCreateRequest {
   rating: number // 1-5점
   comment: string
-  image?: File // MultipartFile
+  image: File // MultipartFile
 }
 
 export interface ProductReviewResponse {

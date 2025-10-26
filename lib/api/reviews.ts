@@ -30,10 +30,7 @@ export const createProductReview = async (
   const formData = new FormData()
   formData.append('rating', reviewData.rating.toString())
   formData.append('comment', reviewData.comment)
-  
-  if (reviewData.image) {
-    formData.append('image', reviewData.image)
-  }
+  formData.append('image', reviewData.image)
 
   const response = await apiClient.post<ProductReviewResponse>(
     `/api/v1/product/reviews/${productId}`,
