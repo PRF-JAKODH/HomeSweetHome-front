@@ -252,26 +252,6 @@ export default function StorePage() {
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
               <div className="space-y-2">
-                {/* 카테고리 경로 표시 */}
-                {categoryPath && (
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <button 
-                        onClick={handleAllCategoriesClick}
-                        className="hover:text-foreground transition-colors"
-                      >
-                        전체
-                      </button>
-                      {categoryPath.split(" > ").map((path, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <span>{'>'}</span>
-                          <span className="text-foreground">{path}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* 전체 카테고리 버튼 */}
                 <button
                   onClick={handleAllCategoriesClick}
