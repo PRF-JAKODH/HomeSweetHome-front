@@ -20,6 +20,7 @@ import {
   GetProductPreviewsResponse,
   SkuStockResponse,
   GetProductStockResponse,
+  ProductManageResponse,
 } from '@/types/api/product'
 import { ApiResponse } from '@/types/api/common'
 
@@ -32,7 +33,7 @@ export const getProducts = async (params?: GetProductsRequest): Promise<GetProdu
 
 // 상품 상세 조회
 export const getProduct = async (id: string): Promise<GetProductResponse> => {
-  return apiClient.get<Product>(PRODUCT_ENDPOINTS.GET_PRODUCT(id))
+  return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT(id))
 }
 
 // 상품 생성
@@ -100,10 +101,28 @@ export const getProductPreviews = async (params: GetProductPreviewsRequest = {})
 
 // 상품 통계 조회
 export const getProductStats = async (): Promise<ApiResponse<ProductStats>> => {
-  return apiClient.get<ProductStats>(PRODUCT_ENDPOINTS.GET_PRODUCT_STATS)
+  return apiClient.get<ApiResponse<ProductStats>>(PRODUCT_ENDPOINTS.GET_PRODUCT_STATS)
 }
 
 // 상품 재고 조회
-export const getProductStock = async (productId: string): Promise<GetProductStockResponse> => {
-  return apiClient.get<SkuStockResponse[]>(PRODUCT_ENDPOINTS.GET_PRODUCT_STOCK(productId))
+export const getProductStock = async (productId: string): Promise<SkuStockResponse[]> => {
+  const response = await apiClient.get<SkuStockResponse[]>(PRODUCT_ENDPOINTS.GET_PRODUCT_STOCK(productId))
+  return response
+}
+
+// 판매자 상품 목록 조회
+export const getSellerProducts = async (
+  startDate?: string,
+  endDate?: string
+): Promise<ProductManageResponse[]> => {
+  const params = new URLSearchParams()
+  if (startDate) {
+    params.append('startDate', startDate)
+  }
+  if (endDate) {
+    params.append('endDate', endDate)
+  }
+
+  const response = await apiClient.get<ProductManageResponse[]>(`/api/v1/products/seller?${params}`)
+  return response
 }

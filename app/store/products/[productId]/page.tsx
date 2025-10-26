@@ -135,7 +135,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         
         // API 응답 구조에 따라 데이터 추출
         const productData = (productResponse.data || productResponse) as any
-        const stockData = (stockResponse.data || stockResponse) || []
+        const stockData = Array.isArray(stockResponse) ? stockResponse : (stockResponse.data || [])
         
         // 카테고리 계층 구조 가져오기
         const categoryResponse = await getCategoryHierarchy(productData.categoryId || 1).catch(() => [])

@@ -25,7 +25,7 @@ type OptionInput = {
 type OptionCombination = {
   combination: string[]
   additionalPrice: number
-  stock: number
+  stockQuantity: number
 }
 
 export default function CreateProductPage() {
@@ -174,12 +174,12 @@ export default function CreateProductPage() {
       combinations.map((combo) => ({
         combination: combo,
         additionalPrice: 0,
-        stock: 0,
+        stockQuantity: 0,
       })),
     )
   }
 
-  const updateCombination = (index: number, field: "additionalPrice" | "stock", value: number) => {
+  const updateCombination = (index: number, field: "additionalPrice" | "stockQuantity", value: number) => {
     const updated = [...optionCombinations]
     updated[index][field] = value
     setOptionCombinations(updated)
@@ -201,7 +201,7 @@ export default function CreateProductPage() {
     setOptionCombinations(
       optionCombinations.map((combo) => ({
         ...combo,
-        stock: stockValue,
+        stockQuantity: stockValue,
       })),
     )
     setBulkStock("")
@@ -293,11 +293,29 @@ export default function CreateProductPage() {
             values: opt.values.split(',').map(v => v.trim()).filter(v => v)
           }))
 
-        const skus: SkuInfo[] = optionCombinations.map(combo => ({
-          priceAdjustment: combo.additionalPrice,
-          stockQuantity: combo.stock,
-          optionIndexes: [] // TODO: 옵션 인덱스 계산 로직 필요
-        }))
+        // 옵션 그룹의 values를 평면화하여 전체 옵션 리스트 생성
+        const flattenedOptions: string[] = []
+        optionGroups.forEach(group => {
+          flattenedOptions.push(...group.values)
+        })
+
+        const skus: SkuInfo[] = optionCombinations.map(combo => {
+          // 각 조합의 옵션값이 평면화된 리스트에서의 인덱스를 찾기
+          const optionIndexes: number[] = []
+          
+          combo.combination.forEach((value) => {
+            const index = flattenedOptions.findIndex(option => option === value)
+            if (index !== -1) {
+              optionIndexes.push(index)
+            }
+          })
+          
+          return {
+            priceAdjustment: combo.additionalPrice,
+            stockQuantity: combo.stockQuantity,
+            optionIndexes
+          }
+        })
 
         productData = {
           categoryId: selectedCategoryId,
@@ -806,9 +824,9 @@ export default function CreateProductPage() {
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  value={combo.stock}
+                                  value={combo.stockQuantity}
                                   onChange={(e) =>
-                                    updateCombination(index, "stock", Number.parseInt(e.target.value) || 0)
+                                    updateCombination(index, "stockQuantity", Number.parseInt(e.target.value) || 0)
                                   }
                                   className="w-32"
                                 />

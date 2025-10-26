@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit, Package, User, Ban, Play } from 'lucide-react'
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
+import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
+import { getSellerProducts, getProductStock } from "@/lib/api/products"
 
 export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
 export type SettlementStatus = "carried-over" | "confirmed" | "completed"
@@ -36,60 +38,15 @@ export default function SellerPage() {
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null)
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set())
-  const [showOptionsModal, setShowOptionsModal] = useState(false) // Declare the variable here
+  const [showOptionsModal, setShowOptionsModal] = useState(false)
+  const [showStockModal, setShowStockModal] = useState(false)
+  const [selectedProductStock, setSelectedProductStock] = useState<{
+    product: ProductManageResponse
+    stockData: SkuStockResponse[]
+  } | null>(null)
+  const [stockLoading, setStockLoading] = useState(false)
 
-  const settlementRecords = [
-    {
-      id: 1,
-      status: "COMPLETED",
-      salesAmount: 3200000,
-      commission: 320000,
-      vat: 32000,
-      refundAmount: 0,
-      settlementAmount: 2848000,
-      settlementDate: "2025-10-15",
-    },
-    {
-      id: 2,
-      status: "COMPLETED",
-      salesAmount: 4100000,
-      commission: 410000,
-      vat: 41000,
-      refundAmount: 150000,
-      settlementAmount: 3499000,
-      settlementDate: "2025-10-14",
-    },
-    {
-      id: 3,
-      status: "HOLD",
-      salesAmount: 5150000,
-      commission: 515000,
-      vat: 51500,
-      refundAmount: 0,
-      settlementAmount: 4583500,
-      settlementDate: "2025-10-13",
-    },
-    {
-      id: 4,
-      status: "COMPLETED",
-      salesAmount: 2800000,
-      commission: 280000,
-      vat: 28000,
-      refundAmount: 200000,
-      settlementAmount: 2292000,
-      settlementDate: "2025-10-12",
-    },
-    {
-      id: 5,
-      status: "CANCELED",
-      salesAmount: 1500000,
-      commission: 150000,
-      vat: 15000,
-      refundAmount: 1500000,
-      settlementAmount: 0,
-      settlementDate: "2025-10-11",
-    },
-  ]
+  const settlementRecords: any[] = []
 
   const totalOrders = settlementRecords.length
   const totalSales = settlementRecords.reduce((sum, record) => sum + record.salesAmount, 0)
@@ -124,148 +81,36 @@ export default function SellerPage() {
     }
   }
 
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      orderNumber: "ORD-20251016-001",
-      productName: "모던 미니멀 소파",
-      productImage: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=100",
-      customerName: "김철수",
-      customerPhone: "010-1234-5678",
-      customerAddress: "서울특별시 강남구 테헤란로 123",
-      customerDetailAddress: "101동 1001호",
-      orderAmount: 360000,
-      orderDate: "2025-10-16 14:30",
-      deliveryStatus: "주문 완료",
-      option: null, // null for single product
-      quantity: 2,
-    },
-    {
-      id: 2,
-      orderNumber: "ORD-20251016-002",
-      productName: "우드 다이닝 테이블",
-      productImage: "https://images.unsplash.com/photo-1617806118233-18e1de247200?w=100",
-      customerName: "이영희",
-      customerPhone: "010-2345-6789",
-      customerAddress: "서울특별시 서초구 서초대로 456",
-      customerDetailAddress: "202동 502호",
-      orderAmount: 272000,
-      orderDate: "2025-10-16 11:20",
-      deliveryStatus: "배송 준비 중",
-      option: "오크 / 4인용",
-      quantity: 1,
-    },
-    {
-      id: 3,
-      orderNumber: "ORD-20251015-003",
-      productName: "모던 미니멀 소파",
-      productImage: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=100",
-      customerName: "박민수",
-      customerPhone: "010-3456-7890",
-      customerAddress: "경기도 성남시 분당구 판교역로 789",
-      customerDetailAddress: "A동 1203호",
-      orderAmount: 360000,
-      orderDate: "2025-10-15 16:45",
-      deliveryStatus: "배송 중",
-      option: null,
-      quantity: 1,
-    },
-    {
-      id: 4,
-      orderNumber: "ORD-20251015-004",
-      productName: "북유럽 스타일 책장",
-      productImage: "https://images.unsplash.com/photo-1594620302200-9a762244a156?w=100",
-      customerName: "최지은",
-      customerPhone: "010-4567-8901",
-      customerAddress: "서울특별시 송파구 올림픽로 321",
-      customerDetailAddress: "B동 805호",
-      orderAmount: 180000,
-      orderDate: "2025-10-15 09:15",
-      deliveryStatus: "배송 완료",
-      option: null,
-      quantity: 1,
-    },
-    {
-      id: 5,
-      orderNumber: "ORD-20251014-005",
-      productName: "우드 다이닝 테이블",
-      productImage: "https://images.unsplash.com/photo-1617806118233-18e1de247200?w=100",
-      customerName: "정수진",
-      customerPhone: "010-5678-9012",
-      customerAddress: "인천광역시 연수구 송도과학로 654",
-      customerDetailAddress: "C동 1504호",
-      orderAmount: 272000,
-      orderDate: "2025-10-14 13:50",
-      deliveryStatus: "배송 완료",
-      option: "월넛 / 6인용",
-      quantity: 1,
-    },
-    {
-      id: 6,
-      orderNumber: "ORD-20251014-006",
-      productName: "모던 미니멀 소파",
-      productImage: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=100",
-      customerName: "강동원",
-      customerPhone: "010-6789-0123",
-      customerAddress: "서울특별시 마포구 월드컵북로 987",
-      customerDetailAddress: "D동 2101호",
-      orderAmount: 360000,
-      orderDate: "2025-10-14 10:30",
-      deliveryStatus: "배송 중",
-      option: null,
-      quantity: 3,
-    },
-  ])
+  const [orders, setOrders] = useState<any[]>([])
 
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: "모던 미니멀 소파",
-      mainImage: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400",
-      category: "가구 > 거실가구 > 소파",
-      originalPrice: 450000,
-      discountRate: 20,
-      finalPrice: 360000,
-      stock: 15,
-      shipping: "무료배송",
-      status: "판매중",
-      productType: "single" as const,
-      createdAt: "2025-10-15",
-    },
-    {
-      id: 2,
-      name: "우드 다이닝 테이블",
-      mainImage: "https://images.unsplash.com/photo-1617806118233-18e1de247200?w=400",
-      category: "가구 > 주방가구 > 식탁",
-      originalPrice: 320000,
-      discountRate: 15,
-      finalPrice: 272000,
-      shipping: "3,000원",
-      status: "판매중",
-      productType: "options" as const,
-      createdAt: "2025-10-14",
-      options: [
-        { name: "오크 / 4인용", additionalPrice: 0, stock: 8 },
-        { name: "오크 / 6인용", additionalPrice: 50000, stock: 3 },
-        { name: "월넛 / 4인용", additionalPrice: 30000, stock: 5 },
-        { name: "월넛 / 6인용", additionalPrice: 80000, stock: 0 },
-      ],
-    },
-    {
-      id: 3,
-      name: "북유럽 스타일 책장",
-      mainImage: "https://images.unsplash.com/photo-1594620302200-9a762244a156?w=400",
-      category: "가구 > 수납가구 > 책장",
-      originalPrice: 180000,
-      discountRate: 0,
-      finalPrice: 180000,
-      stock: 0,
-      shipping: "무료배송",
-      status: "품절",
-      productType: "single" as const,
-      createdAt: "2025-10-13",
-    },
-  ])
+  const [products, setProducts] = useState<ProductManageResponse[]>([])
+  const [productsLoading, setProductsLoading] = useState(false)
+  const [productsError, setProductsError] = useState<string | null>(null)
+
+  // 판매자 상품 목록 조회
+  const fetchSellerProducts = async () => {
+    setProductsLoading(true)
+    setProductsError(null)
+    try {
+      const startDate = dateRange.from ? dateRange.from.toISOString().split('T')[0] : undefined
+      const endDate = dateRange.to ? dateRange.to.toISOString().split('T')[0] : undefined
+      
+      const response = await getSellerProducts(startDate, endDate)
+      setProducts(response)
+    } catch (error) {
+      console.error('상품 목록 조회 실패:', error)
+      setProductsError('상품 목록을 불러오는데 실패했습니다.')
+    } finally {
+      setProductsLoading(false)
+    }
+  }
+
+  // 날짜 범위 변경 시 상품 목록 다시 조회
+  useEffect(() => {
+    if (activeTab === "products") {
+      fetchSellerProducts()
+    }
+  }, [dateRange, activeTab])
 
   const handleDeleteProduct = (productId: number) => {
     if (confirm("정말 이 상품을 삭제하시겠습니까?")) {
@@ -275,14 +120,14 @@ export default function SellerPage() {
 
   const handleStopSelling = (productId: number) => {
     if (confirm("이 상품의 판매를 중지하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: "판매 중지" } : product)))
+      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.OUT_OF_STOCK } : product)))
       alert("상품 판매가 중지되었습니다.")
     }
   }
 
   const handleStartSelling = (productId: number) => {
     if (confirm("이 상품의 판매를 시작하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: "판매중" } : product)))
+      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.ON_SALE } : product)))
       alert("상품 판매가 시작되었습니다.")
     }
   }
@@ -360,13 +205,8 @@ export default function SellerPage() {
     setShowCustomerModal(true)
   }
 
-  const filteredProducts =
-    dateRange.from || dateRange.to
-      ? products.filter((product) => {
-          const productDate = new Date(product.createdAt)
-          return productDate >= dateRange.from && productDate <= dateRange.to
-        })
-      : products
+  // API에서 이미 날짜 필터링을 하므로 클라이언트 사이드 필터링 제거
+  const filteredProducts = products
 
   const toggleProductOptions = (productId: number) => {
     const newExpanded = new Set(expandedProducts)
@@ -383,17 +223,37 @@ export default function SellerPage() {
     setShowOptionsModal(true)
   }
 
+  // 옵션별 재고 조회
+  const handleShowStockOptions = async (product: ProductManageResponse) => {
+    setStockLoading(true)
+    try {
+      const stockData = await getProductStock(product.id.toString())
+      console.log('재고 조회 응답:', stockData) // 디버깅용
+      
+      // 단일 옵션 제품인 경우 단일 옵션 재고만 표시
+      const processedStockData = Array.isArray(stockData) ? stockData : []
+      
+      setSelectedProductStock({
+        product,
+        stockData: processedStockData
+      })
+      setShowStockModal(true)
+    } catch (error) {
+      console.error('재고 조회 실패:', error)
+      alert('재고 정보를 불러오는데 실패했습니다.')
+    } finally {
+      setStockLoading(false)
+    }
+  }
+
   const getStockColor = (stock: number) => {
     if (stock === 0) return "text-red-500"
     if (stock < 5) return "text-orange-500"
     return "text-foreground"
   }
 
-  const getTotalStock = (product: any) => {
-    if (product.productType === "single") {
-      return product.stock
-    }
-    return product.options.reduce((sum: number, opt: any) => sum + opt.stock, 0)
+  const getTotalStock = (product: ProductManageResponse) => {
+    return product.totalStock
   }
 
   const handleDrillDown = (selectedPeriod: string) => {
@@ -458,7 +318,32 @@ export default function SellerPage() {
 
         {activeTab === "products" && (
           <div>
-            {products.length === 0 ? (
+            {productsLoading ? (
+              <Card className="p-12 text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-text-secondary">상품 목록을 불러오는 중...</p>
+              </Card>
+            ) : productsError ? (
+              <Card className="p-12 text-center">
+                <Package className="w-16 h-16 mx-auto text-text-tertiary mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-red-600">오류가 발생했습니다</h3>
+                <p className="text-text-secondary mb-6">{productsError}</p>
+                <Button
+                  onClick={fetchSellerProducts}
+                  variant="outline"
+                  className="mr-2"
+                >
+                  다시 시도
+                </Button>
+                <Button
+                  onClick={() => router.push("/seller/products/create")}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  상품 등록하기
+                </Button>
+              </Card>
+            ) : products.length === 0 ? (
               <Card className="p-12 text-center">
                 <Package className="w-16 h-16 mx-auto text-text-tertiary mb-4" />
                 <h3 className="text-lg font-semibold mb-2">등록된 상품이 없습니다</h3>
@@ -501,8 +386,16 @@ export default function SellerPage() {
                     >
                       초기화
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchSellerProducts}
+                      disabled={productsLoading}
+                    >
+                      {productsLoading ? "조회 중..." : "조회"}
+                    </Button>
                     <div className="ml-auto text-sm text-text-secondary">
-                      총 <span className="font-semibold text-foreground">{filteredProducts.length}</span>개 상품
+                      총 <span className="font-semibold text-foreground">{filteredProducts.length}</span> 상품
                     </div>
                   </div>
                 </div>
@@ -510,107 +403,106 @@ export default function SellerPage() {
                   <table className="w-full">
                     <thead className="bg-background-section">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium">이미지</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">상품명</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">카테고리</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">가격</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">할인율</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">재고</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">배송</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">등록일</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">상태</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">관리</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-20">이미지</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-48">상품명</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-52">카테고리</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-32">가격</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-20">할인율</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-24">재고</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-24">배송</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-28">등록일</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-20">상태</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-20">관리</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {filteredProducts.map((product) => (
                         <tr key={product.id} className="hover:bg-background-section/50">
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-20">
                             <div className="relative w-16 h-16 rounded overflow-hidden">
                               <Image
-                                src={product.mainImage || "/placeholder.svg"}
+                                src={product.imageUrl || "/placeholder.svg"}
                                 alt={product.name}
                                 fill
                                 className="object-cover"
                               />
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium line-clamp-2 max-w-xs">{product.name}</div>
+                          <td className="px-4 py-3 w-48">
+                            <div className="font-medium line-clamp-2">{product.name}</div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm text-text-secondary">{product.category}</div>
+                          <td className="px-4 py-3 w-52">
+                            <div className="text-sm text-text-secondary whitespace-nowrap overflow-hidden text-ellipsis" title={product.categoryPath}>{product.categoryPath}</div>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-32">
                             <div className="space-y-1">
                               {product.discountRate > 0 && (
                                 <div className="text-xs text-text-secondary line-through">
-                                  ₩{product.originalPrice.toLocaleString()}
+                                  ₩{product.basePrice.toLocaleString()}
                                 </div>
                               )}
-                              <div className="font-semibold">₩{product.finalPrice.toLocaleString()}</div>
+                              <div className="font-semibold text-sm">₩{Math.round(product.basePrice * (1 - product.discountRate / 100)).toLocaleString()}</div>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-20">
                             {product.discountRate > 0 ? (
                               <span className="text-sm font-semibold text-red-500">{product.discountRate}%</span>
                             ) : (
                               <span className="text-sm text-text-secondary">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            {product.productType === "single" ? (
-                              <span className={`font-medium ${getStockColor(product.stock)}`}>{product.stock}개</span>
-                            ) : (
-                              <div className="space-y-1">
-                                <div className={`font-medium ${getStockColor(getTotalStock(product))}`}>
-                                  {getTotalStock(product)}개
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleShowOptions(product)}
-                                  className="h-auto p-0 text-xs text-primary hover:bg-transparent"
-                                >
-                                  옵션별 보기
-                                </Button>
+                          <td className="px-4 py-3 w-24">
+                            <div className="space-y-1">
+                              <div className={`font-medium text-sm ${getStockColor(product.totalStock)}`}>
+                                {product.totalStock}
                               </div>
-                            )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleShowStockOptions(product)}
+                                disabled={stockLoading}
+                                className="h-auto p-0 text-xs text-primary hover:bg-transparent"
+                              >
+                                {stockLoading ? "조회 중..." : "옵션별 보기"}
+                              </Button>
+                            </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm">{product.shipping}</span>
+                          <td className="px-4 py-3 w-24">
+                            <span className="text-sm">{product.shippingPrice === 0 ? "무료배송" : `₩${product.shippingPrice.toLocaleString()}`}</span>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-text-secondary">{product.createdAt}</span>
+                          <td className="px-4 py-3 w-28">
+                            <span className="text-sm text-text-secondary whitespace-nowrap">{new Date(product.createdAt).toLocaleDateString()}</span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-20">
                             <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                product.status === "판매중"
+                              className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
+                                product.status === ProductStatus.ON_SALE
                                   ? "bg-green-100 text-green-700"
-                                  : product.status === "판매 중지"
+                                  : product.status === ProductStatus.OUT_OF_STOCK
                                     ? "bg-yellow-100 text-yellow-700"
                                     : "bg-gray-100 text-gray-700"
                               }`}
                             >
-                              {product.status}
+                              {product.status === ProductStatus.ON_SALE ? "판매중" : 
+                               product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-2">
+                          <td className="px-4 py-3 w-20">
+                            <div className="flex gap-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => router.push(`/seller/products/${product.id}/edit`)}
+                                className="text-xs px-1 py-1"
+                                title="수정"
                               >
-                                <Edit className="w-3 h-3 mr-1" />
-                                수정
+                                <Edit className="w-3 h-3" />
                               </Button>
-                              {product.status === "판매 중지" ? (
+                              {product.status === ProductStatus.OUT_OF_STOCK ? (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 bg-transparent"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 bg-transparent text-xs px-2 py-1"
                                   onClick={() => handleStartSelling(product.id)}
                                 >
                                   <Play className="w-3 h-3 mr-1" />
@@ -620,11 +512,11 @@ export default function SellerPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent"
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent text-xs px-1 py-1"
                                   onClick={() => handleStopSelling(product.id)}
+                                  title="판매 중지"
                                 >
-                                  <Ban className="w-3 h-3 mr-1" />
-                                  판매 중지
+                                  <Ban className="w-3 h-3" />
                                 </Button>
                               )}
                             </div>
@@ -732,7 +624,7 @@ export default function SellerPage() {
                             <span className="text-text-tertiary">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium">{order.quantity}개</td>
+                        <td className="px-4 py-3 text-sm font-medium">{order.quantity}</td>
                         <td className="px-4 py-3 text-sm font-mono font-semibold">
                           ₩{order.orderAmount.toLocaleString()}
                         </td>
@@ -871,7 +763,7 @@ export default function SellerPage() {
                           {option.additionalPrice > 0 ? `+₩${option.additionalPrice.toLocaleString()}` : "-"}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-sm font-medium ${getStockColor(option.stock)}`}>{option.stock}개</span>
+                          <span className={`text-sm font-medium ${getStockColor(option.stock)}`}>{option.stock}</span>
                         </td>
                       </tr>
                     ))}
@@ -879,6 +771,75 @@ export default function SellerPage() {
                 </table>
               </div>
               <Button onClick={() => setShowOptionsModal(false)} className="w-full bg-primary hover:bg-primary/90">
+                닫기
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showStockModal} onOpenChange={setShowStockModal}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>옵션별 재고 상세</DialogTitle>
+            <DialogDescription>{selectedProductStock?.product.name}</DialogDescription>
+          </DialogHeader>
+          {selectedProductStock && (
+            <div className="space-y-4">
+              {stockLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-text-secondary">재고 정보를 불러오는 중...</p>
+                </div>
+              ) : selectedProductStock.stockData.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-text-secondary">재고 정보가 없습니다.</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-background-section sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-medium">SKU ID</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">옵션 조합</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">추가 금액</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">재고</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {selectedProductStock.stockData.map((sku, idx) => (
+                        <tr key={sku.skuId || idx}>
+                          <td className="px-4 py-3 text-sm font-mono">{sku.skuId}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {sku.options && sku.options.length > 0 && sku.options.some(opt => opt.groupName && opt.valueName) ? (
+                              <div className="space-y-1">
+                                {sku.options
+                                  .filter(opt => opt.groupName && opt.valueName)
+                                  .map((option, optIdx) => (
+                                    <div key={optIdx} className="text-xs">
+                                      <span className="font-medium">{option.groupName}:</span> {option.valueName}
+                                    </div>
+                                  ))}
+                              </div>
+                            ) : (
+                              <span className="text-text-tertiary">단일 옵션</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-mono">
+                            {sku.priceAdjustment > 0 ? `+₩${sku.priceAdjustment.toLocaleString()}` : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-sm font-medium ${getStockColor(sku.stockQuantity)}`}>
+                              {sku.stockQuantity}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Button onClick={() => setShowStockModal(false)} className="w-full bg-primary hover:bg-primary/90">
                 닫기
               </Button>
             </div>

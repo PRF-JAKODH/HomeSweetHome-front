@@ -146,3 +146,27 @@ export interface OptionCombinationResponse {
 
 // 제품 재고 조회 응답
 export type GetProductStockResponse = ApiResponse<SkuStockResponse[]>
+
+// 상품 상태 열거형
+export enum ProductStatus {
+  ON_SALE = 'ON_SALE', // 판매중
+  OUT_OF_STOCK = 'OUT_OF_STOCK', // 판매중지
+  SUSPENDED = 'SUSPENDED' // 품절
+}
+
+// 판매자 상품 관리 응답
+export interface ProductManageResponse {
+  id: number
+  name: string
+  imageUrl: string
+  categoryPath: string // "가구 > 거실가구 > 소파" 형식
+  basePrice: number
+  discountRate: number
+  shippingPrice: number
+  totalStock: number
+  status: ProductStatus
+  createdAt: string
+}
+
+// 판매자 상품 목록 조회 응답
+export type GetSellerProductsResponse = ScrollResponse<ProductManageResponse>
