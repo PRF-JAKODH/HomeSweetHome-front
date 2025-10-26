@@ -1088,10 +1088,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                         {new Date(review.createdAt).toLocaleDateString("ko-KR")}
                       </span>
                     </div>
-                {review.imageUrl && (
+                {review.reviewImageUrl && (
                   <div className="flex gap-2 mb-3">
                     <img
-                      src={review.imageUrl}
+                      src={review.reviewImageUrl}
                       alt="리뷰 이미지"
                       className="h-20 w-20 rounded-lg object-cover"
                     />
