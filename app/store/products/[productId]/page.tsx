@@ -70,6 +70,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [reviewsTotalCount, setReviewsTotalCount] = useState(0)
   const [reviewStatistics, setReviewStatistics] = useState<ProductReviewStatisticsResponse | null>(null)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
+  const [showCartSuccess, setShowCartSuccess] = useState(false)
 
   // 장바구니 API 훅
   const addToCartMutation = useAddToCart()
@@ -342,7 +343,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         quantity: quantity
       })
 
-      alert("장바구니에 상품이 담겼습니다.")
+      setShowCartSuccess(true)
     } catch (error) {
       console.error('장바구니 추가 실패:', error)
       alert("장바구니에 상품을 담는데 실패했습니다. 다시 시도해주세요.")
@@ -809,6 +810,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                    (product.productType === "options" && !selectedSku) ? "옵션을 선택해주세요" : "바로구매"}
                 </Button>
               </div>
+
+              {/* 장바구니 담기 성공 알림 */}
+              {showCartSuccess && (
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6 w-full">
+                  <div className="text-center">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">장바구니에 상품이 담겼습니다!</h3>
+                    <p className="text-sm text-gray-600 mb-6">장바구니로 이동하시겠습니까?</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowCartSuccess(false)}
+                        className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        계속 쇼핑
+                      </button>
+                      <button
+                        onClick={() => router.push('/cart')}
+                        className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                      >
+                        장바구니 보기
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Button
                 variant="outline"

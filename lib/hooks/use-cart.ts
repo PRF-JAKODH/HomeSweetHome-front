@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { 
   addToCart, 
   getCartItems, 
-  updateCartItem, 
   deleteCartItem, 
   deleteCartItems, 
   clearCart 
@@ -53,20 +52,6 @@ export const useAddToCart = () => {
   })
 }
 
-/**
- * 장바구니 아이템 수량 수정 훅
- */
-export const useUpdateCartItem = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation<Cart, Error, { cartItemId: string; quantity: number }>({
-    mutationFn: ({ cartItemId, quantity }: { cartItemId: string; quantity: number }) =>
-      updateCartItem(cartItemId, quantity),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
-    },
-  })
-}
 
 /**
  * 장바구니 아이템 삭제 훅

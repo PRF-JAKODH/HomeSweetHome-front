@@ -19,6 +19,8 @@ interface CartItem {
   option: string
   quantity: number
   selected: boolean
+  shippingPrice: number // 배송료 필드 추가
+  basePrice: number // 원가 필드 추가
 }
 
 export default function CartPage() {
@@ -36,14 +38,6 @@ export default function CartPage() {
   // API 데이터를 로컬 상태로 변환
   useEffect(() => {
     if (cartData?.contents) {
-      console.log('장바구니 API 응답:', cartData)
-      console.log('장바구니 아이템들:', cartData.contents)
-      
-      // skuId 값 확인을 위한 디버깅
-      cartData.contents.forEach((item, index) => {
-        console.log(`아이템 ${index}: skuId = ${item.skuId}, id = ${item.id}`)
-      })
-      
       const transformedItems: CartItem[] = cartData.contents.map((item: CartResponse) => ({
         id: item.id.toString(),
         productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
@@ -64,9 +58,10 @@ export default function CartPage() {
         })(),
         quantity: item.quantity,
         selected: true,
+        shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
+        basePrice: item.basePrice, // API에서 원가 가져오기
       }))
       
-      console.log('변환된 장바구니 아이템들:', transformedItems)
       setCartItems(transformedItems)
     }
   }, [cartData])
@@ -105,7 +100,6 @@ export default function CartPage() {
       
       // 새로운 수량으로 아이템 추가 (전체 수량을 다시 추가)
       const skuId = item.skuId || parseInt(item.id) // skuId가 null이면 id를 사용
-      console.log('수량 변경 시 사용할 skuId:', skuId)
       
       await addToCartMutation.mutateAsync({
         skuId: skuId, // null 체크된 skuId 사용
@@ -124,7 +118,6 @@ export default function CartPage() {
   const confirmDelete = (id: string) => {
     deleteCartItemMutation.mutate(id, {
       onSuccess: () => {
-        console.log('장바구니 아이템 삭제 성공:', id)
         setShowDeleteConfirm(null)
       },
       onError: (error) => {
@@ -147,7 +140,6 @@ export default function CartPage() {
     if (selectedIds.length > 0) {
       deleteCartItemsMutation.mutate(selectedIds, {
         onSuccess: () => {
-          console.log('선택된 장바구니 아이템들 삭제 성공:', selectedIds)
           setShowDeleteConfirm(null)
         },
         onError: (error) => {
@@ -160,9 +152,24 @@ export default function CartPage() {
   }
 
   const selectedItems = cartItems.filter((item) => item.selected)
-  const totalPrice = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const shippingFee = totalPrice >= 50000 ? 0 : 3000
-  const finalPrice = totalPrice + shippingFee
+  
+  // 상품금액 (원가의 합계)
+  const totalPrice = selectedItems.reduce((sum, item) => sum + item.basePrice * item.quantity, 0)
+  
+  // 배송비 합계
+  const totalShippingFee = selectedItems.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0)
+  
+  // 할인 금액 계산 (원가 - 할인가)
+  const totalDiscountAmount = selectedItems.reduce((sum, item) => {
+    const originalPrice = item.basePrice
+    const discountedPrice = item.price
+    const discountAmount = (originalPrice - discountedPrice) * item.quantity
+    return sum + discountAmount
+  }, 0)
+  
+  // 총 결제금액 = 할인된 가격의 합 + 배송비
+  const finalPrice = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0) + totalShippingFee
+  
 
   // 로딩 상태 처리
   if (isLoading) {
@@ -235,54 +242,102 @@ export default function CartPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Cart Items */}
-            <div className="lg:col-span-2">
-              {/* Select All & Delete */}
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Checkbox id="select-all" checked={allSelected} onCheckedChange={handleSelectAll} />
-                  <label htmlFor="select-all" className="text-sm font-medium text-foreground cursor-pointer">
-                    전체선택 ({selectedItems.length}/{cartItems.length})
-                  </label>
+          <div className="space-y-6">
+            {/* 브랜드별 그룹핑 */}
+            {Object.entries(
+              cartItems.reduce((groups, item) => {
+                const brand = item.brand
+                if (!groups[brand]) {
+                  groups[brand] = []
+                }
+                groups[brand].push(item)
+                return groups
+              }, {} as Record<string, CartItem[]>)
+            ).map(([brand, items]) => (
+              <div key={brand} className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                {/* 브랜드 헤더 */}
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900 text-center">{brand}</h2>
                 </div>
-                <div className="relative">
-                  <Button variant="ghost" size="sm" onClick={handleRemoveSelected} disabled={selectedItems.length === 0}>
-                    선택삭제
-                  </Button>
-                  
-                  {/* 선택 삭제 확인 팝업 */}
-                  {showDeleteConfirm === 'bulk' && (
-                    <div className="absolute top-8 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-6 w-80 z-10">
-                      <div className="text-center">
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">선택한 상품을 삭제하겠습니까?</h3>
-                        <p className="text-sm text-gray-600 mb-6">
-                          {selectedItems.length}개의 상품이 삭제됩니다.
-                        </p>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={cancelDelete}
-                            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
-                          >
-                            취소
-                          </button>
-                          <button
-                            onClick={confirmBulkDelete}
-                            disabled={deleteCartItemsMutation.isPending}
-                            className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
-                          >
-                            {deleteCartItemsMutation.isPending ? "삭제 중..." : "삭제"}
-                          </button>
-                        </div>
-                      </div>
+                
+                {/* 브랜드별 상품들 */}
+                <div className="p-6">
+                  {/* Select All & Delete for this brand */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id={`select-all-${brand}`} 
+                        checked={items.every(item => item.selected)} 
+                        onCheckedChange={(checked) => {
+                          const updatedItems = cartItems.map(cartItem => 
+                            items.includes(cartItem) ? { ...cartItem, selected: checked as boolean } : cartItem
+                          )
+                          updateCart(updatedItems)
+                        }} 
+                      />
+                      <label htmlFor={`select-all-${brand}`} className="text-sm font-medium text-foreground cursor-pointer">
+                        전체선택 ({items.filter(item => item.selected).length}/{items.length})
+                      </label>
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div className="relative">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          const selectedBrandItems = items.filter(item => item.selected)
+                          if (selectedBrandItems.length > 0) {
+                            setShowDeleteConfirm(`bulk-${brand}`)
+                          }
+                        }} 
+                        disabled={items.filter(item => item.selected).length === 0}
+                      >
+                        선택삭제
+                      </Button>
+                      
+                      {/* 브랜드별 선택 삭제 확인 팝업 */}
+                      {showDeleteConfirm === `bulk-${brand}` && (
+                        <div className="absolute top-8 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-6 w-80 z-10">
+                          <div className="text-center">
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">선택한 상품을 삭제하겠습니까?</h3>
+                            <p className="text-sm text-gray-600 mb-6">
+                              {items.filter(item => item.selected).length}개의 상품이 삭제됩니다.
+                            </p>
+                            <div className="flex gap-3">
+                              <button
+                                onClick={cancelDelete}
+                                className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
+                              >
+                                취소
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const selectedIds = items.filter(item => item.selected).map(item => parseInt(item.id))
+                                  deleteCartItemsMutation.mutate(selectedIds, {
+                                    onSuccess: () => {
+                                      setShowDeleteConfirm(null)
+                                    },
+                                    onError: (error) => {
+                                      console.error('선택된 장바구니 아이템들 삭제 실패:', error)
+                                      alert('선택된 상품을 삭제하는데 실패했습니다. 다시 시도해주세요.')
+                                      setShowDeleteConfirm(null)
+                                    }
+                                  })
+                                }}
+                                disabled={deleteCartItemsMutation.isPending}
+                                className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                {deleteCartItemsMutation.isPending ? "삭제 중..." : "삭제"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-              {/* Cart Items List */}
-              <div className="space-y-4">
-                {cartItems.map((item) => (
+                  {/* Cart Items List for this brand */}
+                  <div className="space-y-4">
+                    {items.map((item) => (
                   <Card key={item.id} className="p-6">
                     <div className="flex gap-4">
                       <Checkbox
@@ -364,6 +419,11 @@ export default function CartPage() {
                                 <span className="text-text-secondary">
                                   단가: <span className="font-medium text-foreground">{item.price.toLocaleString()}원</span>
                                 </span>
+                                <span className="text-text-secondary">
+                                  배송비: <span className="font-medium text-foreground">
+                                    {item.shippingPrice === 0 ? "무료" : `${item.shippingPrice.toLocaleString()}원`}
+                                  </span>
+                                </span>
                               </div>
                             </div>
                             
@@ -399,50 +459,58 @@ export default function CartPage() {
                       </div>
                     </div>
                   </Card>
-                ))}
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-24 p-6">
-                <h2 className="mb-4 text-lg font-bold text-foreground">주문 정보</h2>
-                <div className="space-y-3 border-b border-divider pb-4 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-text-secondary">상품금액</span>
-                    <span className="font-medium text-foreground">{totalPrice.toLocaleString()}원</span>
+                    ))}
                   </div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Order Summary */}
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+              <h2 className="mb-4 text-lg font-bold text-foreground">주문 정보</h2>
+              <div className="space-y-3 border-b border-divider pb-4 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-text-secondary">상품금액</span>
+                  <span className="font-medium text-foreground">{totalPrice.toLocaleString()}원</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-text-secondary">배송비</span>
+                  <span className="font-medium text-foreground">
+                    {totalShippingFee === 0 ? "무료" : `${totalShippingFee.toLocaleString()}원`}
+                  </span>
+                </div>
+                {totalDiscountAmount > 0 && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-text-secondary">배송비</span>
-                    <span className="font-medium text-foreground">
-                      {shippingFee === 0 ? "무료" : `${shippingFee.toLocaleString()}원`}
+                    <span className="text-text-secondary">총 할인 금액</span>
+                    <span className="font-medium text-red-500">
+                      -{totalDiscountAmount.toLocaleString()}원
                     </span>
                   </div>
-                  {totalPrice > 0 && totalPrice < 50000 && (
-                    <div className="text-xs text-primary">50,000원 이상 구매 시 무료배송</div>
-                  )}
-                </div>
-                <div className="mb-6 flex items-center justify-between">
-                  <span className="text-base font-bold text-foreground">총 결제금액</span>
-                  <span className="text-2xl font-bold text-primary">{finalPrice.toLocaleString()}원</span>
-                </div>
-                <Button
-                  size="lg"
-                  className="w-full bg-primary hover:bg-primary-dark text-white"
-                  disabled={selectedItems.length === 0}
-                  onClick={() => router.push("/checkout")}
-                >
-                  {selectedItems.length}개 상품 주문하기
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full mt-2 bg-transparent"
-                  onClick={() => router.push("/store")}
-                >
-                  쇼핑 계속하기
-                </Button>
-              </Card>
+                )}
+                {totalPrice === 0 && (
+                  <div className="text-xs text-gray-500">상품을 선택해주세요</div>
+                )}
+              </div>
+              <div className="mb-6 flex items-center justify-between">
+                <span className="text-base font-bold text-foreground">총 결제금액</span>
+                <span className="text-2xl font-bold text-primary">{finalPrice.toLocaleString()}원</span>
+              </div>
+              <Button
+                size="lg"
+                className="w-full bg-primary hover:bg-primary-dark text-white"
+                disabled={selectedItems.length === 0}
+                onClick={() => router.push("/checkout")}
+              >
+                {selectedItems.length}개 상품 주문하기
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full mt-2 bg-transparent"
+                onClick={() => router.push("/store")}
+              >
+                쇼핑 계속하기
+              </Button>
             </div>
           </div>
         )}
