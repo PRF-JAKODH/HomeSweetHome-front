@@ -2,7 +2,7 @@
  * 장바구니 관련 커스텀 훅
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { 
   addToCart, 
   getCartItems, 
@@ -35,6 +35,44 @@ export const useCartItems = (cursorId?: number, size: number = 10) => {
  */
 export const useCart = () => {
   return useCartItems()
+}
+
+/**
+ * 장바구니 무한 스크롤 훅
+ */
+export const useInfiniteCartItems = (size: number = 10) => {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: [...CART_QUERY_KEYS.list(), 'infinite', size],
+    queryFn: ({ pageParam }) => getCartItems(pageParam, size),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasNext ? lastPage.nextCursorId : undefined
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  // 모든 페이지의 장바구니 아이템을 평탄화
+  const cartItems = data?.pages.flatMap((page) => page.contents) ?? []
+
+  return {
+    cartItems,
+    isLoading,
+    isLoadingMore: isFetchingNextPage,
+    hasNext: hasNextPage ?? false,
+    error,
+    loadMore: fetchNextPage,
+    refetch,
+  }
 }
 
 /**

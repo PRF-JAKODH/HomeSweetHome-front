@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { useCart, useAddToCart, useDeleteCartItem, useDeleteCartItems } from "@/lib/hooks/use-cart"
+import { useInfiniteCartItems, useAddToCart, useDeleteCartItem, useDeleteCartItems } from "@/lib/hooks/use-cart"
 import { CartResponse } from "@/types/api/cart"
 
 interface CartItem {
@@ -28,43 +28,122 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [allSelected, setAllSelected] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [showScrollToTop, setShowScrollToTop] = useState(false)
+  
+  // 무한 스크롤을 위한 observer ref
+  const observerTarget = useRef<HTMLDivElement>(null)
+  // 이전 apiCartItems 참조를 추적하여 무한 루프 방지
+  const prevApiCartItemsRef = useRef<CartResponse[] | null>(null)
   
   // API 훅들
-  const { data: cartData, isLoading, error } = useCart()
+  const { 
+    cartItems: apiCartItems, 
+    isLoading, 
+    isLoadingMore, 
+    hasNext, 
+    error, 
+    loadMore 
+  } = useInfiniteCartItems(10)
   const addToCartMutation = useAddToCart()
   const deleteCartItemMutation = useDeleteCartItem()
   const deleteCartItemsMutation = useDeleteCartItems()
 
-  // API 데이터를 로컬 상태로 변환
+  // 스크롤 위치 감지
   useEffect(() => {
-    if (cartData?.contents) {
-      const transformedItems: CartItem[] = cartData.contents.map((item: CartResponse) => ({
-        id: item.id.toString(),
-        productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
-        skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
-        name: item.productName,
-        brand: item.brand,
-        image: item.imageUrl,
-        price: item.finalPrice, // 할인된 최종 가격 사용
-        option: (() => {
-          // null, undefined, "null: null" 문자열 등을 모두 체크
-          if (!item.optionSummary || 
-              item.optionSummary === 'null' || 
-              item.optionSummary === 'null: null' || 
-              item.optionSummary.trim() === '') {
-            return '기본 옵션'
-          }
-          return item.optionSummary
-        })(),
-        quantity: item.quantity,
-        selected: true,
-        shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
-        basePrice: item.basePrice, // API에서 원가 가져오기
-      }))
-      
-      setCartItems(transformedItems)
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+      setShowScrollToTop(scrollTop > 300) // 300px 이상 스크롤 시 버튼 표시
     }
-  }, [cartData])
+
+    window.addEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
+  // 최상단으로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
+
+  // API 데이터를 로컬 상태로 변환 (useRef로 무한 루프 방지)
+  useEffect(() => {
+    if (!apiCartItems) return
+    
+    // 이전 데이터와 비교하여 실제로 변경된 경우에만 처리
+    const prevItems = prevApiCartItemsRef.current
+    if (prevItems && prevItems.length === apiCartItems.length) {
+      const isSame = prevItems.every((prevItem, index) => {
+        const currentItem = apiCartItems[index]
+        return prevItem.id === currentItem.id && 
+               prevItem.quantity === currentItem.quantity &&
+               prevItem.finalPrice === currentItem.finalPrice
+      })
+      if (isSame) return
+    }
+    
+    const transformedItems: CartItem[] = apiCartItems.map((item: CartResponse) => ({
+      id: item.id.toString(),
+      productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
+      skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
+      name: item.productName,
+      brand: item.brand,
+      image: item.imageUrl,
+      price: item.finalPrice, // 할인된 최종 가격 사용
+      option: (() => {
+        // null, undefined, "null: null" 문자열 등을 모두 체크
+        if (!item.optionSummary || 
+            item.optionSummary === 'null' || 
+            item.optionSummary === 'null: null' || 
+            item.optionSummary.trim() === '') {
+          return '기본 옵션'
+        }
+        return item.optionSummary
+      })(),
+      quantity: item.quantity,
+      selected: true,
+      shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
+      basePrice: item.basePrice, // API에서 원가 가져오기
+    }))
+    
+    // ID 기반 중복 제거
+    const uniqueItems = transformedItems.filter((item, index, self) =>
+      index === self.findIndex((i) => i.id === item.id)
+    )
+    
+    setCartItems(uniqueItems)
+    prevApiCartItemsRef.current = apiCartItems
+  }, [apiCartItems])
+
+  // 무한 스크롤 Intersection Observer 설정
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // 타겟이 화면에 보이고, 더 불러올 데이터가 있으면 loadMore 호출
+        if (entries[0].isIntersecting && hasNext && !isLoadingMore) {
+          loadMore()
+        }
+      },
+      {
+        threshold: 0.1, // 10%만 보여도 트리거
+        rootMargin: '100px', // 100px 전에 미리 로드
+      }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [hasNext, isLoadingMore, loadMore])
 
   const updateCart = (items: CartItem[]) => {
     setCartItems(items)
@@ -423,6 +502,26 @@ export default function CartPage() {
                     </div>
                   </Card>
                 ))}
+                
+                {/* 무한 스크롤 트리거 */}
+                {hasNext && (
+                  <div ref={observerTarget} className="py-8">
+                    {isLoadingMore && (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 모든 아이템 로드 완료 메시지 */}
+                {!hasNext && cartItems.length > 0 && (
+                  <div className="py-8 text-center">
+                    <p className="text-muted-foreground">
+                      모든 장바구니 아이템을 불러왔습니다.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -480,6 +579,18 @@ export default function CartPage() {
 
       </main>
 
+      {/* 스크롤 투 탑 버튼 */}
+      {showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 bg-primary hover:bg-primary-dark text-white p-3 rounded-full shadow-lg transition-all duration-300 hover:shadow-xl"
+          aria-label="맨 위로 이동"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
