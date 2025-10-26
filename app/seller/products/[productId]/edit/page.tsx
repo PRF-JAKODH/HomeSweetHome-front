@@ -12,62 +12,9 @@ import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "luc
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
+import { Category } from "@/types/api/category"
 
-const categories = {
-  가구: {
-    침실가구: ["침대", "매트리스", "옷장", "화장대", "협탁"],
-    거실가구: ["소파", "거실장", "TV장", "테이블", "책장"],
-    주방가구: ["식탁", "의자", "수납장", "렌지대", "홈바"],
-    서재가구: ["책상", "의자", "책장", "서랍장", "독서등"],
-  },
-  패브릭: {
-    커튼: ["암막커튼", "쉬어커튼", "블라인드", "롤스크린"],
-    침구: ["이불", "베개", "침대커버", "매트리스커버"],
-    쿠션: ["방석", "쿠션커버", "바디필로우"],
-    러그: ["거실러그", "침실러그", "주방매트"],
-  },
-  조명: {
-    천장조명: ["샹들리에", "직부등", "매입등", "레일조명"],
-    스탠드: ["플로어스탠드", "테이블스탠드", "독서등"],
-    벽등: ["브라켓", "간접조명", "무드등"],
-  },
-  "수납/정리": {
-    수납장: ["서랍장", "옷장", "신발장", "수납박스"],
-    선반: ["벽선반", "진열장", "책장", "선반장"],
-    행거: ["옷걸이", "행거대", "후크"],
-  },
-  생활용품: {
-    욕실용품: ["수건", "욕실매트", "샤워커튼", "비누받침"],
-    청소용품: ["청소기", "걸레", "빗자루", "쓰레기통"],
-    세탁용품: ["빨래건조대", "세탁망", "다리미판"],
-  },
-  주방용품: {
-    조리도구: ["냄비", "프라이팬", "칼", "도마"],
-    식기: ["접시", "그릇", "컵", "수저"],
-    보관용기: ["밀폐용기", "유리병", "냉장고정리"],
-  },
-  홈데코: {
-    액자: ["그림액자", "사진액자", "포스터", "캔버스"],
-    화병: ["꽃병", "화분", "조화"],
-    시계: ["벽시계", "탁상시계", "스탠드시계"],
-    소품: ["캔들", "디퓨저", "오브제"],
-  },
-  가전: {
-    주방가전: ["냉장고", "전자레인지", "에어프라이어", "커피머신"],
-    생활가전: ["청소기", "공기청정기", "가습기", "선풍기"],
-    계절가전: ["히터", "에어컨", "전기장판"],
-  },
-  "공구/DIY": {
-    공구: ["드릴", "드라이버", "망치", "톱"],
-    페인트: ["벽지", "페인트", "붓", "롤러"],
-    자재: ["목재", "철물", "접착제"],
-  },
-  반려동물: {
-    강아지용품: ["사료", "간식", "장난감", "하우스"],
-    고양이용품: ["사료", "간식", "스크래쳐", "화장실"],
-    용품: ["목줄", "식기", "이동장"],
-  },
-}
 
 type OptionValue = {
   name: string
@@ -86,9 +33,11 @@ export default function EditProductPage() {
   const [mainImage, setMainImage] = useState<string | null>(null)
   const [subImages, setSubImages] = useState<string[]>([])
 
-  const [selectedCategory1, setSelectedCategory1] = useState<string>("")
-  const [selectedCategory2, setSelectedCategory2] = useState<string>("")
-  const [selectedCategory3, setSelectedCategory3] = useState<string>("")
+  const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
+  const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
+  const [selectedDetailCategory, setSelectedDetailCategory] = useState<number | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const [isClient, setIsClient] = useState(false)
 
   const [productName, setProductName] = useState("")
   const [brand, setBrand] = useState("")
@@ -106,23 +55,66 @@ export default function EditProductPage() {
   const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
   const [bulkStock, setBulkStock] = useState("")
 
+  // 카테고리 API 훅들
+  const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
+  const { data: subCategories = [], isLoading: subCategoriesLoading } = useCategoriesByParent(selectedMainCategory || 0)
+  const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
+  const { data: subSubCategories = [], isLoading: subSubCategoriesLoading } = useCategoriesByParent(subSubCategoryParentId)
+
   useEffect(() => {
-    setMainImage("https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400")
-    setSubImages([
-      "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200",
-      "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200",
-    ])
-    setSelectedCategory1("가구")
-    setSelectedCategory2("거실가구")
-    setSelectedCategory3("소파")
-    setProductName("모던 미니멀 소파")
-    setBrand("홈스윗홈")
-    setOriginalPrice("450000")
-    setDiscountRate("20")
-    setShippingType("free")
-    setStock("15")
-    setDescription("편안한 착석감과 모던한 디자인이 돋보이는 소파입니다.")
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    // TODO: 실제 상품 데이터를 API에서 가져와서 초기화
+    // const fetchProductData = async () => {
+    //   try {
+    //     const productData = await getProduct(params.productId as string)
+    //     // 상품 데이터로 폼 초기화
+    //     setProductName(productData.name)
+    //     setBrand(productData.brand)
+    //     setOriginalPrice(productData.basePrice.toString())
+    //     setDiscountRate(productData.discountRate.toString())
+    //     setShippingType(productData.shippingPrice === 0 ? "free" : "paid")
+    //     setShippingFee(productData.shippingPrice.toString())
+    //     setDescription(productData.description)
+    //     // 카테고리 설정
+    //     setSelectedMainCategory(productData.categoryId)
+    //     // 이미지 설정
+    //     setMainImage(productData.imageUrl)
+    //     setSubImages(productData.detailImageUrls || [])
+    //   } catch (error) {
+    //     console.error('상품 데이터 로드 실패:', error)
+    //   }
+    // }
+    // fetchProductData()
   }, [params.productId])
+
+  // 카테고리 선택 핸들러들
+  const handleMainCategoryChange = (categoryId: number) => {
+    setSelectedMainCategory(categoryId)
+    setSelectedSubCategory(null)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleSubCategoryChange = (subCategoryId: number) => {
+    setSelectedSubCategory(subCategoryId)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleDetailCategoryChange = (detailCategoryId: number) => {
+    setSelectedDetailCategory(detailCategoryId)
+  }
+
+  const toggleCategory = (categoryId: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
+    } else {
+      newExpanded.add(categoryId)
+    }
+    setExpandedCategories(newExpanded)
+  }
 
   const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -240,12 +232,13 @@ export default function EditProductPage() {
       return
     }
 
-    if (!selectedCategory1 || !selectedCategory2 || !selectedCategory3) {
-      alert("카테고리를 모두 선택해주세요.")
+    const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
+    if (!selectedCategoryId) {
+      alert("카테고리를 선택해주세요.")
       return
     }
 
-    if (!productName || !originalPrice) {
+    if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
       return
     }
@@ -260,20 +253,53 @@ export default function EditProductPage() {
       return
     }
 
+    // TODO: 실제 상품 수정 API 호출
+    // try {
+    //   await updateProduct(params.productId as string, productData)
+    //   alert("상품이 수정되었습니다!")
+    //   router.push("/seller")
+    // } catch (error) {
+    //   console.error('상품 수정 실패:', error)
+    //   alert("상품 수정에 실패했습니다. 다시 시도해주세요.")
+    // }
+    
     alert("상품이 수정되었습니다!")
     router.push("/seller")
   }
 
-  const getCategory2Options = () => {
-    if (!selectedCategory1) return []
-    return Object.keys(categories[selectedCategory1 as keyof typeof categories] || {})
+
+  // 클라이언트 사이드에서만 렌더링
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    )
   }
 
-  const getCategory3Options = () => {
-    if (!selectedCategory1 || !selectedCategory2) return []
-    const cat1 = categories[selectedCategory1 as keyof typeof categories]
-    if (!cat1) return []
-    return cat1[selectedCategory2 as keyof typeof cat1] || []
+  if (topCategoriesLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">카테고리를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (topCategoriesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">카테고리를 불러오는데 실패했습니다.</p>
+          <Button onClick={() => window.location.reload()}>다시 시도</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -289,95 +315,116 @@ export default function EditProductPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card className="p-6">
             <Label className="text-base font-semibold mb-3 block">
-              카테고리 선택 <span className="text-red-500">*</span>
+              카테고리 <span className="text-red-500">*</span>
             </Label>
 
-            {selectedCategory1 && selectedCategory2 && selectedCategory3 && (
-              <div className="mb-4 p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-sm">
-                <span className="font-medium">{selectedCategory1}</span>
-                <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                <span className="font-medium">{selectedCategory2}</span>
-                <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                <span className="font-medium text-primary">{selectedCategory3}</span>
+            {/* Selected Category Path */}
+            {(selectedMainCategory || selectedSubCategory || selectedDetailCategory) && (
+              <div className="mb-4 p-3 bg-primary/10 rounded-lg">
+                <span className="text-sm text-text-secondary">선택된 카테고리: </span>
+                <span className="text-sm font-medium">
+                  {[
+                    topCategories.find(cat => cat.id === selectedMainCategory)?.name,
+                    subCategories.find(cat => cat.id === selectedSubCategory)?.name,
+                    subSubCategories.find(cat => cat.id === selectedDetailCategory)?.name
+                  ].filter(Boolean).join(" > ")}
+                </span>
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-background-section p-2 border-b">
-                  <span className="text-sm font-medium">대분류</span>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {Object.keys(categories).map((cat) => (
+            <div className="grid grid-cols-3 gap-4 h-[400px]">
+              {/* Main Categories */}
+              <div className="border rounded-lg overflow-y-auto">
+                {topCategoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : topCategoriesError ? (
+                  <div className="flex items-center justify-center py-8 text-red-500">
+                    <span className="text-sm">카테고리를 불러올 수 없습니다</span>
+                  </div>
+                ) : (
+                  topCategories.map((category) => (
                     <button
-                      key={cat}
+                      key={category.id}
                       type="button"
                       onClick={() => {
-                        setSelectedCategory1(cat)
-                        setSelectedCategory2("")
-                        setSelectedCategory3("")
+                        handleMainCategoryChange(category.id)
+                        toggleCategory(category.id)
                       }}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-background-section transition-colors flex items-center justify-between ${
-                        selectedCategory1 === cat ? "bg-primary/10 text-primary font-medium" : ""
+                      className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                        selectedMainCategory === category.id ? "bg-primary/10 font-medium text-primary" : ""
                       }`}
                     >
-                      {cat}
-                      <ChevronRight className="w-4 h-4" />
+                      <span>{category.name}</span>
+                      <ChevronRight className="w-4 h-4 text-text-tertiary" />
                     </button>
-                  ))}
-                </div>
+                  ))
+                )}
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-background-section p-2 border-b">
-                  <span className="text-sm font-medium">중분류</span>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {selectedCategory1 ? (
-                    getCategory2Options().map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory2(cat)
-                          setSelectedCategory3("")
-                        }}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-background-section transition-colors flex items-center justify-between ${
-                          selectedCategory2 === cat ? "bg-primary/10 text-primary font-medium" : ""
-                        }`}
-                      >
-                        {cat}
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-sm text-text-tertiary">대분류를 선택하세요</div>
-                  )}
-                </div>
+              {/* Sub Categories */}
+              <div className="border rounded-lg overflow-y-auto">
+                {selectedMainCategory && (
+                  <>
+                    {subCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : subCategories.length > 0 ? (
+                      subCategories.map((subCategory) => (
+                        <button
+                          key={subCategory.id}
+                          type="button"
+                          onClick={() => {
+                            handleSubCategoryChange(subCategory.id)
+                            toggleCategory(subCategory.id)
+                          }}
+                          className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                            selectedSubCategory === subCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                          }`}
+                        >
+                          <span>{subCategory.name}</span>
+                          <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center py-8 text-text-secondary">
+                        <span className="text-sm">하위 카테고리가 없습니다</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-background-section p-2 border-b">
-                  <span className="text-sm font-medium">소분류</span>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {selectedCategory2 ? (
-                    getCategory3Options().map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedCategory3(cat)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-background-section transition-colors ${
-                          selectedCategory3 === cat ? "bg-primary/10 text-primary font-medium" : ""
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-sm text-text-tertiary">중분류를 선택하세요</div>
-                  )}
-                </div>
+              {/* Detail Categories */}
+              <div className="border rounded-lg overflow-y-auto">
+                {selectedMainCategory && selectedSubCategory && (
+                  <>
+                    {subSubCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : subSubCategories.length > 0 ? (
+                      subSubCategories.map((subSubCategory) => (
+                        <button
+                          key={subSubCategory.id}
+                          type="button"
+                          onClick={() => handleDetailCategoryChange(subSubCategory.id)}
+                          className={`w-full px-4 py-3 text-left hover:bg-background-section transition-colors ${
+                            selectedDetailCategory === subSubCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                          }`}
+                        >
+                          {subSubCategory.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center py-8 text-text-secondary">
+                        <span className="text-sm">세부 카테고리가 없습니다</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </Card>
@@ -448,12 +495,15 @@ export default function EditProductPage() {
             </div>
 
             <div>
-              <Label htmlFor="brand">브랜드</Label>
+              <Label htmlFor="brand">
+                브랜드 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="brand"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder="브랜드명을 입력하세요"
+                required
               />
             </div>
 
