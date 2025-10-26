@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,67 +11,9 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
+import { Category } from "@/types/api/category"
 
-const CATEGORIES = {
-  가구: {
-    침실가구: ["침대", "매트리스", "침대프레임", "협탁", "화장대", "옷장"],
-    거실가구: ["소파", "거실장", "TV장", "거실테이블", "콘솔"],
-    주방가구: ["식탁", "식탁의자", "주방수납", "렌지대", "식기장"],
-    서재가구: ["책상", "책장", "서재의자", "컴퓨터책상"],
-    수납가구: ["서랍장", "옷장", "행거", "수납장", "선반"],
-  },
-  패브릭: {
-    커튼: ["암막커튼", "쉬어커튼", "블라인드", "롤스크린"],
-    침구: ["이불", "베개", "침대커버", "요", "쿠션"],
-    러그: ["거실러그", "침실러그", "주방매트", "현관매트"],
-    쿠션: ["방석", "쿠션커버", "등쿠션", "목쿠션"],
-  },
-  조명: {
-    천장조명: ["직부등", "샹들리에", "펜던트", "레일조명"],
-    스탠드: ["플로어스탠드", "테이블스탠드", "독서등"],
-    벽등: ["벽부등", "브라켓", "간접조명"],
-    전구: ["LED전구", "형광등", "할로겐"],
-  },
-  "수납/정리": {
-    옷수납: ["옷걸이", "수납박스", "압축팩", "서랍정리"],
-    주방수납: ["밀폐용기", "양념통", "냉장고정리", "싱크대정리"],
-    욕실수납: ["욕실선반", "수납바구니", "칫솔걸이"],
-    소품수납: ["정리함", "서류정리", "케이블정리"],
-  },
-  생활용품: {
-    청소용품: ["청소기", "걸레", "빗자루", "청소세제"],
-    욕실용품: ["수건", "욕실매트", "샤워기", "비누"],
-    세탁용품: ["세제", "섬유유연제", "빨래건조대", "다리미"],
-    생활잡화: ["휴지통", "우산꽂이", "시계", "거울"],
-  },
-  주방용품: {
-    조리도구: ["냄비", "프라이팬", "칼", "도마", "주걱"],
-    식기: ["그릇", "접시", "컵", "수저", "젓가락"],
-    주방가전: ["전자레인지", "에어프라이어", "믹서기", "토스터"],
-    보관용기: ["밀폐용기", "유리병", "텀블러", "도시락"],
-  },
-  홈데코: {
-    액자: ["그림액자", "사진액자", "포스터", "캔버스"],
-    화병: ["꽃병", "조화", "드라이플라워", "화분"],
-    시계: ["벽시계", "탁상시계", "스탠드시계"],
-    장식소품: ["오브제", "캔들", "디퓨저", "방향제"],
-  },
-  가전: {
-    계절가전: ["선풍기", "에어컨", "히터", "가습기", "제습기"],
-    생활가전: ["청소기", "공기청정기", "다리미", "건조기"],
-    주방가전: ["냉장고", "전자레인지", "정수기", "커피머신"],
-  },
-  "공구/DIY": {
-    전동공구: ["드릴", "그라인더", "샌더", "전동드라이버"],
-    수공구: ["드라이버", "렌치", "펜치", "망치"],
-    DIY자재: ["목재", "페인트", "접착제", "나사못"],
-  },
-  반려동물: {
-    강아지용품: ["사료", "간식", "장난감", "목줄", "하우스"],
-    고양이용품: ["사료", "간식", "스크래쳐", "화장실", "캣타워"],
-    용품: ["식기", "급수기", "이동장", "배변패드"],
-  },
-}
 
 type OptionInput = {
   name: string
@@ -97,9 +39,11 @@ export default function CreateProductPage() {
   const [stock, setStock] = useState("")
   const [description, setDescription] = useState("")
 
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string | null>(null)
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null)
-  const [selectedDetailCategory, setSelectedDetailCategory] = useState<string | null>(null)
+  const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
+  const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
+  const [selectedDetailCategory, setSelectedDetailCategory] = useState<number | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const [isClient, setIsClient] = useState(false)
 
   const [productType, setProductType] = useState<"single" | "option">("single")
 
@@ -107,6 +51,42 @@ export default function CreateProductPage() {
   const [optionCombinations, setOptionCombinations] = useState<OptionCombination[]>([])
   const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
   const [bulkStock, setBulkStock] = useState("")
+
+  // 카테고리 API 훅들
+  const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
+  const { data: subCategories = [], isLoading: subCategoriesLoading } = useCategoriesByParent(selectedMainCategory || 0)
+  const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
+  const { data: subSubCategories = [], isLoading: subSubCategoriesLoading } = useCategoriesByParent(subSubCategoryParentId)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // 카테고리 선택 핸들러들
+  const handleMainCategoryChange = (categoryId: number) => {
+    setSelectedMainCategory(categoryId)
+    setSelectedSubCategory(null)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleSubCategoryChange = (subCategoryId: number) => {
+    setSelectedSubCategory(subCategoryId)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleDetailCategoryChange = (detailCategoryId: number) => {
+    setSelectedDetailCategory(detailCategoryId)
+  }
+
+  const toggleCategory = (categoryId: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
+    } else {
+      newExpanded.add(categoryId)
+    }
+    setExpandedCategories(newExpanded)
+  }
 
   const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -257,6 +237,40 @@ export default function CreateProductPage() {
     router.push("/seller")
   }
 
+  // 클라이언트 사이드에서만 렌더링
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (topCategoriesLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">카테고리를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (topCategoriesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">카테고리를 불러오는데 실패했습니다.</p>
+          <Button onClick={() => window.location.reload()}>다시 시도</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-[1000px] px-4 py-8">
@@ -274,11 +288,15 @@ export default function CreateProductPage() {
             </Label>
 
             {/* Selected Category Path */}
-            {selectedDetailCategory && (
+            {(selectedMainCategory || selectedSubCategory || selectedDetailCategory) && (
               <div className="mb-4 p-3 bg-primary/10 rounded-lg">
                 <span className="text-sm text-text-secondary">선택된 카테고리: </span>
                 <span className="text-sm font-medium">
-                  {selectedMainCategory} &gt; {selectedSubCategory} &gt; {selectedDetailCategory}
+                  {[
+                    topCategories.find(cat => cat.id === selectedMainCategory)?.name,
+                    subCategories.find(cat => cat.id === selectedSubCategory)?.name,
+                    subSubCategories.find(cat => cat.id === selectedDetailCategory)?.name
+                  ].filter(Boolean).join(" > ")}
                 </span>
               </div>
             )}
@@ -286,64 +304,96 @@ export default function CreateProductPage() {
             <div className="grid grid-cols-3 gap-4 h-[400px]">
               {/* Main Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {Object.keys(CATEGORIES).map((mainCat) => (
-                  <button
-                    key={mainCat}
-                    type="button"
-                    onClick={() => {
-                      setSelectedMainCategory(mainCat)
-                      setSelectedSubCategory(null)
-                      setSelectedDetailCategory(null)
-                    }}
-                    className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
-                      selectedMainCategory === mainCat ? "bg-background-section font-medium" : ""
-                    }`}
-                  >
-                    <span>{mainCat}</span>
-                    <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                  </button>
-                ))}
+                {topCategoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : topCategoriesError ? (
+                  <div className="flex items-center justify-center py-8 text-red-500">
+                    <span className="text-sm">카테고리를 불러올 수 없습니다</span>
+                  </div>
+                ) : (
+                  topCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => {
+                        handleMainCategoryChange(category.id)
+                        toggleCategory(category.id)
+                      }}
+                      className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                        selectedMainCategory === category.id ? "bg-primary/10 font-medium text-primary" : ""
+                      }`}
+                    >
+                      <span>{category.name}</span>
+                      <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                    </button>
+                  ))
+                )}
               </div>
 
               {/* Sub Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {selectedMainCategory &&
-                  Object.keys(CATEGORIES[selectedMainCategory as keyof typeof CATEGORIES]).map((subCat) => (
-                    <button
-                      key={subCat}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSubCategory(subCat)
-                        setSelectedDetailCategory(null)
-                      }}
-                      className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
-                        selectedSubCategory === subCat ? "bg-background-section font-medium" : ""
-                      }`}
-                    >
-                      <span>{subCat}</span>
-                      <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                    </button>
-                  ))}
+                {selectedMainCategory && (
+                  <>
+                    {subCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : subCategories.length > 0 ? (
+                      subCategories.map((subCategory) => (
+                        <button
+                          key={subCategory.id}
+                          type="button"
+                          onClick={() => {
+                            handleSubCategoryChange(subCategory.id)
+                            toggleCategory(subCategory.id)
+                          }}
+                          className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                            selectedSubCategory === subCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                          }`}
+                        >
+                          <span>{subCategory.name}</span>
+                          <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center py-8 text-text-secondary">
+                        <span className="text-sm">하위 카테고리가 없습니다</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Detail Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {selectedMainCategory &&
-                  selectedSubCategory &&
-                  CATEGORIES[selectedMainCategory as keyof typeof CATEGORIES][
-                    selectedSubCategory as keyof (typeof CATEGORIES)[keyof typeof CATEGORIES]
-                  ].map((detailCat: string) => (
-                    <button
-                      key={detailCat}
-                      type="button"
-                      onClick={() => setSelectedDetailCategory(detailCat)}
-                      className={`w-full px-4 py-3 text-left hover:bg-background-section transition-colors ${
-                        selectedDetailCategory === detailCat ? "bg-primary/10 font-medium text-primary" : ""
-                      }`}
-                    >
-                      {detailCat}
-                    </button>
-                  ))}
+                {selectedMainCategory && selectedSubCategory && (
+                  <>
+                    {subSubCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : subSubCategories.length > 0 ? (
+                      subSubCategories.map((subSubCategory) => (
+                        <button
+                          key={subSubCategory.id}
+                          type="button"
+                          onClick={() => handleDetailCategoryChange(subSubCategory.id)}
+                          className={`w-full px-4 py-3 text-left hover:bg-background-section transition-colors ${
+                            selectedDetailCategory === subSubCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                          }`}
+                        >
+                          {subSubCategory.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center py-8 text-text-secondary">
+                        <span className="text-sm">세부 카테고리가 없습니다</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </Card>
