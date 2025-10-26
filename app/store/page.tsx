@@ -402,9 +402,9 @@ export default function StorePage() {
                   </Button>
                   
                   {showSortOptions && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                       <div className="p-2">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 gap-2">
                           <button
                             onClick={() => handleSortTypeChange('POPULAR')}
                             className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
