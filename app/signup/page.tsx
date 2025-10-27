@@ -1,21 +1,23 @@
 "use client"
 
 import { useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/hooks/use-auth"
+import { useRedirectIfAuthenticated, useAuth } from "@/hooks/use-auth"
 import { toast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
 
-export default function LoginPage() {
+export default function SignupPage() {
+  // 이미 인증된 사용자는 홈으로 리다이렉트
+  useRedirectIfAuthenticated("/")
   
-  const { login, isLoading, error, clearError } = useAuth()
-  const router = useRouter()
+  // use-auth 훅에서 필요한 상태와 함수들을 가져옴
+  const { isLoading, error, clearError, login } = useAuth()
 
   // 에러가 있으면 토스트 표시
   useEffect(() => {
     if (error) {
       toast({
-        title: "로그인 오류",
+        title: "회원가입 오류",
         description: error,
         variant: "destructive",
       })
@@ -23,8 +25,14 @@ export default function LoginPage() {
     }
   }, [error, clearError])
 
-  const handleGoogleLogin = () => {
+  const handleGoogleSignup = () => {
+    clearError()
     login('google')
+  }
+
+  const handleKakaoSignup = () => {
+    clearError()
+    login('kakao')
   }
 
   return (
@@ -47,15 +55,15 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             홈스윗<span className="text-primary">홈</span>
           </h1>
-          <p className="text-text-secondary">로그인하고 다양한 인테리어를 만나보세요</p>
+          <p className="text-text-secondary">회원가입하고 다양한 인테리어를 만나보세요</p>
         </div>
 
-        {/* Login Card */}
+        {/* Signup Card */}
         <div className="bg-background rounded-lg border border-divider p-8 shadow-sm">
           <div className="space-y-4">
-            {/* Google Login Button */}
+            {/* Google Signup Button */}
             <Button
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignup}
               disabled={isLoading}
               className="w-full h-12 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium flex items-center justify-center gap-3"
             >
@@ -77,14 +85,28 @@ export default function LoginPage() {
                   fill="#EA4335"
                 />
               </svg>
-              {isLoading ? "로그인 중..." : "구글로 시작하기"}
+              {isLoading ? "회원가입 중..." : "구글로 시작하기"}
             </Button>
 
-           
+            {/* Kakao Signup Button */}
+            <Button
+              onClick={handleKakaoSignup}
+              disabled={isLoading}
+              className="w-full h-12 font-medium flex items-center justify-center gap-3"
+              style={{ backgroundColor: "#FEE500", color: "#000000" }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M10 0C4.477 0 0 3.582 0 8c0 2.89 1.897 5.43 4.736 6.863l-.946 3.465a.5.5 0 00.727.577l4.15-2.49c.44.058.892.085 1.333.085 5.523 0 10-3.582 10-8S15.523 0 10 0z"
+                  fill="#000000"
+                />
+              </svg>
+              {isLoading ? "회원가입 중..." : "카카오로 시작하기"}
+            </Button>
           </div>
 
           <div className="mt-6 text-center text-sm text-text-secondary">
-            로그인하면{" "}
+            회원가입하면{" "}
             <span>
               홈스윗<span className="text-primary">홈</span>
             </span>
@@ -100,16 +122,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Signup Link */}
+        {/* Login Link */}
         <div className="mt-6 text-center">
           <p className="text-sm text-text-secondary">
-            아직 계정이 없으신가요?{" "}
-            <a 
-              href="/signup" 
+            이미 계정이 있으신가요?{" "}
+            <Link 
+              href="/login" 
               className="text-primary hover:underline font-medium"
             >
-              회원가입하기
-            </a>
+              로그인하기
+            </Link>
           </p>
         </div>
       </div>
