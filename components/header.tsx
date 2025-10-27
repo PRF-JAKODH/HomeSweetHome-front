@@ -4,7 +4,7 @@ import { Search, ShoppingCart, Menu, Bell, User, MessageCircle } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth"
 
 export function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const { isLoading, logout, isAuthenticated } = useAuth()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
@@ -128,8 +129,42 @@ export function Header() {
         <div className="flex h-[60px] items-center justify-between gap-4">
           {/* Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <Logo />
-            <Navigation />
+            <a href="/" className="flex items-center gap-2">
+              <Image
+                src="/house-logo.png"
+                alt="홈스윗홈"
+                width={32}
+                height={32}
+                className="w-8 h-8"
+              />
+              <span className="text-xl font-bold text-foreground">
+                홈스윗<span className="text-primary">홈</span>
+              </span>
+            </a>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden items-center gap-6 md:flex">
+              <a 
+                href="/store" 
+                className={`text-sm font-medium transition-colors ${
+                  pathname?.startsWith("/store") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
+                스토어
+              </a>
+              <a 
+                href="/community" 
+                className={`text-sm font-medium transition-colors ${
+                  pathname?.startsWith("/community") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
+                커뮤니티
+              </a>
+            </nav>
           </div>
 
           {/* Search Bar */}
