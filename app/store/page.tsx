@@ -44,7 +44,7 @@ export default function StorePage() {
   // 정렬 타입별 표시명
   const getSortTypeLabel = (type: ProductSortType) => {
     switch (type) {
-      case 'POPULAR': return '인기순'
+      case 'POPULAR': return '리뷰순'
       case 'LATEST': return '최신순'
       case 'PRICE_LOW': return '낮은가격순'
       case 'PRICE_HIGH': return '높은가격순'
@@ -414,7 +414,7 @@ export default function StorePage() {
                             <div className={`w-4 h-4 rounded-full border-2 ${
                               sortType === 'POPULAR' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
                             }`}></div>
-                            인기순
+                            리뷰순
                           </button>
                           <button
                             onClick={() => handleSortTypeChange('LATEST')}

@@ -20,7 +20,8 @@ export interface ProductReviewResponse {
   username: string
   rating: number
   comment: string
-  imageUrl: string
+  productImageUrl: string
+  reviewImageUrl: string | null
   createdAt: string
   updatedAt: string
 }

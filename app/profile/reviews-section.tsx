@@ -39,10 +39,10 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 </div>
               </div>
               <p className="text-foreground mb-3">{review.comment}</p>
-              {review.imageUrl && (
+              {review.reviewImageUrl && (
                 <div className="flex gap-2 mb-4">
                   <img
-                    src={review.imageUrl || "/placeholder.svg"}
+                    src={review.reviewImageUrl || "/placeholder.svg"}
                     alt="리뷰 이미지"
                     className="w-20 h-20 object-cover rounded-lg"
                   />

@@ -8,17 +8,22 @@ import { ApiResponse } from './common'
 export interface Category {
   id: number
   name: string
-  parentId: number | null
+  parentId: number | null  // 최상단 카테고리는 null, 하위 카테고리는 number
   depth: number
   createdAt: string
   updatedAt: string
 }
 
-// 카테고리 생성 요청
-export interface CreateCategoryRequest {
+// 카테고리 생성 요청 (백엔드 CategoryCreateRequest와 일치)
+export interface CategoryCreateRequest {
   name: string
-  parentId?: number
+  parentId?: number  // 최상단 카테고리는 생략, 하위 카테고리는 필수
 }
+
+// 기존 호환성을 위한 별칭들
+export type CreateTopCategoryRequest = Omit<CategoryCreateRequest, 'parentId'>
+export type CreateSubCategoryRequest = Required<CategoryCreateRequest>
+export type CreateCategoryRequest = CategoryCreateRequest
 
 // 카테고리 목록 조회 요청
 export interface GetCategoriesRequest {
@@ -32,7 +37,8 @@ export type GetCategoriesResponse = ApiResponse<Category[]>
 // 카테고리 상세 조회 응답
 export type GetCategoryResponse = ApiResponse<Category>
 
-// 카테고리 생성 응답
+// 카테고리 생성 응답 (백엔드 CategoryResponse와 일치)
+export type CategoryResponse = Category
 export type CreateCategoryResponse = ApiResponse<Category>
 
 // 카테고리 트리 구조

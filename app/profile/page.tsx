@@ -193,8 +193,8 @@ export default function ProfilePage() {
     setEditReviewContent(review.comment)
     
     // 기존 이미지가 있는 경우 표시
-    if (review.imageUrl) {
-      setEditReviewImages([review.imageUrl])
+    if (review.reviewImageUrl) {
+      setEditReviewImages([review.reviewImageUrl])
     } else {
       // 이미지가 없는 경우 빈 배열로 설정
       setEditReviewImages([])

@@ -4,7 +4,7 @@
 
 import { apiClient } from './client'
 import { CATEGORY_ENDPOINTS } from './endpoints'
-import { Category } from '@/types/api/category'
+import { Category, CategoryCreateRequest, CategoryResponse } from '@/types/api/category'
 
 
 // 최상단 카테고리 조회
@@ -40,4 +40,24 @@ export const getCategoryHierarchy = async (categoryId: number): Promise<Category
     console.error('Failed to fetch category hierarchy:', error)
     return []
   }
+}
+
+// 카테고리 생성 (백엔드 API와 일치)
+export const createCategory = async (data: CategoryCreateRequest): Promise<CategoryResponse> => {
+  try {
+    const response = await apiClient.post<CategoryResponse>('/api/v1/categories', data)
+    return response
+  } catch (error) {
+    console.error('Failed to create category:', error)
+    throw error
+  }
+}
+
+// 기존 호환성을 위한 별칭 함수들
+export const createTopCategory = async (data: { name: string }): Promise<CategoryResponse> => {
+  return createCategory(data)
+}
+
+export const createSubCategory = async (data: { name: string; parentId: number }): Promise<CategoryResponse> => {
+  return createCategory(data)
 }
