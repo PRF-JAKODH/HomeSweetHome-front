@@ -46,12 +46,9 @@ export default function CheckoutPage() {
   })
 
   useEffect(() => {
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      const selected = cart.filter((item: CartItem & { selected: boolean }) => item.selected)
-      setOrderItems(selected)
-    }
+    // TODO: API를 통해 장바구니 데이터 조회하도록 수정 필요
+    // 현재는 빈 배열로 초기화
+    setOrderItems([])
 
     const storedAddresses = localStorage.getItem("ohouse_addresses")
     if (storedAddresses) {
@@ -72,18 +69,8 @@ export default function CheckoutPage() {
         return item
       })
 
-      const storedCart = localStorage.getItem("ohouse_cart")
-      if (storedCart) {
-        const cart = JSON.parse(storedCart)
-        const updatedCart = cart.map((item: CartItem & { selected: boolean }) => {
-          const updatedItem = updated.find((u) => u.id === item.id)
-          if (updatedItem) {
-            return { ...item, quantity: updatedItem.quantity }
-          }
-          return item
-        })
-        localStorage.setItem("ohouse_cart", JSON.stringify(updatedCart))
-      }
+      // TODO: API를 통해 장바구니 수량 업데이트하도록 수정 필요
+      // 로컬 스토리지 로직 제거
 
       return updated
     })
@@ -134,12 +121,8 @@ export default function CheckoutPage() {
 
     localStorage.setItem("ohouse_last_order", JSON.stringify(order))
 
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      const remaining = cart.filter((item: CartItem & { selected: boolean }) => !item.selected)
-      localStorage.setItem("ohouse_cart", JSON.stringify(remaining))
-    }
+    // TODO: API를 통해 주문 완료 후 장바구니에서 해당 상품들 제거하도록 수정 필요
+    // 로컬 스토리지 로직 제거
 
     router.push("/checkout/complete")
   }

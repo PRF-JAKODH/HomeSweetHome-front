@@ -2,76 +2,20 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2, FolderPlus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { useTopCategories, useCategoriesByParent, useCreateCategory } from "@/lib/hooks/use-categories"
+import { createProduct } from "@/lib/api/products"
+import { Category } from "@/types/api/category"
+import { CreateProductRequest, OptionGroup, SkuInfo } from "@/types/api/product"
 
-const CATEGORIES = {
-  가구: {
-    침실가구: ["침대", "매트리스", "침대프레임", "협탁", "화장대", "옷장"],
-    거실가구: ["소파", "거실장", "TV장", "거실테이블", "콘솔"],
-    주방가구: ["식탁", "식탁의자", "주방수납", "렌지대", "식기장"],
-    서재가구: ["책상", "책장", "서재의자", "컴퓨터책상"],
-    수납가구: ["서랍장", "옷장", "행거", "수납장", "선반"],
-  },
-  패브릭: {
-    커튼: ["암막커튼", "쉬어커튼", "블라인드", "롤스크린"],
-    침구: ["이불", "베개", "침대커버", "요", "쿠션"],
-    러그: ["거실러그", "침실러그", "주방매트", "현관매트"],
-    쿠션: ["방석", "쿠션커버", "등쿠션", "목쿠션"],
-  },
-  조명: {
-    천장조명: ["직부등", "샹들리에", "펜던트", "레일조명"],
-    스탠드: ["플로어스탠드", "테이블스탠드", "독서등"],
-    벽등: ["벽부등", "브라켓", "간접조명"],
-    전구: ["LED전구", "형광등", "할로겐"],
-  },
-  "수납/정리": {
-    옷수납: ["옷걸이", "수납박스", "압축팩", "서랍정리"],
-    주방수납: ["밀폐용기", "양념통", "냉장고정리", "싱크대정리"],
-    욕실수납: ["욕실선반", "수납바구니", "칫솔걸이"],
-    소품수납: ["정리함", "서류정리", "케이블정리"],
-  },
-  생활용품: {
-    청소용품: ["청소기", "걸레", "빗자루", "청소세제"],
-    욕실용품: ["수건", "욕실매트", "샤워기", "비누"],
-    세탁용품: ["세제", "섬유유연제", "빨래건조대", "다리미"],
-    생활잡화: ["휴지통", "우산꽂이", "시계", "거울"],
-  },
-  주방용품: {
-    조리도구: ["냄비", "프라이팬", "칼", "도마", "주걱"],
-    식기: ["그릇", "접시", "컵", "수저", "젓가락"],
-    주방가전: ["전자레인지", "에어프라이어", "믹서기", "토스터"],
-    보관용기: ["밀폐용기", "유리병", "텀블러", "도시락"],
-  },
-  홈데코: {
-    액자: ["그림액자", "사진액자", "포스터", "캔버스"],
-    화병: ["꽃병", "조화", "드라이플라워", "화분"],
-    시계: ["벽시계", "탁상시계", "스탠드시계"],
-    장식소품: ["오브제", "캔들", "디퓨저", "방향제"],
-  },
-  가전: {
-    계절가전: ["선풍기", "에어컨", "히터", "가습기", "제습기"],
-    생활가전: ["청소기", "공기청정기", "다리미", "건조기"],
-    주방가전: ["냉장고", "전자레인지", "정수기", "커피머신"],
-  },
-  "공구/DIY": {
-    전동공구: ["드릴", "그라인더", "샌더", "전동드라이버"],
-    수공구: ["드라이버", "렌치", "펜치", "망치"],
-    DIY자재: ["목재", "페인트", "접착제", "나사못"],
-  },
-  반려동물: {
-    강아지용품: ["사료", "간식", "장난감", "목줄", "하우스"],
-    고양이용품: ["사료", "간식", "스크래쳐", "화장실", "캣타워"],
-    용품: ["식기", "급수기", "이동장", "배변패드"],
-  },
-}
 
 type OptionInput = {
   name: string
@@ -81,7 +25,7 @@ type OptionInput = {
 type OptionCombination = {
   combination: string[]
   additionalPrice: number
-  stock: number
+  stockQuantity: number
 }
 
 export default function CreateProductPage() {
@@ -97,9 +41,11 @@ export default function CreateProductPage() {
   const [stock, setStock] = useState("")
   const [description, setDescription] = useState("")
 
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string | null>(null)
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null)
-  const [selectedDetailCategory, setSelectedDetailCategory] = useState<string | null>(null)
+  const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
+  const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
+  const [selectedDetailCategory, setSelectedDetailCategory] = useState<number | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const [isClient, setIsClient] = useState(false)
 
   const [productType, setProductType] = useState<"single" | "option">("single")
 
@@ -107,6 +53,51 @@ export default function CreateProductPage() {
   const [optionCombinations, setOptionCombinations] = useState<OptionCombination[]>([])
   const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
   const [bulkStock, setBulkStock] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // 카테고리 생성 관련 상태
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [editingCategory, setEditingCategory] = useState<{
+    type: "top" | "sub" | "detail"
+    parentId?: number
+  } | null>(null)
+
+  // 카테고리 API 훅들
+  const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
+  const { data: subCategories = [], isLoading: subCategoriesLoading } = useCategoriesByParent(selectedMainCategory || 0)
+  const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
+  const { data: subSubCategories = [], isLoading: subSubCategoriesLoading } = useCategoriesByParent(subSubCategoryParentId)
+  const createCategoryMutation = useCreateCategory()
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // 카테고리 선택 핸들러들
+  const handleMainCategoryChange = (categoryId: number) => {
+    setSelectedMainCategory(categoryId)
+    setSelectedSubCategory(null)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleSubCategoryChange = (subCategoryId: number) => {
+    setSelectedSubCategory(subCategoryId)
+    setSelectedDetailCategory(null)
+  }
+
+  const handleDetailCategoryChange = (detailCategoryId: number) => {
+    setSelectedDetailCategory(detailCategoryId)
+  }
+
+  const toggleCategory = (categoryId: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
+    } else {
+      newExpanded.add(categoryId)
+    }
+    setExpandedCategories(newExpanded)
+  }
 
   const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -191,12 +182,12 @@ export default function CreateProductPage() {
       combinations.map((combo) => ({
         combination: combo,
         additionalPrice: 0,
-        stock: 0,
+        stockQuantity: 0,
       })),
     )
   }
 
-  const updateCombination = (index: number, field: "additionalPrice" | "stock", value: number) => {
+  const updateCombination = (index: number, field: "additionalPrice" | "stockQuantity", value: number) => {
     const updated = [...optionCombinations]
     updated[index][field] = value
     setOptionCombinations(updated)
@@ -218,13 +209,86 @@ export default function CreateProductPage() {
     setOptionCombinations(
       optionCombinations.map((combo) => ({
         ...combo,
-        stock: stockValue,
+        stockQuantity: stockValue,
       })),
     )
     setBulkStock("")
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 카테고리 생성 함수들
+  const handleCreateCategory = async (event?: React.MouseEvent | React.KeyboardEvent) => {
+    // 중복 실행 방지
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    if (!newCategoryName.trim()) {
+      alert("카테고리명을 입력해주세요.")
+      return
+    }
+
+    if (!editingCategory) return
+
+    // 이미 생성 중이면 중복 실행 방지
+    if (createCategoryMutation.isPending) return
+
+    try {
+      const categoryData = {
+        name: newCategoryName.trim(),
+        ...(editingCategory.type !== "top" && { parentId: editingCategory.parentId })
+      }
+
+      const newCategory = await createCategoryMutation.mutateAsync(categoryData)
+      
+      // 생성된 카테고리 자동 선택
+      if (editingCategory.type === "top") {
+        setSelectedMainCategory(newCategory.id)
+        setSelectedSubCategory(null)
+        setSelectedDetailCategory(null)
+      } else if (editingCategory.type === "sub") {
+        setSelectedSubCategory(newCategory.id)
+        setSelectedDetailCategory(null)
+      } else if (editingCategory.type === "detail") {
+        setSelectedDetailCategory(newCategory.id)
+      }
+
+      // 폼 초기화
+      setNewCategoryName("")
+      setEditingCategory(null)
+    } catch (error: any) {
+      console.error('카테고리 생성 실패:', error)
+      alert("카테고리 생성에 실패했습니다. 다시 시도해주세요.")
+    }
+  }
+
+  const startCreatingCategory = (type: "top" | "sub" | "detail", parentId?: number) => {
+    setEditingCategory({ type, parentId })
+    setNewCategoryName("")
+  }
+
+  const cancelCreatingCategory = () => {
+    setEditingCategory(null)
+    setNewCategoryName("")
+  }
+
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve) => {
+      const arr = base64String.split(',')
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const file = new File([u8arr], filename, { type: mime })
+      resolve(file)
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!mainImage) {
@@ -232,12 +296,13 @@ export default function CreateProductPage() {
       return
     }
 
-    if (!selectedDetailCategory) {
+    const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
+    if (!selectedCategoryId) {
       alert("카테고리를 선택해주세요.")
       return
     }
 
-    if (!productName || !originalPrice) {
+    if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
       return
     }
@@ -252,9 +317,134 @@ export default function CreateProductPage() {
       return
     }
 
-    // Save product logic here
-    alert("상품이 등록되었습니다!")
-    router.push("/seller")
+    setIsSubmitting(true)
+    try {
+      // 메인 이미지를 File로 변환
+      const mainImageFile = await base64ToFile(mainImage, 'main-image.jpg')
+      
+      // 상세 이미지들을 File로 변환
+      const detailImageFiles: File[] = []
+      for (const image of subImages) {
+        const file = await base64ToFile(image, `detail-image-${detailImageFiles.length}.jpg`)
+        detailImageFiles.push(file)
+      }
+
+      // 상품 데이터 구성
+      let productData: CreateProductRequest
+
+      if (productType === "single") {
+        // 단일 상품
+        productData = {
+          categoryId: selectedCategoryId,
+          name: productName,
+          brand: brand,
+          basePrice: parseInt(originalPrice),
+          discountRate: parseFloat(discountRate) || 0,
+          description: description,
+          shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0,
+          optionGroups: [],
+          skus: [{
+            priceAdjustment: 0,
+            stockQuantity: parseInt(stock),
+            optionIndexes: []
+          }]
+        }
+      } else {
+        // 옵션 상품
+        const optionGroups: OptionGroup[] = optionInputs
+          .filter(opt => opt.name && opt.values)
+          .map(opt => ({
+            groupName: opt.name,
+            values: opt.values.split(',').map(v => v.trim()).filter(v => v)
+          }))
+
+        // 옵션 그룹의 values를 평면화하여 전체 옵션 리스트 생성
+        const flattenedOptions: string[] = []
+        optionGroups.forEach(group => {
+          flattenedOptions.push(...group.values)
+        })
+
+        const skus: SkuInfo[] = optionCombinations.map(combo => {
+          // 각 조합의 옵션값이 평면화된 리스트에서의 인덱스를 찾기
+          const optionIndexes: number[] = []
+          
+          combo.combination.forEach((value) => {
+            const index = flattenedOptions.findIndex(option => option === value)
+            if (index !== -1) {
+              optionIndexes.push(index)
+            }
+          })
+          
+          return {
+            priceAdjustment: combo.additionalPrice,
+            stockQuantity: combo.stockQuantity,
+            optionIndexes
+          }
+        })
+
+        productData = {
+          categoryId: selectedCategoryId,
+          name: productName,
+          brand: brand,
+          basePrice: parseInt(originalPrice),
+          discountRate: parseFloat(discountRate) || 0,
+          description: description,
+          shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0,
+          optionGroups,
+          skus
+        }
+      }
+
+      await createProduct(productData, mainImageFile, detailImageFiles)
+      
+      alert("상품이 등록되었습니다!")
+      router.push("/seller")
+    } catch (error: any) {
+      console.error('상품 등록 실패:', error)
+      
+      // 409 에러 (동일한 제품명) 처리
+      if (error?.response?.status === 409) {
+        alert(error?.response?.data?.message || "동일한 제품명을 사용할 수 없습니다.")
+      } else {
+        alert("상품 등록에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 클라이언트 사이드에서만 렌더링
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (topCategoriesLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">카테고리를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (topCategoriesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">카테고리를 불러오는데 실패했습니다.</p>
+          <Button onClick={() => window.location.reload()}>다시 시도</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -274,11 +464,15 @@ export default function CreateProductPage() {
             </Label>
 
             {/* Selected Category Path */}
-            {selectedDetailCategory && (
+            {(selectedMainCategory || selectedSubCategory || selectedDetailCategory) && (
               <div className="mb-4 p-3 bg-primary/10 rounded-lg">
                 <span className="text-sm text-text-secondary">선택된 카테고리: </span>
                 <span className="text-sm font-medium">
-                  {selectedMainCategory} &gt; {selectedSubCategory} &gt; {selectedDetailCategory}
+                  {[
+                    topCategories.find(cat => cat.id === selectedMainCategory)?.name,
+                    subCategories.find(cat => cat.id === selectedSubCategory)?.name,
+                    subSubCategories.find(cat => cat.id === selectedDetailCategory)?.name
+                  ].filter(Boolean).join(" > ")}
                 </span>
               </div>
             )}
@@ -286,64 +480,247 @@ export default function CreateProductPage() {
             <div className="grid grid-cols-3 gap-4 h-[400px]">
               {/* Main Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {Object.keys(CATEGORIES).map((mainCat) => (
-                  <button
-                    key={mainCat}
-                    type="button"
-                    onClick={() => {
-                      setSelectedMainCategory(mainCat)
-                      setSelectedSubCategory(null)
-                      setSelectedDetailCategory(null)
-                    }}
-                    className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
-                      selectedMainCategory === mainCat ? "bg-background-section font-medium" : ""
-                    }`}
-                  >
-                    <span>{mainCat}</span>
-                    <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                  </button>
-                ))}
+                {topCategoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : topCategoriesError ? (
+                  <div className="flex items-center justify-center py-8 text-red-500">
+                    <span className="text-sm">카테고리를 불러올 수 없습니다</span>
+                  </div>
+                ) : (
+                  <>
+                    {topCategories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => {
+                          handleMainCategoryChange(category.id)
+                          toggleCategory(category.id)
+                        }}
+                        className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                          selectedMainCategory === category.id ? "bg-primary/10 font-medium text-primary" : ""
+                        }`}
+                      >
+                        <span>{category.name}</span>
+                        <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                      </button>
+                    ))}
+                    
+                    {/* 최상단 카테고리 생성 */}
+                    {editingCategory?.type === "top" ? (
+                      <div className="px-4 py-3 border-t">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            placeholder="카테고리명 입력"
+                            className="flex-1 text-sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault()
+                                handleCreateCategory(e)
+                              } else if (e.key === "Escape") {
+                                e.preventDefault()
+                                cancelCreatingCategory()
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCreateCategory}
+                            disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                            className="px-2"
+                          >
+                            ✓
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelCreatingCategory}
+                            className="px-2"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startCreatingCategory("top")}
+                        className="w-full px-4 py-3 text-left flex items-center gap-2 hover:bg-background-section transition-colors text-text-secondary border-t"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>카테고리 추가</span>
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Sub Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {selectedMainCategory &&
-                  Object.keys(CATEGORIES[selectedMainCategory as keyof typeof CATEGORIES]).map((subCat) => (
-                    <button
-                      key={subCat}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSubCategory(subCat)
-                        setSelectedDetailCategory(null)
-                      }}
-                      className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
-                        selectedSubCategory === subCat ? "bg-background-section font-medium" : ""
-                      }`}
-                    >
-                      <span>{subCat}</span>
-                      <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                    </button>
-                  ))}
+                {selectedMainCategory && (
+                  <>
+                    {subCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <>
+                        {subCategories.map((subCategory) => (
+                          <button
+                            key={subCategory.id}
+                            type="button"
+                            onClick={() => {
+                              handleSubCategoryChange(subCategory.id)
+                              toggleCategory(subCategory.id)
+                            }}
+                            className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-background-section transition-colors ${
+                              selectedSubCategory === subCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                            }`}
+                          >
+                            <span>{subCategory.name}</span>
+                            <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                          </button>
+                        ))}
+                        
+                        {/* 하위 카테고리 생성 */}
+                        {editingCategory?.type === "sub" && editingCategory.parentId === selectedMainCategory ? (
+                          <div className="px-4 py-3 border-t">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="카테고리명 입력"
+                                className="flex-1 text-sm"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault()
+                                    handleCreateCategory(e)
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault()
+                                    cancelCreatingCategory()
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleCreateCategory}
+                                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                                className="px-2"
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={cancelCreatingCategory}
+                                className="px-2"
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startCreatingCategory("sub", selectedMainCategory)}
+                            className="w-full px-4 py-3 text-left flex items-center gap-2 hover:bg-background-section transition-colors text-text-secondary border-t"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>카테고리 추가</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Detail Categories */}
               <div className="border rounded-lg overflow-y-auto">
-                {selectedMainCategory &&
-                  selectedSubCategory &&
-                  CATEGORIES[selectedMainCategory as keyof typeof CATEGORIES][
-                    selectedSubCategory as keyof (typeof CATEGORIES)[keyof typeof CATEGORIES]
-                  ].map((detailCat: string) => (
-                    <button
-                      key={detailCat}
-                      type="button"
-                      onClick={() => setSelectedDetailCategory(detailCat)}
-                      className={`w-full px-4 py-3 text-left hover:bg-background-section transition-colors ${
-                        selectedDetailCategory === detailCat ? "bg-primary/10 font-medium text-primary" : ""
-                      }`}
-                    >
-                      {detailCat}
-                    </button>
-                  ))}
+                {selectedMainCategory && selectedSubCategory && (
+                  <>
+                    {subSubCategoriesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <>
+                        {subSubCategories.map((subSubCategory) => (
+                          <button
+                            key={subSubCategory.id}
+                            type="button"
+                            onClick={() => handleDetailCategoryChange(subSubCategory.id)}
+                            className={`w-full px-4 py-3 text-left hover:bg-background-section transition-colors ${
+                              selectedDetailCategory === subSubCategory.id ? "bg-primary/10 font-medium text-primary" : ""
+                            }`}
+                          >
+                            {subSubCategory.name}
+                          </button>
+                        ))}
+                        
+                        {/* 세부 카테고리 생성 */}
+                        {editingCategory?.type === "detail" && editingCategory.parentId === selectedSubCategory ? (
+                          <div className="px-4 py-3 border-t">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="카테고리명 입력"
+                                className="flex-1 text-sm"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault()
+                                    handleCreateCategory(e)
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault()
+                                    cancelCreatingCategory()
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleCreateCategory}
+                                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                                className="px-2"
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={cancelCreatingCategory}
+                                className="px-2"
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startCreatingCategory("detail", selectedSubCategory)}
+                            className="w-full px-4 py-3 text-left flex items-center gap-2 hover:bg-background-section transition-colors text-text-secondary border-t"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>카테고리 추가</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </Card>
@@ -417,12 +794,15 @@ export default function CreateProductPage() {
             </div>
 
             <div>
-              <Label htmlFor="brand">브랜드</Label>
+              <Label htmlFor="brand">
+                브랜드 <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="brand"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder="브랜드명을 입력하세요"
+                required
               />
             </div>
 
@@ -650,20 +1030,22 @@ export default function CreateProductPage() {
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  value={combo.additionalPrice}
-                                  onChange={(e) =>
-                                    updateCombination(index, "additionalPrice", Number.parseInt(e.target.value) || 0)
-                                  }
+                                  value={combo.additionalPrice || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0
+                                    updateCombination(index, "additionalPrice", value)
+                                  }}
                                   className="w-32"
                                 />
                               </td>
                               <td className="px-4 py-3">
                                 <Input
                                   type="number"
-                                  value={combo.stock}
-                                  onChange={(e) =>
-                                    updateCombination(index, "stock", Number.parseInt(e.target.value) || 0)
-                                  }
+                                  value={combo.stockQuantity || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0
+                                    updateCombination(index, "stockQuantity", value)
+                                  }}
                                   className="w-32"
                                 />
                               </td>
@@ -698,11 +1080,16 @@ export default function CreateProductPage() {
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
               취소
             </Button>
-            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-              상품 등록
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isSubmitting ? "등록 중..." : "상품 등록"}
             </Button>
           </div>
         </form>
+
       </div>
     </div>
   )

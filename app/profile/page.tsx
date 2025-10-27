@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+// 리뷰 관련 import 제거 - ReviewsSection에서 처리
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -62,12 +63,7 @@ export default function ProfilePage() {
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
 
-  const [editReviewDialogOpen, setEditReviewDialogOpen] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<any>(null)
-  const [editReviewRating, setEditReviewRating] = useState(0)
-  const [editReviewContent, setEditReviewContent] = useState("")
-  const [editReviewImages, setEditReviewImages] = useState<string[]>([])
-  const [hoveredEditRating, setHoveredEditRating] = useState(0)
+  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
 
 
   const [profileData, setProfileData] = useState({
@@ -158,26 +154,7 @@ export default function ProfilePage() {
   }
 
 
-  const [myReviews, setMyReviews] = useState([
-    {
-      id: 1,
-      productName: "모던 미니멀 소파",
-      productImage: "/modern-minimalist-sofa.png",
-      rating: 5,
-      content: "정말 만족스러운 제품입니다. 디자인도 예쁘고 앉았을 때 편안해요. 거실 분위기가 확 바뀌었습니다!",
-      date: "2025-01-15",
-      images: ["/sofa-review-1.jpg", "/sofa-review-2.jpg"],
-    },
-    {
-      id: 2,
-      productName: "원목 다이닝 테이블",
-      productImage: "/wooden-dining-table.png",
-      rating: 4,
-      content: "원목 질감이 좋고 튼튼합니다. 다만 조립이 조금 어려웠어요.",
-      date: "2025-01-12",
-      images: [],
-    },
-  ])
+  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
 
   const handleCancelOrder = (orderId: number) => {
     setSelectedOrderId(orderId)
@@ -202,61 +179,7 @@ export default function ProfilePage() {
     alert("주문이 취소되었습니다.")
   }
 
-  const handleEditReview = (review: any) => {
-    setSelectedReview(review)
-    setEditReviewRating(review.rating)
-    setEditReviewContent(review.content)
-    setEditReviewImages(review.images)
-    setEditReviewDialogOpen(true)
-  }
-
-  const handleEditReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const newImages: string[] = []
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          newImages.push(reader.result as string)
-          if (newImages.length === files.length) {
-            setEditReviewImages([...editReviewImages, ...newImages])
-          }
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-  }
-
-  const handleSaveEditedReview = () => {
-    if (editReviewRating === 0) {
-      alert("별점을 선택해주세요.")
-      return
-    }
-    if (!editReviewContent.trim()) {
-      alert("리뷰 내용을 입력해주세요.")
-      return
-    }
-
-    setMyReviews((prevReviews) =>
-      prevReviews.map((review) =>
-        review.id === selectedReview.id
-          ? {
-            ...review,
-            rating: editReviewRating,
-            content: editReviewContent,
-            images: editReviewImages,
-          }
-          : review,
-      ),
-    )
-
-    setEditReviewDialogOpen(false)
-    setSelectedReview(null)
-    setEditReviewRating(0)
-    setEditReviewContent("")
-    setEditReviewImages([])
-    alert("리뷰가 수정되었습니다.")
-  }
+  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
 
   const filteredOrders = orderFilter === "all" ? myOrders : myOrders.filter((order) => order.status === orderFilter)
 
@@ -317,6 +240,8 @@ export default function ProfilePage() {
     }
   }
 
+  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
+
   const renderContent = () => {
     switch (selectedMenu) {
       case "shopping":
@@ -333,12 +258,7 @@ export default function ProfilePage() {
         )
 
       case "reviews":
-        return (
-          <ReviewsSection
-            myReviews={myReviews}
-            onEditReview={handleEditReview}
-          />
-        )
+        return <ReviewsSection />
 
       case "seller-apply":
         return (
@@ -368,23 +288,28 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const userData = await fetchUser()
-      console.log(userData)
-      if (userData) {
-        const addressStr = userData.address || ''
-        const parts = addressStr.split('/')
-        const road = parts[0] || ''
-        const detail = parts[1] || ''
-        setProfileData(prev => ({
-          ...prev,
-          name: userData.name || "",
-          email: userData.email || "",
-          phone: userData.phoneNumber || "",  
-          birthdate: String(userData.birthDate ?? ''),
-          roadAddress: road,
-          detailAddress: detail,
-          profileImage: userData.profileImageUrl || "/placeholder.svg",
-        }))
+      try {
+        const userData = await fetchUser()
+        console.log(userData)
+        if (userData) {
+          const addressStr = userData.address || ''
+          const parts = addressStr.split('/')
+          const road = parts[0] || ''
+          const detail = parts[1] || ''
+          setProfileData(prev => ({
+            ...prev,
+            name: userData.name || "",
+            email: userData.email || "",
+            phone: userData.phoneNumber || "",  
+            birthdate: String(userData.birthDate ?? ''),
+            roadAddress: road,
+            detailAddress: detail,
+            profileImage: userData.profileImageUrl || "/placeholder.svg",
+          }))
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 실패:', error)
+        // 에러가 발생해도 페이지는 표시하도록 함
       }
     }
     fetchUserData()
@@ -400,120 +325,24 @@ export default function ProfilePage() {
     }
   }, [router])
 
+  // 리뷰 관련 useEffect 제거 - ReviewsSection에서 처리
+
+  // 로딩 상태 표시 (선택사항)
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+  //         <p>사용자 정보를 불러오는 중...</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
   return (
     <>
       <Script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" strategy="lazyOnload" />
 
-      <Dialog open={editReviewDialogOpen} onOpenChange={setEditReviewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">리뷰 수정</DialogTitle>
-            <DialogDescription>{selectedReview?.productName}</DialogDescription>
-          </DialogHeader>
-
-          {selectedReview && (
-            <div className="space-y-6 py-4">
-              {/* Star Rating */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">별점</label>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setEditReviewRating(star)}
-                      onMouseEnter={() => setHoveredEditRating(star)}
-                      onMouseLeave={() => setHoveredEditRating(0)}
-                      className="text-3xl transition-colors"
-                    >
-                      <span
-                        className={star <= (hoveredEditRating || editReviewRating) ? "text-warning" : "text-divider"}
-                      >
-                        ★
-                      </span>
-                    </button>
-                  ))}
-                  {editReviewRating > 0 && (
-                    <span className="ml-2 text-sm text-text-secondary">{editReviewRating}점</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Review Content */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">리뷰 내용</label>
-                <Textarea
-                  value={editReviewContent}
-                  onChange={(e) => setEditReviewContent(e.target.value)}
-                  placeholder="상품에 대한 솔직한 리뷰를 작성해주세요."
-                  className="min-h-[120px] resize-none"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택)</label>
-                <div className="flex flex-wrap gap-3">
-                  {editReviewImages.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image || "/placeholder.svg"}
-                        alt={`리뷰 이미지 ${index + 1}`}
-                        className="h-24 w-24 rounded-lg object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditReviewImages(editReviewImages.filter((_, i) => i !== index))}
-                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-white hover:bg-foreground/80"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {editReviewImages.length < 5 && (
-                    <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80">
-                      <svg
-                        className="mb-1 h-6 w-6 text-text-secondary"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="text-xs text-text-secondary">{editReviewImages.length}/5</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleEditReviewImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditReviewDialogOpen(false)
-                setSelectedReview(null)
-                setEditReviewRating(0)
-                setEditReviewContent("")
-                setEditReviewImages([])
-              }}
-            >
-              취소
-            </Button>
-            <Button onClick={handleSaveEditedReview} className="bg-primary hover:bg-primary/90 text-white">
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 리뷰 수정 다이얼로그 제거 - ReviewsSection에서 처리 */}
 
       <Dialog open={orderDetailOpen} onOpenChange={setOrderDetailOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -714,8 +543,8 @@ export default function ProfilePage() {
                       )}
                     </div>
                     <div>
-                      <p className="font-semibold text-foreground">{profileData.name || user?.name}</p>
-                      <p className="text-sm text-text-secondary">{profileData.email || user?.email}</p>
+                      <p className="font-semibold text-foreground">{profileData.name || user?.name || "사용자"}</p>
+                      <p className="text-sm text-text-secondary">{profileData.email || user?.email || "이메일을 불러오는 중..."}</p>
                     </div>
                   </div>
                 </div>

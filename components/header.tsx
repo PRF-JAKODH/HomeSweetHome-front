@@ -4,19 +4,25 @@ import { Search, ShoppingCart, Menu, Bell, User, MessageCircle } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
+import { useCart } from "@/lib/hooks/use-cart"
 
 
 export function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const { isLoading, logout, isAuthenticated } = useAuth()
+  const { data: cartData, isLoading: cartLoading } = useCart()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [cartCount, setCartCount] = useState(0)
+  const [searchKeyword, setSearchKeyword] = useState("")
+
+  // 장바구니 개수 계산
+  const cartCount = cartData?.contents?.length || 0
 
   useEffect(() => {
     const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -64,21 +70,7 @@ export function Header() {
       setUnreadCount(sampleNotifications.filter((n) => !n.read).length)
     }
 
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      setCartCount(cart.length)
-    }
-
-    const handleCartUpdate = () => {
-      const storedCart = localStorage.getItem("ohouse_cart")
-      if (storedCart) {
-        const cart = JSON.parse(storedCart)
-        setCartCount(cart.length)
-      } else {
-        setCartCount(0)
-      }
-    }
+    // 장바구니 개수는 useCart 훅을 통해 API에서 가져옴
 
     const handleUserTypeUpdate = () => {
       const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -87,13 +79,9 @@ export function Header() {
       }
     }
 
-    window.addEventListener("storage", handleCartUpdate)
-    window.addEventListener("cartUpdated", handleCartUpdate)
     window.addEventListener("userTypeUpdated", handleUserTypeUpdate)
 
     return () => {
-      window.removeEventListener("storage", handleCartUpdate)
-      window.removeEventListener("cartUpdated", handleCartUpdate)
       window.removeEventListener("userTypeUpdated", handleUserTypeUpdate)
     }
   }, [])
@@ -105,6 +93,17 @@ export function Header() {
 
   const handleLogin = () => {
     router.push("/login")
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchKeyword.trim()) {
+      router.push(`/store?keyword=${encodeURIComponent(searchKeyword.trim())}`)
+    }
+  }
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKeyword(e.target.value)
   }
 
   const markAsRead = (id: number) => {
@@ -128,13 +127,56 @@ export function Header() {
         <div className="flex h-[60px] items-center justify-between gap-4">
           {/* Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <Logo />
-            <Navigation />
+            <a href="/" className="flex items-center gap-2">
+              <Image
+                src="/house-logo.png"
+                alt="홈스윗홈"
+                width={32}
+                height={32}
+                className="w-8 h-8"
+              />
+              <span className="text-2xl font-bold text-foreground">
+                홈스윗<span className="text-primary">홈</span>
+              </span>
+            </a>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden items-center gap-6 md:flex">
+              <a 
+                href="/store" 
+                className={`text-base font-medium transition-colors ${
+                  pathname?.startsWith("/store") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
+                스토어
+              </a>
+              <a 
+                href="/community" 
+                className={`text-base font-medium transition-colors ${
+                  pathname?.startsWith("/community") 
+                    ? "text-sky-500 font-bold" 
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
+                커뮤니티
+              </a>
+            </nav>
           </div>
 
           {/* Search Bar */}
           <div className="hidden flex-1 max-w-md md:block">
-            <SearchBar />
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
+              <Input
+                type="search"
+                placeholder="검색어를 입력하세요"
+                value={searchKeyword}
+                onChange={handleSearchInputChange}
+                className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
+              />
+            </form>
           </div>
 
           {/* Actions */}
@@ -144,6 +186,7 @@ export function Header() {
                   <UserActions
                     userType={userType}
                     cartCount={cartCount}
+                    cartLoading={cartLoading}
                     onLogout={handleLogout}
                     notificationDropdownProps={{
                       notifications: notifications,
@@ -167,7 +210,16 @@ export function Header() {
 
         {/* Mobile Search */}
         <div className="pb-3 md:hidden">
-          <SearchBar />
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
+            <Input
+              type="search"
+              placeholder="검색어를 입력하세요"
+              value={searchKeyword}
+              onChange={handleSearchInputChange}
+              className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
+            />
+          </form>
         </div>
       </div>
     </header>
@@ -314,6 +366,7 @@ function NotificationDropdown({
 interface UserActionsProps {
   userType: "buyer" | "seller"
   cartCount: number
+  cartLoading?: boolean
   onLogout: () => void
   notificationDropdownProps: NotificationDropdownProps
 }
@@ -321,6 +374,7 @@ interface UserActionsProps {
 function UserActions({ 
   userType, 
   cartCount, 
+  cartLoading = false,
   onLogout,
   notificationDropdownProps
 }: UserActionsProps) {
@@ -334,11 +388,15 @@ function UserActions({
       </Button>
       <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/cart")}>
         <ShoppingCart className="h-5 w-5" />
-        {cartCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
+        {cartLoading ? (
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center font-medium">
+            ...
+          </span>
+        ) : cartCount > 0 ? (
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
             {cartCount > 9 ? "9+" : cartCount}
           </span>
-        )}
+        ) : null}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

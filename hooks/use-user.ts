@@ -42,6 +42,8 @@ export function useUser(): UseUser {
     const fetchUser = async (): Promise<UserResponse> => {
         const response = await fetchUserApi();
         if (response.status === 200 && response.data) {
+            // 사용자 정보를 store에 저장
+            setUser(response.data);
             return response.data;
         } else {
             throw new Error('Failed to fetch user info');
