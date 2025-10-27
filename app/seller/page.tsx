@@ -432,7 +432,7 @@ export default function SellerPage() {
                 : "text-text-secondary hover:text-foreground"
             }`}
           >
-            판매 재고 목록
+            재고 목록
           </button>
           <button
             onClick={() => setActiveTab("stats")}

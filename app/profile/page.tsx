@@ -4,6 +4,8 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { getMyReviews, updateProductReview } from "@/lib/api/reviews"
+import { ProductReviewResponse, ProductReviewUpdateRequest } from "@/types/api/review"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -63,7 +65,7 @@ export default function ProfilePage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
 
   const [editReviewDialogOpen, setEditReviewDialogOpen] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<any>(null)
+  const [selectedReview, setSelectedReview] = useState<ProductReviewResponse | null>(null)
   const [editReviewRating, setEditReviewRating] = useState(0)
   const [editReviewContent, setEditReviewContent] = useState("")
   const [editReviewImages, setEditReviewImages] = useState<string[]>([])
@@ -158,26 +160,9 @@ export default function ProfilePage() {
   }
 
 
-  const [myReviews, setMyReviews] = useState([
-    {
-      id: 1,
-      productName: "모던 미니멀 소파",
-      productImage: "/modern-minimalist-sofa.png",
-      rating: 5,
-      content: "정말 만족스러운 제품입니다. 디자인도 예쁘고 앉았을 때 편안해요. 거실 분위기가 확 바뀌었습니다!",
-      date: "2025-01-15",
-      images: ["/sofa-review-1.jpg", "/sofa-review-2.jpg"],
-    },
-    {
-      id: 2,
-      productName: "원목 다이닝 테이블",
-      productImage: "/wooden-dining-table.png",
-      rating: 4,
-      content: "원목 질감이 좋고 튼튼합니다. 다만 조립이 조금 어려웠어요.",
-      date: "2025-01-12",
-      images: [],
-    },
-  ])
+  const [myReviews, setMyReviews] = useState<ProductReviewResponse[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
 
   const handleCancelOrder = (orderId: number) => {
     setSelectedOrderId(orderId)
@@ -202,32 +187,77 @@ export default function ProfilePage() {
     alert("주문이 취소되었습니다.")
   }
 
-  const handleEditReview = (review: any) => {
+  const handleEditReview = (review: ProductReviewResponse) => {
     setSelectedReview(review)
     setEditReviewRating(review.rating)
-    setEditReviewContent(review.content)
-    setEditReviewImages(review.images)
+    setEditReviewContent(review.comment)
+    
+    // 기존 이미지가 Data URL 형식인지 확인
+    if (review.imageUrl && review.imageUrl.startsWith('data:')) {
+      setEditReviewImages([review.imageUrl])
+    } else {
+      // 일반 URL이거나 이미지가 없는 경우 빈 배열로 설정
+      setEditReviewImages([])
+    }
+    
     setEditReviewDialogOpen(true)
   }
 
   const handleEditReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files) {
-      const newImages: string[] = []
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          newImages.push(reader.result as string)
-          if (newImages.length === files.length) {
-            setEditReviewImages([...editReviewImages, ...newImages])
-          }
-        }
-        reader.readAsDataURL(file)
-      })
+    if (files && files.length > 0) {
+      const file = files[0] // 첫 번째 파일만 사용
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setEditReviewImages([reader.result as string]) // 기존 이미지를 대체
+      }
+      reader.readAsDataURL(file)
     }
   }
 
-  const handleSaveEditedReview = () => {
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Base64 문자열이 유효한지 확인
+        if (!base64String || typeof base64String !== 'string') {
+          throw new Error('Invalid base64 string')
+        }
+
+        const arr = base64String.split(',')
+        if (arr.length !== 2) {
+          throw new Error('Invalid data URL format')
+        }
+
+        // Data URL 형식인지 확인
+        if (!arr[0].startsWith('data:')) {
+          throw new Error('Not a valid data URL')
+        }
+
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+        
+        // Base64 데이터가 유효한지 확인
+        const base64Data = arr[1]
+        if (!base64Data || base64Data.length === 0) {
+          throw new Error('Empty base64 data')
+        }
+
+        const bstr = atob(base64Data)
+        let n = bstr.length
+        const u8arr = new Uint8Array(n)
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n)
+        }
+        const file = new File([u8arr], filename, { type: mime })
+        resolve(file)
+      } catch (error) {
+        console.error('Base64 to File conversion error:', error)
+        reject(error)
+      }
+    })
+  }
+
+  const handleSaveEditedReview = async () => {
     if (editReviewRating === 0) {
       alert("별점을 선택해주세요.")
       return
@@ -237,25 +267,49 @@ export default function ProfilePage() {
       return
     }
 
-    setMyReviews((prevReviews) =>
-      prevReviews.map((review) =>
-        review.id === selectedReview.id
-          ? {
-            ...review,
-            rating: editReviewRating,
-            content: editReviewContent,
-            images: editReviewImages,
-          }
-          : review,
-      ),
-    )
+    if (!selectedReview) return
 
-    setEditReviewDialogOpen(false)
-    setSelectedReview(null)
-    setEditReviewRating(0)
-    setEditReviewContent("")
-    setEditReviewImages([])
-    alert("리뷰가 수정되었습니다.")
+    try {
+      let imageFile: File
+      
+      if (editReviewImages.length > 0 && editReviewImages[0]) {
+        try {
+          // Base64 이미지를 File 객체로 변환
+          imageFile = await base64ToFile(editReviewImages[0], 'review-image.jpg')
+        } catch (base64Error) {
+          console.error('이미지 변환 실패:', base64Error)
+          // 이미지 변환 실패 시 빈 파일로 대체
+          imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+        }
+      } else {
+        // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
+        imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+      }
+      
+      const reviewData: ProductReviewUpdateRequest = {
+        rating: editReviewRating,
+        comment: editReviewContent,
+        image: imageFile
+      }
+
+      const updatedReview = await updateProductReview(selectedReview.reviewId, reviewData)
+      
+      setMyReviews((prevReviews) =>
+        prevReviews.map((review) =>
+          review.reviewId === selectedReview.reviewId ? updatedReview : review
+        )
+      )
+
+      setEditReviewDialogOpen(false)
+      setSelectedReview(null)
+      setEditReviewRating(0)
+      setEditReviewContent("")
+      setEditReviewImages([])
+      alert("리뷰가 수정되었습니다.")
+    } catch (error: any) {
+      console.error('리뷰 수정 실패:', error)
+      alert("리뷰 수정에 실패했습니다. 다시 시도해주세요.")
+    }
   }
 
   const filteredOrders = orderFilter === "all" ? myOrders : myOrders.filter((order) => order.status === orderFilter)
@@ -314,6 +368,21 @@ export default function ProfilePage() {
     if (order) {
       setSelectedOrder(order)
       setOrderDetailOpen(true)
+    }
+  }
+
+  // 내 리뷰 데이터 가져오기
+  const fetchMyReviews = async () => {
+    setReviewsLoading(true)
+    setReviewsError(null)
+    try {
+      const response = await getMyReviews()
+      setMyReviews(response.contents)
+    } catch (error) {
+      console.error('리뷰 조회 실패:', error)
+      setReviewsError('리뷰를 불러오는데 실패했습니다.')
+    } finally {
+      setReviewsLoading(false)
     }
   }
 
@@ -400,6 +469,16 @@ export default function ProfilePage() {
     }
   }, [router])
 
+  // 리뷰 메뉴 선택 시 리뷰 데이터 가져오기
+  useEffect(() => {
+    if (selectedMenu === "reviews") {
+      fetchMyReviews()
+    }
+  }, [selectedMenu])
+
+  if (!user) {
+    return null
+  }
   return (
     <>
       <Script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" strategy="lazyOnload" />
@@ -427,7 +506,7 @@ export default function ProfilePage() {
                       className="text-3xl transition-colors"
                     >
                       <span
-                        className={star <= (hoveredEditRating || editReviewRating) ? "text-warning" : "text-divider"}
+                        className={star <= (hoveredEditRating || editReviewRating) ? "text-sky-400" : "text-gray-300"}
                       >
                         ★
                       </span>
@@ -452,7 +531,7 @@ export default function ProfilePage() {
 
               {/* Image Upload */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택)</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택, 최대 1장)</label>
                 <div className="flex flex-wrap gap-3">
                   {editReviewImages.map((image, index) => (
                     <div key={index} className="relative">
@@ -470,7 +549,7 @@ export default function ProfilePage() {
                       </button>
                     </div>
                   ))}
-                  {editReviewImages.length < 5 && (
+                  {editReviewImages.length < 1 && (
                     <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80">
                       <svg
                         className="mb-1 h-6 w-6 text-text-secondary"
@@ -480,11 +559,10 @@ export default function ProfilePage() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                      <span className="text-xs text-text-secondary">{editReviewImages.length}/5</span>
+                      <span className="text-xs text-text-secondary">{editReviewImages.length}/1</span>
                       <input
                         type="file"
                         accept="image/*"
-                        multiple
                         onChange={handleEditReviewImageUpload}
                         className="hidden"
                       />
