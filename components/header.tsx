@@ -21,8 +21,8 @@ export function Header() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState("")
 
-  // 장바구니 개수 계산
-  const cartCount = cartData?.contents?.length || 0
+  // 장바구니 개수 계산 (인증된 상태에서만)
+  const cartCount = isAuthenticated ? (cartData?.contents?.length || 0) : 0
 
   useEffect(() => {
     const storedUserType = localStorage.getItem("ohouse_user_type")

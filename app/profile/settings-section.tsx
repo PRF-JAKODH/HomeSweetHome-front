@@ -69,7 +69,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           label="이름"
           value={profileData.name}
           placeholder="이름을 입력하세요"
-          readOnly
+          onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
         />
 
         {/* Email */}
@@ -79,7 +79,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           type="email"
           value={profileData.email}
           placeholder="이메일을 입력하세요"
-          readOnly
+          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
         />
 
         {/* Phone */}
@@ -89,7 +89,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           type="tel"
           value={profileData.phone}
           placeholder="전화번호를 입력하세요"
-          readOnly
+          onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
         />
 
         {/* Birthdate */}
@@ -99,7 +99,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           type="date"
           value={profileData.birthdate}
           placeholder=""
-          readOnly
+          onChange={(e) => setProfileData({ ...profileData, birthdate: e.target.value })}
         />
 
         {/* Address */}

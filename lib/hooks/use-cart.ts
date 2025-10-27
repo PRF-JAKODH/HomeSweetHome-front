@@ -12,6 +12,7 @@ import {
 } from '@/lib/api/cart'
 import { CartRequest, Cart, CartResponse } from '@/types/api/cart'
 import { ScrollResponse } from '@/types/api/common'
+import { useAuthStore } from '@/stores/auth-store'
 
 // 장바구니 쿼리 키
 export const CART_QUERY_KEYS = {
@@ -23,10 +24,13 @@ export const CART_QUERY_KEYS = {
  * 장바구니 목록 조회 훅
  */
 export const useCartItems = (cursorId?: number, size: number = 10) => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  
   return useQuery({
     queryKey: [...CART_QUERY_KEYS.list(), cursorId, size],
     queryFn: () => getCartItems(cursorId, size),
     staleTime: 5 * 60 * 1000, // 5분
+    enabled: isAuthenticated, // 인증된 상태에서만 쿼리 실행
   })
 }
 
@@ -43,9 +47,15 @@ export const useCart = () => {
  */
 export const useAddToCart = () => {
   const queryClient = useQueryClient()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   return useMutation<Cart, Error, CartRequest>({
-    mutationFn: (cartRequest: CartRequest) => addToCart(cartRequest),
+    mutationFn: (cartRequest: CartRequest) => {
+      if (!isAuthenticated) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      return addToCart(cartRequest)
+    },
     onSuccess: () => {
       // 장바구니 목록 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
@@ -59,9 +69,15 @@ export const useAddToCart = () => {
  */
 export const useDeleteCartItem = () => {
   const queryClient = useQueryClient()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   return useMutation({
-    mutationFn: (cartItemId: string) => deleteCartItem(cartItemId),
+    mutationFn: (cartItemId: string) => {
+      if (!isAuthenticated) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      return deleteCartItem(cartItemId)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
     },
@@ -73,9 +89,15 @@ export const useDeleteCartItem = () => {
  */
 export const useDeleteCartItems = () => {
   const queryClient = useQueryClient()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   return useMutation({
-    mutationFn: (cartItemIds: number[]) => deleteCartItems(cartItemIds),
+    mutationFn: (cartItemIds: number[]) => {
+      if (!isAuthenticated) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      return deleteCartItems(cartItemIds)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
     },
@@ -87,9 +109,15 @@ export const useDeleteCartItems = () => {
  */
 export const useClearCart = () => {
   const queryClient = useQueryClient()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   return useMutation({
-    mutationFn: clearCart,
+    mutationFn: () => {
+      if (!isAuthenticated) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      return clearCart()
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
     },
