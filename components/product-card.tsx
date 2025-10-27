@@ -52,23 +52,23 @@ export function ProductCard({
         {/* Product Info */}
         <div className="p-3 flex flex-col flex-grow">
           {/* Brand */}
-          <div className="mb-1 text-xs font-medium text-text-secondary">{brand}</div>
+          <div className="mb-1 text-sm font-medium text-text-secondary">{brand}</div>
 
           {/* Product Name */}
-          <h3 className="mb-2 line-clamp-2 text-sm font-medium text-foreground leading-relaxed">{name}</h3>
+          <h3 className="mb-2 line-clamp-2 text-base font-medium text-foreground leading-relaxed">{name}</h3>
 
           {/* Price */}
           <div className="mb-2 flex items-center gap-2">
-            {discountRate && <span className="text-base font-bold text-primary">{discountRate}%</span>}
-            <span className="text-base font-bold text-foreground">{price?.toLocaleString() || '0'}원</span>
+            {discountRate && <span className="text-lg font-bold text-primary">{discountRate}%</span>}
+            <span className="text-lg font-bold text-foreground">{price?.toLocaleString() || '0'}원</span>
           </div>
 
           {originalPrice && (
-            <div className="mb-2 text-xs text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}원</div>
+            <div className="mb-2 text-sm text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}원</div>
           )}
 
           {/* Rating & Reviews */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-sm">
             <div className="flex items-center gap-1">
               <span className="text-warning">★</span>
               <span className="font-medium text-foreground">{rating}</span>
@@ -79,11 +79,11 @@ export function ProductCard({
           {/* Shipping Info */}
           <div className="mt-1 mt-auto">
             {isFreeShipping ? (
-              <div className="inline-block rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+              <div className="inline-block rounded bg-gray-100 px-2 py-1 text-sm font-medium text-gray-700">
                 무료배송
               </div>
             ) : (
-              <span className="text-xs text-text-secondary">배송비 {shippingPrice.toLocaleString()}원</span>
+              <span className="text-sm text-text-secondary">배송비 {shippingPrice.toLocaleString()}원</span>
             )}
           </div>
         </div>

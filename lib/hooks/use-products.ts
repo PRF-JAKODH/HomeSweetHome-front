@@ -10,7 +10,8 @@ import { getProductPreviews } from '@/lib/api/products'
 export const useInfiniteProductPreviews = (
   categoryId?: number,
   sortType: ProductSortType = 'LATEST',
-  limit: number = 10
+  limit: number = 10,
+  keyword?: string
 ) => {
   const [allProducts, setAllProducts] = useState<ProductPreviewResponse[]>([])
   const [cursorId, setCursorId] = useState<number | null>(null)
@@ -18,13 +19,14 @@ export const useInfiniteProductPreviews = (
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit],
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword],
     queryFn: () =>
       getProductPreviews({
         categoryId,
         limit,
         sortType,
         cursorId: cursorId ?? undefined,
+        keyword: keyword || undefined,
       }),
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -63,7 +65,7 @@ export const useInfiniteProductPreviews = (
   useEffect(() => {
     reset()
     refetch()
-  }, [categoryId, sortType, reset, refetch])
+  }, [categoryId, sortType, keyword, reset, refetch])
 
   return {
     products: allProducts,

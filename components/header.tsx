@@ -18,6 +18,7 @@ export function Header() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [cartCount, setCartCount] = useState(0)
+  const [searchKeyword, setSearchKeyword] = useState("")
 
   useEffect(() => {
     const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -108,6 +109,17 @@ export function Header() {
     router.push("/login")
   }
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchKeyword.trim()) {
+      router.push(`/store?keyword=${encodeURIComponent(searchKeyword.trim())}`)
+    }
+  }
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKeyword(e.target.value)
+  }
+
   const markAsRead = (id: number) => {
     const updatedNotifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     setNotifications(updatedNotifications)
@@ -137,7 +149,7 @@ export function Header() {
                 height={32}
                 className="w-8 h-8"
               />
-              <span className="text-xl font-bold text-foreground">
+              <span className="text-2xl font-bold text-foreground">
                 홈스윗<span className="text-primary">홈</span>
               </span>
             </a>
@@ -146,7 +158,7 @@ export function Header() {
             <nav className="hidden items-center gap-6 md:flex">
               <a 
                 href="/store" 
-                className={`text-sm font-medium transition-colors ${
+                className={`text-base font-medium transition-colors ${
                   pathname?.startsWith("/store") 
                     ? "text-sky-500 font-bold" 
                     : "text-foreground hover:text-primary"
@@ -156,7 +168,7 @@ export function Header() {
               </a>
               <a 
                 href="/community" 
-                className={`text-sm font-medium transition-colors ${
+                className={`text-base font-medium transition-colors ${
                   pathname?.startsWith("/community") 
                     ? "text-sky-500 font-bold" 
                     : "text-foreground hover:text-primary"
@@ -169,7 +181,16 @@ export function Header() {
 
           {/* Search Bar */}
           <div className="hidden flex-1 max-w-md md:block">
-            <SearchBar />
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
+              <Input
+                type="search"
+                placeholder="검색어를 입력하세요"
+                value={searchKeyword}
+                onChange={handleSearchInputChange}
+                className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
+              />
+            </form>
           </div>
 
           {/* Actions */}
@@ -202,7 +223,16 @@ export function Header() {
 
         {/* Mobile Search */}
         <div className="pb-3 md:hidden">
-          <SearchBar />
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
+            <Input
+              type="search"
+              placeholder="검색어를 입력하세요"
+              value={searchKeyword}
+              onChange={handleSearchInputChange}
+              className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
+            />
+          </form>
         </div>
       </div>
     </header>
