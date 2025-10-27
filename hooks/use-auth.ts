@@ -19,6 +19,7 @@ type AuthState = {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  isHydrated: boolean
 }
 
 type UseAuth = AuthAction & AuthState
@@ -32,6 +33,7 @@ export function useAuth (): UseAuth {
   const setIsAuthenticated = useAuthStore((s) => s.setIsAuthenticated)
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const isHydrated = useAuthStore((s) => s.isHydrated)
 
   const login = useCallback((provider: LoginCredentials['provider']) => {
     if (typeof window === 'undefined') return
@@ -112,6 +114,7 @@ export function useAuth (): UseAuth {
     logout,
     getIsAuthenticated,
     isAuthenticated,
+    isHydrated,
   }
 }
 
