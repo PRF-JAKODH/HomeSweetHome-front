@@ -4,8 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { getMyReviews, updateProductReview } from "@/lib/api/reviews"
-import { ProductReviewResponse, ProductReviewUpdateRequest } from "@/types/api/review"
+// 리뷰 관련 import 제거 - ReviewsSection에서 처리
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -64,12 +63,7 @@ export default function ProfilePage() {
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
 
-  const [editReviewDialogOpen, setEditReviewDialogOpen] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<ProductReviewResponse | null>(null)
-  const [editReviewRating, setEditReviewRating] = useState(0)
-  const [editReviewContent, setEditReviewContent] = useState("")
-  const [editReviewImages, setEditReviewImages] = useState<string[]>([])
-  const [hoveredEditRating, setHoveredEditRating] = useState(0)
+  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
 
 
   const [profileData, setProfileData] = useState({
@@ -160,9 +154,7 @@ export default function ProfilePage() {
   }
 
 
-  const [myReviews, setMyReviews] = useState<ProductReviewResponse[]>([])
-  const [reviewsLoading, setReviewsLoading] = useState(false)
-  const [reviewsError, setReviewsError] = useState<string | null>(null)
+  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
 
   const handleCancelOrder = (orderId: number) => {
     setSelectedOrderId(orderId)
@@ -187,138 +179,7 @@ export default function ProfilePage() {
     alert("주문이 취소되었습니다.")
   }
 
-  const handleEditReview = (review: ProductReviewResponse) => {
-    setSelectedReview(review)
-    setEditReviewRating(review.rating)
-    setEditReviewContent(review.comment)
-    
-    // 기존 이미지가 있는 경우 표시
-    if (review.reviewImageUrl) {
-      setEditReviewImages([review.reviewImageUrl])
-    } else {
-      // 이미지가 없는 경우 빈 배열로 설정
-      setEditReviewImages([])
-    }
-    
-    setEditReviewDialogOpen(true)
-  }
-
-  const handleEditReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      const file = files[0] // 첫 번째 파일만 사용
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setEditReviewImages([reader.result as string]) // 기존 이미지를 대체
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
-  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      try {
-        // Base64 문자열이 유효한지 확인
-        if (!base64String || typeof base64String !== 'string') {
-          throw new Error('Invalid base64 string')
-        }
-
-        const arr = base64String.split(',')
-        if (arr.length !== 2) {
-          throw new Error('Invalid data URL format')
-        }
-
-        // Data URL 형식인지 확인
-        if (!arr[0].startsWith('data:')) {
-          throw new Error('Not a valid data URL')
-        }
-
-        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
-        
-        // Base64 데이터가 유효한지 확인
-        const base64Data = arr[1]
-        if (!base64Data || base64Data.length === 0) {
-          throw new Error('Empty base64 data')
-        }
-
-        const bstr = atob(base64Data)
-        let n = bstr.length
-        const u8arr = new Uint8Array(n)
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n)
-        }
-        const file = new File([u8arr], filename, { type: mime })
-        resolve(file)
-      } catch (error) {
-        console.error('Base64 to File conversion error:', error)
-        reject(error)
-      }
-    })
-  }
-
-  const handleSaveEditedReview = async () => {
-    if (editReviewRating === 0) {
-      alert("별점을 선택해주세요.")
-      return
-    }
-    if (!editReviewContent.trim()) {
-      alert("리뷰 내용을 입력해주세요.")
-      return
-    }
-
-    if (!selectedReview) return
-
-    try {
-      let imageFile: File
-      
-      if (editReviewImages.length > 0 && editReviewImages[0]) {
-        // 이미지가 Data URL 형식인지 확인
-        if (editReviewImages[0].startsWith('data:')) {
-          try {
-            // Base64 이미지를 File 객체로 변환
-            imageFile = await base64ToFile(editReviewImages[0], 'review-image.jpg')
-          } catch (base64Error) {
-            console.error('이미지 변환 실패:', base64Error)
-            // 이미지 변환 실패 시 빈 파일로 대체
-            imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
-          }
-        } else {
-          // 일반 URL인 경우 빈 파일로 처리 (기존 이미지 유지)
-          imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
-        }
-      } else {
-        // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
-        imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
-      }
-      
-      const reviewData: ProductReviewUpdateRequest = {
-        rating: editReviewRating,
-        comment: editReviewContent,
-        image: imageFile
-      }
-
-      const updatedReview = await updateProductReview(selectedReview.reviewId, reviewData)
-      
-      setMyReviews((prevReviews) =>
-        prevReviews.map((review) =>
-          review.reviewId === selectedReview.reviewId 
-            ? { ...updatedReview, productName: review.productName } // 기존 productName 보존
-            : review
-        )
-      )
-
-      setEditReviewDialogOpen(false)
-      setSelectedReview(null)
-      setEditReviewRating(0)
-      setEditReviewContent("")
-      setEditReviewImages([])
-      alert("리뷰가 수정되었습니다.")
-    } catch (error: any) {
-      console.error('리뷰 수정 실패:', error)
-      alert("리뷰 수정에 실패했습니다. 다시 시도해주세요.")
-    }
-  }
+  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
 
   const filteredOrders = orderFilter === "all" ? myOrders : myOrders.filter((order) => order.status === orderFilter)
 
@@ -379,20 +240,7 @@ export default function ProfilePage() {
     }
   }
 
-  // 내 리뷰 데이터 가져오기
-  const fetchMyReviews = async () => {
-    setReviewsLoading(true)
-    setReviewsError(null)
-    try {
-      const response = await getMyReviews()
-      setMyReviews(response.contents)
-    } catch (error) {
-      console.error('리뷰 조회 실패:', error)
-      setReviewsError('리뷰를 불러오는데 실패했습니다.')
-    } finally {
-      setReviewsLoading(false)
-    }
-  }
+  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
 
   const renderContent = () => {
     switch (selectedMenu) {
@@ -410,12 +258,7 @@ export default function ProfilePage() {
         )
 
       case "reviews":
-        return (
-          <ReviewsSection
-            myReviews={myReviews}
-            onEditReview={handleEditReview}
-          />
-        )
+        return <ReviewsSection />
 
       case "seller-apply":
         return (
@@ -445,23 +288,28 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const userData = await fetchUser()
-      console.log(userData)
-      if (userData) {
-        const addressStr = userData.address || ''
-        const parts = addressStr.split('/')
-        const road = parts[0] || ''
-        const detail = parts[1] || ''
-        setProfileData(prev => ({
-          ...prev,
-          name: userData.name || "",
-          email: userData.email || "",
-          phone: userData.phoneNumber || "",  
-          birthdate: String(userData.birthDate ?? ''),
-          roadAddress: road,
-          detailAddress: detail,
-          profileImage: userData.profileImageUrl || "/placeholder.svg",
-        }))
+      try {
+        const userData = await fetchUser()
+        console.log(userData)
+        if (userData) {
+          const addressStr = userData.address || ''
+          const parts = addressStr.split('/')
+          const road = parts[0] || ''
+          const detail = parts[1] || ''
+          setProfileData(prev => ({
+            ...prev,
+            name: userData.name || "",
+            email: userData.email || "",
+            phone: userData.phoneNumber || "",  
+            birthdate: String(userData.birthDate ?? ''),
+            roadAddress: road,
+            detailAddress: detail,
+            profileImage: userData.profileImageUrl || "/placeholder.svg",
+          }))
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 실패:', error)
+        // 에러가 발생해도 페이지는 표시하도록 함
       }
     }
     fetchUserData()
@@ -477,129 +325,24 @@ export default function ProfilePage() {
     }
   }, [router])
 
-  // 리뷰 메뉴 선택 시 리뷰 데이터 가져오기
-  useEffect(() => {
-    if (selectedMenu === "reviews") {
-      fetchMyReviews()
-    }
-  }, [selectedMenu])
+  // 리뷰 관련 useEffect 제거 - ReviewsSection에서 처리
 
-  if (!user) {
-    return null
-  }
+  // 로딩 상태 표시 (선택사항)
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+  //         <p>사용자 정보를 불러오는 중...</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
   return (
     <>
       <Script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" strategy="lazyOnload" />
 
-      <Dialog open={editReviewDialogOpen} onOpenChange={setEditReviewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">리뷰 수정</DialogTitle>
-            <DialogDescription>{selectedReview?.productName}</DialogDescription>
-          </DialogHeader>
-
-          {selectedReview && (
-            <div className="space-y-6 py-4">
-              {/* Star Rating */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">별점</label>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setEditReviewRating(star)}
-                      onMouseEnter={() => setHoveredEditRating(star)}
-                      onMouseLeave={() => setHoveredEditRating(0)}
-                      className="text-3xl transition-colors"
-                    >
-                      <span
-                        className={star <= (hoveredEditRating || editReviewRating) ? "text-sky-400" : "text-gray-300"}
-                      >
-                        ★
-                      </span>
-                    </button>
-                  ))}
-                  {editReviewRating > 0 && (
-                    <span className="ml-2 text-sm text-text-secondary">{editReviewRating}점</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Review Content */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">리뷰 내용</label>
-                <Textarea
-                  value={editReviewContent}
-                  onChange={(e) => setEditReviewContent(e.target.value)}
-                  placeholder="상품에 대한 솔직한 리뷰를 작성해주세요."
-                  className="min-h-[120px] resize-none"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">사진 첨부 (선택, 최대 1장)</label>
-                <div className="flex flex-wrap gap-3">
-                  {editReviewImages.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image || "/placeholder.svg"}
-                        alt={`리뷰 이미지 ${index + 1}`}
-                        className="h-24 w-24 rounded-lg object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditReviewImages(editReviewImages.filter((_, i) => i !== index))}
-                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-white hover:bg-foreground/80"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {editReviewImages.length < 1 && (
-                    <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80">
-                      <svg
-                        className="mb-1 h-6 w-6 text-text-secondary"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="text-xs text-text-secondary">{editReviewImages.length}/1</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleEditReviewImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditReviewDialogOpen(false)
-                setSelectedReview(null)
-                setEditReviewRating(0)
-                setEditReviewContent("")
-                setEditReviewImages([])
-              }}
-            >
-              취소
-            </Button>
-            <Button onClick={handleSaveEditedReview} className="bg-primary hover:bg-primary/90 text-white">
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 리뷰 수정 다이얼로그 제거 - ReviewsSection에서 처리 */}
 
       <Dialog open={orderDetailOpen} onOpenChange={setOrderDetailOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -800,8 +543,8 @@ export default function ProfilePage() {
                       )}
                     </div>
                     <div>
-                      <p className="font-semibold text-foreground">{profileData.name || user?.name}</p>
-                      <p className="text-sm text-text-secondary">{profileData.email || user?.email}</p>
+                      <p className="font-semibold text-foreground">{profileData.name || user?.name || "사용자"}</p>
+                      <p className="text-sm text-text-secondary">{profileData.email || user?.email || "이메일을 불러오는 중..."}</p>
                     </div>
                   </div>
                 </div>

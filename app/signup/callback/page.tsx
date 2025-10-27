@@ -26,6 +26,47 @@ export default function OnboardingPage() {
   const [authStatus, setAuthStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [authMessage, setAuthMessage] = useState('인증 처리 중...')
   const [showForm, setShowForm] = useState(false)
+  const [isDaumScriptLoaded, setIsDaumScriptLoaded] = useState(false)
+
+  // 다음 우편번호 API 스크립트 로드
+  useEffect(() => {
+    const loadDaumScript = () => {
+      // 이미 스크립트가 로드되었는지 확인
+      if (typeof window !== 'undefined' && (window as any).daum && (window as any).daum.Postcode) {
+        setIsDaumScriptLoaded(true);
+        return;
+      }
+
+      // 스크립트가 이미 DOM에 있는지 확인
+      const existingScript = document.querySelector('script[src*="t1.daumcdn.net/mapjsapi"]');
+      if (existingScript) {
+        // 스크립트가 있지만 아직 로드되지 않은 경우, 로드 완료를 기다림
+        existingScript.addEventListener('load', () => {
+          setIsDaumScriptLoaded(true);
+        });
+        return;
+      }
+
+      // 스크립트 동적 로드
+      const script = document.createElement('script');
+      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.async = true;
+      script.onload = () => {
+        setIsDaumScriptLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('다음 우편번호 API 스크립트 로드 실패');
+        toast({
+          title: "주소 검색 오류",
+          description: "주소 검색 서비스를 불러올 수 없습니다.",
+          variant: "destructive",
+        });
+      };
+      document.head.appendChild(script);
+    };
+
+    loadDaumScript();
+  }, []);
 
   // OAuth2 인증 처리 (성공 여부만 확인)
   useEffect(() => {
@@ -84,14 +125,32 @@ export default function OnboardingPage() {
   }
 
   const handleAddressSearch = () => {
-    new (window as any).daum.Postcode({
-      oncomplete: (data: any) => {
-        setFormData(prev => ({
-          ...prev,
-          roadAddress: data.roadAddress
-        }))
-      },
-    }).open()
+    // 다음 우편번호 API가 로드되었는지 확인
+    if (!isDaumScriptLoaded) {
+      toast({
+        title: "주소 검색 오류",
+        description: "주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (typeof window !== 'undefined' && (window as any).daum && (window as any).daum.Postcode) {
+      new (window as any).daum.Postcode({
+        oncomplete: (data: any) => {
+          setFormData(prev => ({
+            ...prev,
+            roadAddress: data.roadAddress
+          }))
+        },
+      }).open()
+    } else {
+      toast({
+        title: "주소 검색 오류",
+        description: "주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -301,8 +360,9 @@ export default function OnboardingPage() {
                     type="button"
                     variant="outline"
                     onClick={handleAddressSearch}
+                    disabled={!isDaumScriptLoaded}
                   >
-                    주소 검색
+                    {isDaumScriptLoaded ? "주소 검색" : "로딩 중..."}
                   </Button>
                 </div>
                 <Input

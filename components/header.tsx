@@ -8,17 +8,21 @@ import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
+import { useCart } from "@/lib/hooks/use-cart"
 
 
 export function Header() {
   const router = useRouter()
   const pathname = usePathname()
   const { isLoading, logout, isAuthenticated } = useAuth()
+  const { data: cartData, isLoading: cartLoading } = useCart()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [cartCount, setCartCount] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState("")
+
+  // 장바구니 개수 계산
+  const cartCount = cartData?.contents?.length || 0
 
   useEffect(() => {
     const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -66,8 +70,7 @@ export function Header() {
       setUnreadCount(sampleNotifications.filter((n) => !n.read).length)
     }
 
-    // 장바구니 개수는 API에서 가져오므로 로컬 스토리지 로직 제거
-    // TODO: API를 통해 장바구니 개수 조회하도록 수정 필요
+    // 장바구니 개수는 useCart 훅을 통해 API에서 가져옴
 
     const handleUserTypeUpdate = () => {
       const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -183,6 +186,7 @@ export function Header() {
                   <UserActions
                     userType={userType}
                     cartCount={cartCount}
+                    cartLoading={cartLoading}
                     onLogout={handleLogout}
                     notificationDropdownProps={{
                       notifications: notifications,
@@ -362,6 +366,7 @@ function NotificationDropdown({
 interface UserActionsProps {
   userType: "buyer" | "seller"
   cartCount: number
+  cartLoading?: boolean
   onLogout: () => void
   notificationDropdownProps: NotificationDropdownProps
 }
@@ -369,6 +374,7 @@ interface UserActionsProps {
 function UserActions({ 
   userType, 
   cartCount, 
+  cartLoading = false,
   onLogout,
   notificationDropdownProps
 }: UserActionsProps) {
@@ -382,11 +388,15 @@ function UserActions({
       </Button>
       <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/cart")}>
         <ShoppingCart className="h-5 w-5" />
-        {cartCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
+        {cartLoading ? (
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center font-medium">
+            ...
+          </span>
+        ) : cartCount > 0 ? (
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
             {cartCount > 9 ? "9+" : cartCount}
           </span>
-        )}
+        ) : null}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
