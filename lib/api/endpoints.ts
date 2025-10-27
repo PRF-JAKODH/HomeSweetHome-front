@@ -24,6 +24,9 @@ export const PRODUCT_ENDPOINTS = {
   
   // 상품 재고 조회
   GET_PRODUCT_STOCK: (productId: string) => `/api/v1/products/${productId}/stocks`,
+  
+  // 판매자 상품 관리
+  GET_SELLER_PRODUCTS: '/api/v1/products/seller',
 } as const
 
 // 카테고리 관련 엔드포인트

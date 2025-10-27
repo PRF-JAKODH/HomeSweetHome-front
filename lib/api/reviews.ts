@@ -32,12 +32,16 @@ export const createProductReview = async (
   formData.append('comment', reviewData.comment)
   formData.append('image', reviewData.image)
 
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+
   const response = await apiClient.post<ProductReviewResponse>(
     `/api/v1/product/reviews/${productId}`,
     formData,
     {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'X-Test-User-Id': userId,
       },
     }
   )
@@ -48,7 +52,14 @@ export const createProductReview = async (
  * 리뷰 삭제
  */
 export const deleteProductReview = async (reviewId: number): Promise<void> => {
-  await apiClient.delete(`/api/v1/product/reviews/${reviewId}`)
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+  
+  await apiClient.delete(`/api/v1/product/reviews/${reviewId}`, {
+    headers: {
+      'X-Test-User-Id': userId,
+    },
+  })
 }
 
 /**
@@ -72,7 +83,14 @@ export const getMyReviews = async (
   }
   params.append('limit', limit.toString())
 
-  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`/api/v1/product/reviews/me?${params}`)
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+
+  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`/api/v1/product/reviews/me?${params}`, {
+    headers: {
+      'X-Test-User-Id': userId,
+    },
+  })
   return response
 }
 
@@ -88,12 +106,16 @@ export const updateProductReview = async (
   formData.append('comment', reviewData.comment)
   formData.append('image', reviewData.image)
 
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+
   const response = await apiClient.patch<ProductReviewResponse>(
     `/api/v1/product/reviews/${reviewId}`,
     formData,
     {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'X-Test-User-Id': userId,
       },
     }
   )

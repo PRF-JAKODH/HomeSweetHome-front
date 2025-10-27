@@ -55,9 +55,13 @@ export const createProduct = async (
     formData.append('detailImages', image)
   })
 
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+
   return apiClient.post<Product>(PRODUCT_ENDPOINTS.CREATE_PRODUCT, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
+      'X-Test-User-Id': userId,
     },
   })
 }
@@ -65,12 +69,27 @@ export const createProduct = async (
 // 상품 수정
 export const updateProduct = async (data: UpdateProductRequest): Promise<UpdateProductResponse> => {
   const { id, ...updateData } = data
-  return apiClient.put<Product>(PRODUCT_ENDPOINTS.UPDATE_PRODUCT(id), updateData)
+  
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+  
+  return apiClient.put<Product>(PRODUCT_ENDPOINTS.UPDATE_PRODUCT(id), updateData, {
+    headers: {
+      'X-Test-User-Id': userId,
+    },
+  })
 }
 
 // 상품 삭제
 export const deleteProduct = async (id: string): Promise<DeleteProductResponse> => {
-  return apiClient.delete<{ id: string }>(PRODUCT_ENDPOINTS.DELETE_PRODUCT(id))
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+  
+  return apiClient.delete<{ id: string }>(PRODUCT_ENDPOINTS.DELETE_PRODUCT(id), {
+    headers: {
+      'X-Test-User-Id': userId,
+    },
+  })
 }
 
 // 상품 검색
@@ -123,6 +142,13 @@ export const getSellerProducts = async (
     params.append('endDate', endDate)
   }
 
-  const response = await apiClient.get<ProductManageResponse[]>(`/api/v1/products/seller?${params}`)
+  // 사용자 ID 헤더 추가
+  const userId = apiClient.getUserId() || '1'
+
+  const response = await apiClient.get<ProductManageResponse[]>(`${PRODUCT_ENDPOINTS.GET_SELLER_PRODUCTS}?${params}`, {
+    headers: {
+      'X-Test-User-Id': userId,
+    },
+  })
   return response
 }

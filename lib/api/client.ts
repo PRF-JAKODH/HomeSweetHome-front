@@ -3,7 +3,7 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { ApiResponse, ApiError } from '@/types/api/common'
+import { ApiResponse } from '@/types/api/common'
 
 // API 클라이언트 클래스
 class ApiClient {
@@ -30,6 +30,8 @@ class ApiClient {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
+
+        // 사용자 ID 헤더는 장바구니 API에서만 개별적으로 추가
 
         // 요청 로깅
         console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`)
@@ -60,6 +62,21 @@ class ApiClient {
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('auth_token')
+  }
+
+  // 사용자 ID 가져오기 함수 (장바구니 API에서 사용)
+  getUserId(): string | null {
+    if (typeof window === 'undefined') return null
+    const authStorage = localStorage.getItem('auth-storage')
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage)
+        return parsed.state?.user?.id?.toString() || '1' // 기본값 1
+      } catch {
+        return '1' // 기본값 1
+      }
+    }
+    return '1' // 기본값 1
   }
 
   private handleError(error: any) {

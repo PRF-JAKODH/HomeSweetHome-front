@@ -7,11 +7,22 @@ import { CART_ENDPOINTS } from './endpoints'
 import { CartRequest, Cart, CartResponse, DeleteCartItemsRequest } from '@/types/api/cart'
 import { ApiResponse, ScrollResponse } from '@/types/api/common'
 
+// 장바구니 API용 헤더 설정 함수
+const getCartHeaders = () => {
+  const userId = apiClient.getUserId() || '1'
+  
+  return {
+    'X-Test-User-Id': userId
+  }
+}
+
 /**
  * 장바구니에 상품 추가
  */
 export const addToCart = async (cartRequest: CartRequest): Promise<Cart> => {
-  const response = await apiClient.post(CART_ENDPOINTS.ADD_TO_CART, cartRequest)
+  const response = await apiClient.post(CART_ENDPOINTS.ADD_TO_CART, cartRequest, {
+    headers: getCartHeaders()
+  })
   return response.data as Cart
 }
 
@@ -26,14 +37,18 @@ export const getCartItems = async (
   if (cursorId) params.append('cursorId', cursorId.toString())
   params.append('size', size.toString())
   
-  return await apiClient.get<ScrollResponse<CartResponse>>(`${CART_ENDPOINTS.GET_CART}?${params.toString()}`)
+  return await apiClient.get<ScrollResponse<CartResponse>>(`${CART_ENDPOINTS.GET_CART}?${params.toString()}`, {
+    headers: getCartHeaders()
+  })
 }
 
 /**
  * 장바구니 아이템 삭제
  */
 export const deleteCartItem = async (cartItemId: string): Promise<void> => {
-  await apiClient.delete(CART_ENDPOINTS.DELETE_CART_ITEM(cartItemId))
+  await apiClient.delete(CART_ENDPOINTS.DELETE_CART_ITEM(cartItemId), {
+    headers: getCartHeaders()
+  })
   // 백엔드에서 null을 반환하므로 void로 처리
 }
 
@@ -43,7 +58,8 @@ export const deleteCartItem = async (cartItemId: string): Promise<void> => {
 export const deleteCartItems = async (cartItemIds: number[]): Promise<void> => {
   const request: DeleteCartItemsRequest = { cartIds: cartItemIds }
   await apiClient.delete(CART_ENDPOINTS.DELETE_CART_ITEMS, { 
-    data: request 
+    data: request,
+    headers: getCartHeaders()
   })
 }
 
@@ -51,5 +67,7 @@ export const deleteCartItems = async (cartItemIds: number[]): Promise<void> => {
  * 장바구니 전체 삭제
  */
 export const clearCart = async (): Promise<ApiResponse<void>> => {
-  return await apiClient.delete(CART_ENDPOINTS.CLEAR_CART)
+  return await apiClient.delete(CART_ENDPOINTS.CLEAR_CART, {
+    headers: getCartHeaders()
+  })
 }
