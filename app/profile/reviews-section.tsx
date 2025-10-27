@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,6 +19,7 @@ interface ReviewsSectionProps {
 }
 
 export const ReviewsSection: React.FC<ReviewsSectionProps> = () => {
+  const router = useRouter()
   const [myReviews, setMyReviews] = useState<ProductReviewResponse[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
@@ -49,6 +51,11 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = () => {
   useEffect(() => {
     fetchMyReviews()
   }, [])
+
+  // 제품 상세 페이지로 이동하는 함수
+  const handleProductClick = (productId: number) => {
+    router.push(`/store/products/${productId}`)
+  }
 
   const handleEditReview = (review: ProductReviewResponse) => {
     setSelectedReview(review)
@@ -222,7 +229,12 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = () => {
                       </div>
                       {/* 제품명과 별점 */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground mb-2">{review.productName}</h3>
+                        <h3 
+                          className="font-semibold text-foreground mb-2 cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => handleProductClick(review.productId)}
+                        >
+                          {review.productName}
+                        </h3>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1">
                             {[...Array(5)].map((_, i) => (
