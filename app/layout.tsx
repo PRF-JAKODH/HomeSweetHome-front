@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { Suspense } from "react"
 import { Header } from "@/components/header"
+import { QueryProvider } from "@/lib/providers/query-provider"
 
 export const metadata: Metadata = {
   title: "홈스윗홈 - 인테리어 쇼핑의 모든 것",
@@ -16,15 +17,25 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ko">
-      <head>
-        <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-      </head>
-      <body className="font-sans antialiased">
-        <Suspense fallback={<div>Loading...</div>}>
-          <Header />
-          {children}
-        </Suspense>
+// <<<<<<< HEAD
+//     <html lang="ko">
+//       <head>
+//         <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+//       </head>
+//       <body className="font-sans antialiased">
+//         <Suspense fallback={<div>Loading...</div>}>
+//           <Header />
+//           {children}
+//         </Suspense>
+// =======
+    <html lang="ko" suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
+        <QueryProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Header />
+            {children}
+          </Suspense>
+        </QueryProvider>
       </body>
     </html>
   )
