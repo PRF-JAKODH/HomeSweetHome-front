@@ -7,7 +7,9 @@ import { useAuth } from '@/hooks/use-auth'
 import { useAuthStore } from '@/stores/auth-store'
 import { toast } from '@/hooks/use-toast'
 import { EventSourcePolyfill } from 'event-source-polyfill'
-import type { Notification, NotificationStore } from '@/types/notification'
+import type { Notification } from '@/types/notification'
+import type { NotificationStore } from '@/stores/notification-store'
+import { replaceTemplateVariables } from '@/lib/notification-util'
 
 export type NotificationStoreApi = ReturnType<typeof createNotificationStore>
 
@@ -17,31 +19,12 @@ interface NotificationProviderProps {
   children: ReactNode
 }
 
-// 템플릿 변수 치환 함수
-function replaceTemplateVariables(
-  content: string,
-  contextData?: Record<string, any>
-): string {
-  if (!contextData) {
-    return content
-  }
-
-  let replacedContent = content
-  
-  // contextData의 모든 키-값 쌍으로 {key}를 실제 값으로 치환
-  Object.entries(contextData).forEach(([key, value]) => {
-    const placeholder = `{${key}}`
-    replacedContent = replacedContent.replace(
-      new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'),
-      String(value)
-    )
-  })
-
-  return replacedContent
-}
+// 템플릿 변수 치환은 공용 유틸을 사용
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const storeRef = useRef<NotificationStoreApi | null>(null)
+  const hasLoadedInitialNotifications = useRef(false)
+  const eventSourceRef = useRef<EventSourcePolyfill | null>(null)
   const { isAuthenticated } = useAuth()
   const accessToken = useAuthStore((state) => state.accessToken)
 
@@ -57,6 +40,31 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     const store = storeRef.current
     if (!store) return
 
+    // 앱 첫 로딩 시 서버에서 알림 목록 가져오기 (중복 방지)
+    const loadInitialNotifications = async () => {
+      if (hasLoadedInitialNotifications.current) {
+        console.log('Initial notifications already loaded, skipping')
+        return
+      }
+      
+      try {
+        await store.getState().loadNotificationsFromServer()
+        hasLoadedInitialNotifications.current = true
+        console.log('Initial notifications loaded from server')
+      } catch (error) {
+        console.error('Failed to load initial notifications:', error)
+      }
+    }
+
+    loadInitialNotifications()
+
+    // 기존 SSE 연결이 있다면 정리
+    if (eventSourceRef.current) {
+      console.log('Closing existing SSE connection')
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+
     // EventSourcePolyfill을 사용한 SSE 연결
     const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
     const eventSource = new EventSourcePolyfill(
@@ -69,6 +77,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         heartbeatTimeout: 180000,
       }
     )
+    
+    eventSourceRef.current = eventSource
 
     store.getState().setConnectionStatus(true)
     console.log('SSE connection established')
@@ -85,15 +95,20 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           const rawData = JSON.parse(data)
           console.log('Parsed notification:', rawData)
 
-          // 백엔드의 read 필드를 isRead로 변환하고 content의 템플릿 변수를 치환
+          // 템플릿 변수 치환 적용
           const processedTitle = replaceTemplateVariables(rawData.title, rawData.contextData)
           const processedContent = replaceTemplateVariables(rawData.content, rawData.contextData)
-          
+          const processedRedirectUrl = replaceTemplateVariables(rawData.redirectUrl, rawData.contextData)
+
           const notification: Notification = {
-            ...rawData,
+            notificationId: rawData.notificationId,
             title: processedTitle,
             content: processedContent,
-            isRead: rawData.read ?? rawData.isRead ?? false,
+            redirectUrl: processedRedirectUrl,
+            contextData: rawData.contextData,
+            isRead: rawData.read,
+            categoryType: rawData.categoryType,
+            createdAt: rawData.createdAt,
           }
 
           console.log('Processed notification:', notification)
@@ -142,12 +157,16 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
 
     eventSource.onopen = (_event: Event) => {
-      console.log('SSE connection opened')
+      console.log('SSE connected')
       store.getState().setConnectionStatus(true)
     }
 
     return () => {
-      eventSource.close()
+      if (eventSourceRef.current) {
+        console.log('Cleaning up SSE connection')
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
       store.getState().setConnectionStatus(false)
     }
   }, [isAuthenticated, accessToken])

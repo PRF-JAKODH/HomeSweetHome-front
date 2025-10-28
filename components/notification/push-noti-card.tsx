@@ -3,6 +3,7 @@
 import type { Notification } from '@/types/notification'
 import { Bell, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { getCategoryDisplayName, getCategoryColor } from '@/lib/notification-util'
 
 interface PushNotificationCardProps {
   notification: Notification
@@ -11,40 +12,6 @@ interface PushNotificationCardProps {
 
 export function PushNotificationCard({ notification, onAction }: PushNotificationCardProps) {
   const router = useRouter()
-
-  const getCategoryLabel = (category: string): string => {
-    switch (category) {
-      case 'ORDER':
-        return '주문'
-      case 'DELIVERY':
-        return '배송'
-      case 'REVIEW':
-        return '리뷰'
-      case 'CHAT':
-        return '채팅'
-      case 'EVENT':
-        return '이벤트'
-      case 'SYSTEM':
-        return '시스템'
-      default:
-        return category
-    }
-  }
-
-  const getCategoryColor = (category: string): string => {
-    switch (category) {
-      case 'ORDER_DELIVERY':
-        return 'bg-blue-100 text-blue-700'
-      case 'REVIEW':
-        return 'bg-purple-100 text-purple-700'
-      case 'EVENT':
-        return 'bg-orange-100 text-orange-700'
-      case 'SYSTEM':
-        return 'bg-gray-100 text-gray-700'
-      default:
-        return 'bg-primary/10 text-primary'
-    }
-  }
 
   const formatRelativeTime = (isoString: string): string => {
     const now = new Date()
@@ -77,6 +44,7 @@ export function PushNotificationCard({ notification, onAction }: PushNotificatio
         }
       `}
       onClick={onAction}
+      style={{ zIndex: 80 }}
     >
       {/* 아이콘 */}
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -88,7 +56,7 @@ export function PushNotificationCard({ notification, onAction }: PushNotificatio
         {/* 카테고리 뱃지 */}
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getCategoryColor(notification.categoryType)}`}>
-            {getCategoryLabel(notification.categoryType)}
+            {getCategoryDisplayName(notification.categoryType)}
           </span>
           {!notification.isRead && (
             <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
