@@ -43,8 +43,6 @@ export async function getPost(postId: number): Promise<CommunityPost> {
  * 백엔드는 multipart/form-data로 images와 request를 받음
  */
 export async function createPost(data: CreatePostRequest): Promise<ApiResponse<CommunityPost>> {
-  const userId = apiClient.getUserId()
-
   // FormData 생성
   const formData = new FormData()
 
@@ -64,7 +62,6 @@ export async function createPost(data: CreatePostRequest): Promise<ApiResponse<C
 
   console.log('[createPost] Request:', {
     url: COMMUNITY_ENDPOINTS.CREATE_POST,
-    userId,
     data: { title: data.title, content: data.content, imageCount: data.images?.length || 0 },
   })
 
@@ -73,7 +70,6 @@ export async function createPost(data: CreatePostRequest): Promise<ApiResponse<C
     formData,
     {
       headers: {
-        'User-Id': userId || '1',
         'Content-Type': 'multipart/form-data',
       },
     }
@@ -88,8 +84,6 @@ export async function updatePost(
   postId: number,
   data: UpdatePostRequest
 ): Promise<ApiResponse<CommunityPost>> {
-  const userId = apiClient.getUserId()
-
   // 백엔드 Request DTO에 맞게 title, content만 전송
   const requestData = {
     title: data.title,
@@ -98,12 +92,7 @@ export async function updatePost(
 
   return apiClient.put<CommunityPost>(
     COMMUNITY_ENDPOINTS.UPDATE_POST(postId),
-    requestData,
-    {
-      headers: {
-        'User-Id': userId || '1',
-      },
-    }
+    requestData
   )
 }
 
@@ -111,13 +100,7 @@ export async function updatePost(
  * 게시글 삭제
  */
 export async function deletePost(postId: number): Promise<ApiResponse<void>> {
-  const userId = apiClient.getUserId()
-
-  return apiClient.delete<void>(COMMUNITY_ENDPOINTS.DELETE_POST(postId), {
-    headers: {
-      'User-Id': userId || '1',
-    },
-  })
+  return apiClient.delete<void>(COMMUNITY_ENDPOINTS.DELETE_POST(postId))
 }
 
 /**
@@ -134,16 +117,9 @@ export async function createComment(
   postId: number,
   data: CreateCommentRequest
 ): Promise<ApiResponse<CommunityComment>> {
-  const userId = apiClient.getUserId()
-
   return apiClient.post<CommunityComment>(
     COMMUNITY_ENDPOINTS.CREATE_COMMENT(postId),
-    data,
-    {
-      headers: {
-        'User-Id': userId || '1',
-      },
-    }
+    data
   )
 }
 
@@ -155,16 +131,9 @@ export async function updateComment(
   commentId: number,
   data: UpdateCommentRequest
 ): Promise<ApiResponse<CommunityComment>> {
-  const userId = apiClient.getUserId()
-
   return apiClient.put<CommunityComment>(
     COMMUNITY_ENDPOINTS.UPDATE_COMMENT(postId, commentId),
-    data,
-    {
-      headers: {
-        'User-Id': userId || '1',
-      },
-    }
+    data
   )
 }
 
@@ -175,14 +144,7 @@ export async function deleteComment(
   postId: number,
   commentId: number
 ): Promise<ApiResponse<void>> {
-  const userId = apiClient.getUserId()
-
   return apiClient.delete<void>(
-    COMMUNITY_ENDPOINTS.DELETE_COMMENT(postId, commentId),
-    {
-      headers: {
-        'User-Id': userId || '1',
-      },
-    }
+    COMMUNITY_ENDPOINTS.DELETE_COMMENT(postId, commentId)
   )
 }

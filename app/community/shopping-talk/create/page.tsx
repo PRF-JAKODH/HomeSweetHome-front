@@ -5,6 +5,8 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { useMutation } from '@tanstack/react-query'
+import { createPost } from '@/lib/api/community'
 
 const categories = [
   { value: "추천", label: "추천" },
@@ -19,10 +21,25 @@ export default function CreateShoppingTalkPage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [images, setImages] = useState<string[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+
+  const createMutation = useMutation({
+    mutationFn: createPost,
+    onSuccess: () => {
+      router.push("/community/shopping-talk")
+    },
+    onError: (error) => {
+      console.error('게시글 작성 실패:', error)
+      alert('게시글 작성에 실패했습니다.')
+    }
+  })
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
+
+    const fileArray = Array.from(files)
+    setImageFiles([...imageFiles, ...fileArray])
 
     const newImages: string[] = []
     Array.from(files).forEach((file) => {
@@ -39,30 +56,17 @@ export default function CreateShoppingTalkPage() {
 
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index))
+    setImageFiles(imageFiles.filter((_, i) => i !== index))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Save post to localStorage (in real app, this would be an API call)
-    const newPost = {
-      id: Date.now(),
-      category,
+    createMutation.mutate({
       title,
       content,
-      images,
-      author: "사용자",
-      createdAt: "방금 전",
-      views: 0,
-      likes: 0,
-      comments: 0,
-    }
-
-    // In a real app, you would send this to an API
-    console.log("New post:", newPost)
-
-    // Redirect to shopping talk list
-    router.push("/community/shopping-talk")
+      images: imageFiles.length > 0 ? imageFiles : undefined
+    })
   }
 
   return (
