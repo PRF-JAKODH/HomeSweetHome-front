@@ -52,6 +52,22 @@ export const CART_ENDPOINTS = {
   CLEAR_CART: '/api/v1/carts/clear',
 } as const
 
+// 커뮤니티 관련 엔드포인트
+export const COMMUNITY_ENDPOINTS = {
+  // 게시글 CRUD
+  GET_POSTS: '/api/v1/community/posts',
+  GET_POST: (postId: number) => `/api/v1/community/posts/${postId}`,
+  CREATE_POST: '/api/v1/community/posts',
+  UPDATE_POST: (postId: number) => `/api/v1/community/posts/${postId}`,
+  DELETE_POST: (postId: number) => `/api/v1/community/posts/${postId}`,
+
+  // 댓글 CRUD
+  GET_COMMENTS: (postId: number) => `/api/v1/community/posts/${postId}/comments`,
+  CREATE_COMMENT: (postId: number) => `/api/v1/community/posts/${postId}/comments`,
+  UPDATE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
+  DELETE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
+} as const
+
 // 공통 엔드포인트
 export const COMMON_ENDPOINTS = {
   HEALTH_CHECK: '/health',
