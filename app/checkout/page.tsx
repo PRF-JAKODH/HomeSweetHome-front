@@ -5,9 +5,14 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import axios from "axios"
 
+// 토스페이먼츠 SDK
+import { loadPaymentWidget, PaymentWidgetInstance, ANONYMOUS } from '@tosspayments/payment-widget-sdk';
+
+// 인터페이스 구간
 interface CartItem {
   id: string
   productId: string
@@ -28,6 +33,36 @@ interface Address {
   isDefault: boolean
 }
 
+// API 요청/응답 타입 정의
+
+// 백엔드의 CreateOrderRequest DTO 안에 있는 OrderItemRequest 부분과 데이터 구조를 정확히 맞추기 위함.
+// 개별 상품 정보의 타입을 정의함.
+// 결제 페이지에서 '결제하기' 버튼을 눌렀을 때 사용됨.
+interface OrderItemRequest{
+  productId: string;
+  quantity: number;
+}
+
+// 백엔드의 CreateOrderRequest.java 레코드와 데이터 구조를 1:1로 일치시키기 위해 만들었음.
+// API계약(Contract)
+// 결제 페이지에서 '결제하기' 버튼을 눌렀을 때 사용됨.
+interface CreateOrderRequestDto {
+  orderItems: OrderItemRequest[];
+  recipientName: string;
+  recipientPhone: string;
+  shippingAddress: string;
+  shippingRequest: string;
+}
+
+// 백엔드의 OrderReadyResponse.java 레코드와 데이터 구조를 1:1로 일치시키기 위해 만들었음.
+// 백엔드의 주문 생성 API 호출이 성공한 직후 사용됨.
+// 백엔드에서 주문 생성 성공했고, 이 정보로 결제창을 띄우라고 알려주는 응답 양식.
+interface OrderReadyResponseDto {
+  merchantUid: string;
+  orderName: string;
+  totalAmount: number;
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const [orderItems, setOrderItems] = useState<CartItem[]>([])
@@ -45,10 +80,28 @@ export default function CheckoutPage() {
     isDefault: false,
   })
 
+  // 토스
+  const paymentWidgetRef = useRef<PaymentWidgetInstance | null>(null); // 위젯 인스턴스 Ref 추가
+  const paymentMethodsWidgetRef = useRef<ReturnType<PaymentWidgetInstance['renderPaymentMethods']> | null>(null); // 결제수단 위젯 Ref 추가
+  const agreementWidgetRef = useRef<ReturnType<PaymentWidgetInstance['renderAgreement']> | null>(null); // 이용약관 위젯 Ref 추가
+
+
+
+  // API 호출 같은 시간이 걸리는 비동기 작업이 진행중임을 사용자에게 알리기 위함. 중복 요청을 방지하기 위해 필요.
+  // isLoading(상태 변수), isLoading이 true면 '결제하기' 버튼 비활성화, 버튼 텍스트를 '처리중...'으로 바꿈
+  // isLoading이 false면 버튼을 활성화, 버튼 텍스트를 원래대로 ("결제하기") 표시.
+  // setIsLoading: isLoading의 상태 변수의 값을 변경하는 함수.
+  // handlePayment 함수가 시작될 때(API 호출 직전) setIsLoading(true)를 호출하여 로딩 상태로 만듬
+  // API 호출이 완료되면 setIsLoading(false)를 호출하여 로딩 상태를 해제함.
+  const [isLoading, setIsLoading] = useState(false); // 로딩 상태 추가
+
   useEffect(() => {
-    // TODO: API를 통해 장바구니 데이터 조회하도록 수정 필요
-    // 현재는 빈 배열로 초기화
-    setOrderItems([])
+    const storedCart = localStorage.getItem("ohouse_cart")
+    if (storedCart) {
+      const cart = JSON.parse(storedCart)
+      const selected = cart.filter((item: CartItem & { selected: boolean }) => item.selected)
+      setOrderItems(selected)
+    }
 
     const storedAddresses = localStorage.getItem("ohouse_addresses")
     if (storedAddresses) {
@@ -69,8 +122,18 @@ export default function CheckoutPage() {
         return item
       })
 
-      // TODO: API를 통해 장바구니 수량 업데이트하도록 수정 필요
-      // 로컬 스토리지 로직 제거
+      const storedCart = localStorage.getItem("ohouse_cart")
+      if (storedCart) {
+        const cart = JSON.parse(storedCart)
+        const updatedCart = cart.map((item: CartItem & { selected: boolean }) => {
+          const updatedItem = updated.find((u) => u.id === item.id)
+          if (updatedItem) {
+            return { ...item, quantity: updatedItem.quantity }
+          }
+          return item
+        })
+        localStorage.setItem("ohouse_cart", JSON.stringify(updatedCart))
+      }
 
       return updated
     })
@@ -103,34 +166,171 @@ export default function CheckoutPage() {
     }).open()
   }
 
-  const handlePayment = () => {
-    if (!selectedAddress) {
-      alert("배송지를 선택해주세요")
-      return
-    }
-
-    const order = {
-      orderId: `ORD${Date.now()}`,
-      items: orderItems,
-      address: addresses.find((addr) => addr.id === selectedAddress),
-      paymentMethod,
-      usedPoints: usePoints,
-      totalAmount: finalPrice,
-      orderDate: new Date().toISOString(),
-    }
-
-    localStorage.setItem("ohouse_last_order", JSON.stringify(order))
-
-    // TODO: API를 통해 주문 완료 후 장바구니에서 해당 상품들 제거하도록 수정 필요
-    // 로컬 스토리지 로직 제거
-
-    router.push("/checkout/complete")
-  }
-
   const totalPrice = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shippingFee = totalPrice >= 50000 ? 0 : 3000
   const discount = usePoints
   const finalPrice = totalPrice + shippingFee - discount
+
+// --- 클라이언트 키로 위젯 인스턴스 생성 (페이지 로드 시) ---
+  useEffect(() => {
+    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+    if (!clientKey) {
+      console.error('TOSS_CLIENT_KEY가 설정되지 않았습니다.');
+      return;
+    }
+
+    // 비동기 함수 즉시 실행
+    (async () => {
+      try {
+        // 결제위젯 인스턴스 생성
+        const paymentWidget = await loadPaymentWidget(clientKey, ANONYMOUS); // 비회원 customerKey
+
+        // 결제위젯 렌더링 (결제 금액 표시) - *옵셔널*: 금액을 미리 보여주고 싶다면 사용
+         const paymentMethodsWidget = paymentWidget.renderPaymentMethods(
+           "#payment-widget", // 결제위젯 영역 렌더링 위치 (div id)
+           { value: finalPrice }, // 최종 결제 금액 (UI 표시용, 실제 결제 금액은 requestPayment에서 설정)
+           { variantKey: "DEFAULT" } // 위젯 스타일 variantKey (개발자센터 설정)
+         );
+         paymentMethodsWidgetRef.current = paymentMethodsWidget;
+
+        // 이용약관 렌더링 - *필수*
+        // @docs https://docs.tosspayments.com/reference/widget-sdk#renderagreement선택자-옵션
+        const agreementWidget = paymentWidget.renderAgreement(
+          '#agreement', // 이용약관 영역 렌더링 위치 (div id)
+          { variantKey: 'DEFAULT' } // 약관 스타일 variantKey
+        );
+        agreementWidgetRef.current = agreementWidget;
+
+
+        paymentWidgetRef.current = paymentWidget;
+      } catch (error) {
+        console.error("결제 위젯 로드 실패:", error);
+        alert("결제 위젯을 불러오는 중 오류가 발생했습니다.");
+      }
+    })();
+  }, [finalPrice]);
+
+
+
+  // 시간이 걸리는 작업을 기다려야 하기 때문에 await를 사용하기 위해 async사용(백엔드 응답이 오기도 전에 실행되면 에러)(순서대로)
+  // 백엔드 API 호출, 토스 결제창 호출
+  const handlePayment = async () => {
+    // 유효성 검사
+    // 사용자가 '결제하기' 버튼을 클릭했을 때, 배송지를 선택했는지 확인하는 유효성 검사.
+    if (!selectedAddress) {
+      alert("배송지를 선택해주세요")
+      return;
+    }
+
+    // 선택된 배송지 ID(selectedAddress)가 현재 보유하고 있는 배송지 목록(address)안에 존재하지 않는 비정상적인 상황을 대비한 안전장치
+    // 데이터 일관성 확인, 오류 방지
+    const currentAddress = addresses.find((addr) => addr.id === selectedAddress);
+    if (!currentAddress) {
+      alert ("선택된 배송지 정보를 찾을 수 없습니다.")
+      return;
+    }
+
+    // API 요청을 시작하기 전에 로딩 상태를 활성화하고, 백엔드 서버 주소를 안전하게 가져오는 부분
+    // handlePayment 함수가 시작되는 맨 앞부분에서 사용됨. API 요청을 보내기 전에 로딩 상태를 설정하고, 요청을 보낼 대상 URL을 준비하는 필수 단계
+    // NEXT_PUBLIC_API_URL은 Spring Boot 서버의 주소(localhost:8080)를 저장하기 위해 정의한 환경 변수 이름.
+    // Next.js에서는 브라우저에서 접근 가능한 환경 변수 이름 앞에 NEXT_PUBLIC을 붙임.
+    setIsLoading(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      alert('API URL 환경 변수가 설정되지 않았습니다.')
+      setIsLoading(false);
+      return;
+    }
+
+    // --- 백엔드 API 1 요청 데이터 준비 ---
+
+    // 주문 생성(API 1) 호출하기 직전에, 프론트엔드의 현재 상태(장바구니 상품, 선택된 배송지)를 백엔드가 이해할 수 있는 데이터 형식(CreateOrderRequestDto)
+    // 으로 변환하는 부분.
+    // 프론트는 도로명 주소(roadAddress)와 상세 주소(detailAddress)를 따로 관리하지만, 백엔드는 하나의 shippingAddress필드로 받길 원함.
+    // trim()을 이용하여 두 주소를 합쳐서 하나의 문자열로 만들어줌
+    // handlePayment 함수 안에서 실행됨.
+    // 결제하기 버튼을 누르고, 배송지, API URL이 있는지 등의 기본 검증이 끝난 후 이 코드가 실행됨.
+    const requestData: CreateOrderRequestDto = {
+      orderItems: orderItems.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })),
+      recipientName: currentAddress.name,
+      recipientPhone: currentAddress.phone,
+      shippingAddress: `${currentAddress.roadAddress} ${currentAddress.detailAddress}`.trim(), // 주소 조합
+      shippingRequest: "",
+    };
+
+    try {
+      // --- 백엔드 API 1 호출 ---
+      console.log('API 1 요청 데이터:', requestData);
+      const response = await axios.post<OrderReadyResponseDto>(
+        `${apiUrl}/api/v1/orders`,
+        requestData
+        // (인증 필요 시 헤더 추가)
+      );
+      console.log('API 1 응답 데이터:', response.data);
+
+      const { merchantUid, orderName, totalAmount } = response.data;
+
+      // --- 성공 시, 토스 결제 요청 함수 호출 (3단계에서 구현) ---
+      // TODO: 백엔드가 계산한 finalPrice(totalAmount)와 현재 finalPrice가 다른 경우 처리?
+      // 우선 백엔드 값을 사용
+      await requestTossPayment(merchantUid, orderName, totalAmount, currentAddress.name);
+
+      // --- 주문 완료 후 처리 (임시 로직 제거) ---
+      // localStorage.setItem("ohouse_last_order", JSON.stringify(order)) // <- 백엔드가 처리하므로 제거
+      // const storedCart = localStorage.getItem("ohouse_cart") ... // <- 결제 성공 후 처리
+      // router.push("/checkout/complete") // <- 결제 성공 후 처리
+
+    } catch (error) {
+      console.error('주문 생성 요청 실패:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        alert(`오류: ${error.response.data.message || '주문 생성 중 오류 발생'}`);
+      } else {
+        alert('주문 생성 중 알 수 없는 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsLoading(false); // 로딩 종료
+    }
+  };
+
+  //--requestTossPayment--
+  const requestTossPayment = async (merchantUid: string, orderName: string, totalAmount: number, customerName: string) => {
+    const paymentWidget = paymentWidgetRef.current;
+    const agreementStatus = await agreementWidgetRef.current?.getAgreementStatus(); // 이용약관 동의 상태 확인
+
+    // 필수 정보 및 약관 동의 확인
+    if (!paymentWidget) {
+      alert('결제 위젯이 로드되지 않았습니다.');
+      return;
+    }
+     if (agreementStatus?.agreedRequiredTerms !== true) {
+      alert("필수 이용약관에 동의해주세요.");
+      return;
+    }
+
+
+    try {
+      setIsLoading(true); // 토스 결제창 호출 직전 로딩 시작
+      console.log('토스 결제 요청 실행:', { merchantUid, orderName, totalAmount, customerName });
+      // ------ 결제창 띄우기 ------
+      await paymentWidget.requestPayment({
+        orderId: merchantUid,       // 백엔드 API 1 응답의 merchantUid
+        orderName: orderName,       // 백엔드 API 1 응답의 orderName
+        customerName: customerName, // 고객 이름
+        successUrl: `${window.location.origin}/checkout/success`, // 성공 시 돌아올 URL (4단계 페이지)
+        failUrl: `${window.location.origin}/checkout/fail`,     // 실패 시 돌아올 URL
+      });
+      // 성공/실패 처리는 successUrl/failUrl 페이지에서 백엔드 API 2를 호출하여 진행됨
+    } catch (error) {
+      console.error("토스 결제 요청 에러:", error);
+      alert("결제 요청 중 오류가 발생했습니다.");
+      setIsLoading(false); // 결제창 띄우기 실패 시 로딩 해제
+    }
+      // 결제창이 성공적으로 뜨면, 사용자가 닫거나 성공/실패 페이지로 이동하기 전까지 isLoading은 true 유지
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -280,8 +480,8 @@ export default function CheckoutPage() {
               <h2 className="mb-4 text-lg font-bold text-foreground">결제 수단</h2>
               <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
-                    <RadioGroupItem value="card" id="card" />
+                  {/* <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer"> */}
+                    {/* <RadioGroupItem value="card" id="card" />
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
                       <svg className="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
@@ -291,12 +491,12 @@ export default function CheckoutPage() {
                           d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                         />
                       </svg>
-                    </div>
-                    <label htmlFor="card" className="flex-1 cursor-pointer">
+                    </div> */}
+                    {/* <label htmlFor="card" className="flex-1 cursor-pointer">
                       <div className="font-medium text-foreground">신용카드</div>
                       <div className="text-sm text-text-secondary">모든 카드 사용 가능</div>
-                    </label>
-                  </div>
+                    </label> */}
+                  {/* </div> */}
                   <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
                     <RadioGroupItem value="naverpay" id="naverpay" />
                     <img src="/naverpay-logo.png" alt="네이버페이" className="h-10 w-10 rounded-lg object-cover" />
@@ -390,13 +590,18 @@ export default function CheckoutPage() {
                 <p className="mb-1">• 주문 완료 시 {Math.floor(finalPrice * 0.01).toLocaleString()}P 적립</p>
                 <p>• 결제 완료 후 취소/변경은 고객센터로 문의해주세요</p>
               </div>
+
+              {/* 토스 이용약관 위젯 렌더링 */}
+              <div id="payment-widget" className="my-4" />
+              <div id="agreement" className="my-4"/>
+
               <Button
                 size="lg"
                 className="w-full bg-primary hover:bg-primary-dark text-white"
                 onClick={handlePayment}
-                disabled={!selectedAddress || orderItems.length === 0}
+                disabled={!selectedAddress || orderItems.length === 0 || isLoading}
               >
-                {finalPrice.toLocaleString()}원 결제하기
+                {isLoading ? '처리 중...' : `${finalPrice.toLocaleString()}원 결제하기`}
               </Button>
             </Card>
           </div>
