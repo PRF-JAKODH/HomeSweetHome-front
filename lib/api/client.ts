@@ -4,6 +4,7 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '@/types/api/common'
+import { useAuthStore } from '@/stores/auth-store'
 
 // API 클라이언트 클래스
 class ApiClient {
@@ -29,6 +30,9 @@ class ApiClient {
         const token = this.getAuthToken()
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
+          console.log(`[API Request] Token attached: ${token.substring(0, 20)}...`)
+        } else {
+          console.warn('[API Request] No access token found')
         }
 
         // 사용자 ID 헤더는 장바구니 API에서만 개별적으로 추가
@@ -61,23 +65,9 @@ class ApiClient {
 
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') return null
-    return localStorage.getItem('auth_token')
+    return useAuthStore.getState().accessToken
   }
 
-  // 사용자 ID 가져오기 함수 (장바구니 API에서 사용)
-  getUserId(): string | null {
-    if (typeof window === 'undefined') return null
-    const authStorage = localStorage.getItem('auth-storage')
-    if (authStorage) {
-      try {
-        const parsed = JSON.parse(authStorage)
-        return parsed.state?.user?.id?.toString() || '1' // 기본값 1
-      } catch {
-        return '1' // 기본값 1
-      }
-    }
-    return '1' // 기본값 1
-  }
 
   private handleError(error: any) {
     console.error('[API Error]', error)
@@ -90,7 +80,7 @@ class ApiClient {
 
   private logout() {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token')
+      useAuthStore.getState().clearAuth()
       window.location.href = '/login'
     }
   }

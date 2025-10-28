@@ -367,6 +367,14 @@ export default function StorePage() {
                       : categoryPath ? `${categoryPath} 상품` : '전체'
                     }
                   </h2>
+                  {searchKeyword && (
+                    <button
+                      onClick={clearSearchKeyword}
+                      className="text-sm text-text-secondary hover:text-foreground transition-colors"
+                    >
+                      ✕ 필터 초기화
+                    </button>
+                  )}
                 </div>
                 <div className="relative sort-dropdown">
                   <Button 

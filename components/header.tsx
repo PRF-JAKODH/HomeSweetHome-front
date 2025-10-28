@@ -9,22 +9,28 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
 import { useCart } from "@/lib/hooks/use-cart"
+import { useAuthStore } from "@/stores/auth-store"
 
 
 export function Header() {
   const router = useRouter()
   const pathname = usePathname()
-  const { isLoading, logout, isAuthenticated } = useAuth()
+  const { isLoading, logout, isAuthenticated, isHydrated } = useAuth()
   const { data: cartData, isLoading: cartLoading } = useCart()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState("")
 
-  // 장바구니 개수 계산
-  const cartCount = cartData?.contents?.length || 0
+  // 장바구니 개수 계산 (인증된 상태에서만)
+  const cartCount = isAuthenticated ? (cartData?.contents?.length || 0) : 0
 
   useEffect(() => {
+    // 컴포넌트 마운트 시 즉시 hydration 완료로 설정
+    if (!isHydrated) {
+      useAuthStore.getState().setHydrated(true)
+    }
+
     const storedUserType = localStorage.getItem("ohouse_user_type")
     if (storedUserType) {
       setUserType(storedUserType as "buyer" | "seller")
@@ -84,7 +90,43 @@ export function Header() {
     return () => {
       window.removeEventListener("userTypeUpdated", handleUserTypeUpdate)
     }
-  }, [])
+  }, [isHydrated])
+
+  // hydration이 완료되기 전까지는 로딩 상태 표시
+  if (!isHydrated) {
+    return (
+      <div className="sticky top-0 z-50 w-full border-b border-divider bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto max-w-[1256px] px-4">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo Skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-24 h-6 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            
+            {/* Navigation Skeleton */}
+            <div className="hidden md:flex items-center gap-6">
+              <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            
+            {/* Search Bar Skeleton */}
+            <div className="hidden md:flex flex-1 max-w-md mx-8">
+              <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            </div>
+            
+            {/* Right Side Skeleton */}
+            <div className="flex items-center gap-4">
+              <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const handleLogout = async () => {
     await logout()
@@ -227,6 +269,42 @@ export function Header() {
 }
 
 // ===== 내부 컴포넌트들 =====
+
+// HeaderSkeleton 컴포넌트
+function HeaderSkeleton() {
+  return (
+    <header className="sticky top-0 z-50 w-full border-b border-divider bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto max-w-[1256px] px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo Skeleton */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-24 h-6 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          
+          {/* Navigation Skeleton */}
+          <div className="hidden md:flex items-center gap-6">
+            <div className="w-12 h-4 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          
+          {/* Search Bar Skeleton */}
+          <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+          
+          {/* Right Side Skeleton */}
+          <div className="flex items-center gap-4">
+            <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
 
 // Logo 컴포넌트
 function Logo() {
