@@ -669,7 +669,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           {/* Product Info */}
           <div>
             {/* Brand */}
-            <div className="mb-2 text-sm font-medium text-text-secondary">{product.brand}</div>
+            <div 
+              className="mb-2 text-sm font-medium text-text-secondary cursor-pointer hover:text-primary transition-colors"
+              onClick={() => router.push(`/store?keyword=${encodeURIComponent(product.brand)}`)}
+            >
+              {product.brand}
+            </div>
 
             {/* Product Name */}
             <h1 className="mb-4 text-2xl font-bold text-foreground leading-relaxed">{product.name}</h1>
