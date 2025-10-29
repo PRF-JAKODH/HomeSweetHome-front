@@ -4,8 +4,9 @@ import { useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPost, getComments, createComment } from '@/lib/api/community'
+import { getPost, getComments, createComment, deletePost, updateComment, deleteComment } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 const categoryColors: Record<string, string> = {
   추천: "bg-primary/10 text-primary",
@@ -14,14 +15,37 @@ const categoryColors: Record<string, string> = {
   후기: "bg-purple-500/10 text-purple-600",
 }
 
+// ✅ JWT 디코딩 함수
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+    return JSON.parse(jsonPayload)
+  } catch (error) {
+    return null
+  }
+}
+
 export default function ShoppingTalkDetailPage() {
   const router = useRouter()
   const params = useParams()
   const postId = Number(params.postId)
   const queryClient = useQueryClient()
 
+  // ✅ 현재 로그인한 사용자 (JWT에서 추출)
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const currentUserId = accessToken ? Number(parseJwt(accessToken)?.sub) : null
+
   const [isLiked, setIsLiked] = useState(false)
   const [commentText, setCommentText] = useState("")
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
+  const [editingCommentText, setEditingCommentText] = useState("")
 
   // ✅ 게시글 조회 API
   const { data: post, isLoading: postLoading } = useQuery({
@@ -50,6 +74,47 @@ export default function ShoppingTalkDetailPage() {
     }
   })
 
+  // ✅ 게시글 삭제 API
+  const deletePostMutation = useMutation({
+    mutationFn: () => deletePost(postId),
+    onSuccess: () => {
+      alert('게시글이 삭제되었습니다.')
+      router.push('/community/shopping-talk')
+    },
+    onError: (error) => {
+      console.error('게시글 삭제 실패:', error)
+      alert('게시글 삭제에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 수정 API
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
+      updateComment(postId, commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      setEditingCommentId(null)
+      setEditingCommentText("")
+    },
+    onError: (error) => {
+      console.error('댓글 수정 실패:', error)
+      alert('댓글 수정에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 삭제 API
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: number) => deleteComment(postId, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      alert('댓글이 삭제되었습니다.')
+    },
+    onError: (error) => {
+      console.error('댓글 삭제 실패:', error)
+      alert('댓글 삭제에 실패했습니다.')
+    }
+  })
+
   // ✅ API 데이터를 기존 UI 형식으로 변환
   const postData = post ? {
     id: String(post.postId),
@@ -69,6 +134,7 @@ export default function ShoppingTalkDetailPage() {
   const mockComments = comments.map(comment => ({
     id: comment.commentId,
     author: comment.authorName,
+    authorId: comment.authorId,
     avatar: "/user-avatar-1.png",
     content: comment.content,
     createdAt: formatRelativeTime(comment.createdAt),
@@ -83,6 +149,15 @@ export default function ShoppingTalkDetailPage() {
     )
   }
 
+  // ✅ 본인 게시글 확인
+  const isMyPost = currentUserId === post?.authorId
+
+  // 디버깅용 로그
+  console.log('accessToken:', accessToken)
+  console.log('currentUserId:', currentUserId, typeof currentUserId)
+  console.log('post?.authorId:', post?.authorId, typeof post?.authorId)
+  console.log('isMyPost:', isMyPost)
+
   const handleDM = () => {
     router.push(`/community/messages/${postData.authorId}`)
   }
@@ -90,6 +165,44 @@ export default function ShoppingTalkDetailPage() {
   const handleSubmitComment = () => {
     if (commentText.trim()) {
       createCommentMutation.mutate(commentText)
+    }
+  }
+
+  // ✅ 삭제 핸들러
+  const handleDelete = () => {
+    if (confirm('정말 삭제하시겠습니까?')) {
+      deletePostMutation.mutate()
+    }
+  }
+
+  // ✅ 수정 핸들러
+  const handleEdit = () => {
+    router.push(`/community/shopping-talk/${postId}/edit`)
+  }
+
+  // ✅ 댓글 수정 시작
+  const handleEditComment = (commentId: number, content: string) => {
+    setEditingCommentId(commentId)
+    setEditingCommentText(content)
+  }
+
+  // ✅ 댓글 수정 취소
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditingCommentText("")
+  }
+
+  // ✅ 댓글 수정 제출
+  const handleSubmitEditComment = (commentId: number) => {
+    if (editingCommentText.trim()) {
+      updateCommentMutation.mutate({ commentId, content: editingCommentText })
+    }
+  }
+
+  // ✅ 댓글 삭제
+  const handleDeleteComment = (commentId: number) => {
+    if (confirm('정말 삭제하시겠습니까?')) {
+      deleteCommentMutation.mutate(commentId)
     }
   }
 
@@ -127,26 +240,50 @@ export default function ShoppingTalkDetailPage() {
           <div className="flex items-center justify-between border-y border-divider py-4">
             <div className="flex items-center gap-3">
               <img
-                src={post.authorAvatar || "/placeholder.svg"}
-                alt={post.author}
+                src={postData.authorAvatar || "/placeholder.svg"}
+                alt={postData.author}
                 className="h-12 w-12 rounded-full object-cover"
               />
               <div>
-                <p className="font-medium text-foreground">{post.author}</p>
-                <p className="text-sm text-text-secondary">{post.createdAt}</p>
+                <p className="font-medium text-foreground">{postData.author}</p>
+                <p className="text-sm text-text-secondary">{postData.createdAt}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleDM} className="gap-2 bg-transparent">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-              DM
-            </Button>
+            <div className="flex gap-2">
+              {/* ✅ 수정/삭제 버튼 */}
+              {isMyPost && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="text-sm"
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={deletePostMutation.isPending}
+                    className="text-sm text-red-500 hover:text-red-600"
+                  >
+                    {deletePostMutation.isPending ? '삭제 중...' : '삭제'}
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" size="sm" onClick={handleDM} className="gap-2 bg-transparent">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                DM
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -217,35 +354,95 @@ export default function ShoppingTalkDetailPage() {
 
           {/* Comments List */}
           <div className="space-y-4">
-            {mockComments.map((comment) => (
-              <div key={comment.id} className="border-b border-divider pb-4 last:border-0">
-                <div className="mb-2 flex items-start gap-3">
-                  <img
-                    src={comment.avatar || "/placeholder.svg"}
-                    alt={comment.author}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <div className="flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="font-medium text-foreground">{comment.author}</span>
-                      <span className="text-xs text-text-secondary">{comment.createdAt}</span>
+            {mockComments.map((comment) => {
+              const isMyComment = currentUserId === comment.authorId
+              const isEditing = editingCommentId === comment.id
+
+              return (
+                <div key={comment.id} className="border-b border-divider pb-4 last:border-0">
+                  <div className="mb-2 flex items-start gap-3">
+                    <img
+                      src={comment.avatar || "/placeholder.svg"}
+                      alt={comment.author}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-medium text-foreground">{comment.author}</span>
+                        <span className="text-xs text-text-secondary">{comment.createdAt}</span>
+                      </div>
+
+                      {/* ✅ 수정 모드 */}
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            className="w-full rounded-lg border border-divider bg-background p-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSubmitEditComment(comment.id)}
+                              disabled={!editingCommentText.trim() || updateCommentMutation.isPending}
+                              className="text-xs"
+                            >
+                              {updateCommentMutation.isPending ? '수정 중...' : '수정 완료'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelEditComment}
+                              className="text-xs"
+                            >
+                              취소
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-foreground leading-relaxed">{comment.content}</p>
+
+                          <div className="mt-2 flex items-center gap-3">
+                            <button className="flex items-center gap-1 text-xs text-text-secondary hover:text-foreground transition-colors">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                />
+                              </svg>
+                              <span>{comment.likes}</span>
+                            </button>
+
+                            {/* ✅ 본인 댓글에만 수정/삭제 버튼 표시 */}
+                            {isMyComment && (
+                              <>
+                                <button
+                                  onClick={() => handleEditComment(comment.id, comment.content)}
+                                  className="text-xs text-text-secondary hover:text-foreground transition-colors"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  disabled={deleteCommentMutation.isPending}
+                                  className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                                >
+                                  삭제
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <p className="text-sm text-foreground leading-relaxed">{comment.content}</p>
-                    <button className="mt-2 flex items-center gap-1 text-xs text-text-secondary hover:text-foreground transition-colors">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                        />
-                      </svg>
-                      <span>{comment.likes}</span>
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
