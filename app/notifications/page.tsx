@@ -1,58 +1,35 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { Notification } from "@/types/notification"
+import { useNotification } from "@/hooks/use-notification"
 
 export default function NotificationsPage() {
   const router = useRouter()
-  const [notifications, setNotifications] = useState<any[]>([])
+  const { notifications, markAsRead, markAllAsRead, deleteNotification } = useNotification()
   const [selectedCategory, setSelectedCategory] = useState("전체")
   const [selectedStatus, setSelectedStatus] = useState("전체")
 
-  const categories = ["전체", "주문/배송", "리뷰", "이벤트", "시스템"]
+  const categories = ["전체", "주문", "배송", "리뷰", "이벤트", "시스템"]
 
-  useEffect(() => {
-    const storedNotifications = localStorage.getItem("ohouse_notifications")
-    if (storedNotifications) {
-      setNotifications(JSON.parse(storedNotifications))
-    }
-  }, [])
-
-  const filteredNotifications = notifications.filter((notification) => {
-    const categoryMatch = selectedCategory === "전체" || notification.category === selectedCategory
+  const filteredNotifications = useMemo(() => notifications.filter((notification: Notification) => {
+    const categoryMatch = selectedCategory === "전체" || notification.categoryType === selectedCategory
     const statusMatch =
       selectedStatus === "전체" ||
-      (selectedStatus === "읽지 않음" && !notification.read) ||
-      (selectedStatus === "읽음" && notification.read)
+      (selectedStatus === "읽지 않음" && !notification.isRead) ||
+      (selectedStatus === "읽음" && notification.isRead)
     return categoryMatch && statusMatch
-  })
+  }), [notifications, selectedCategory, selectedStatus])
 
-  const markAsRead = (id: number) => {
-    const updatedNotifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-    setNotifications(updatedNotifications)
-    localStorage.setItem("ohouse_notifications", JSON.stringify(updatedNotifications))
-  }
-
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map((n) => ({ ...n, read: true }))
-    setNotifications(updatedNotifications)
-    localStorage.setItem("ohouse_notifications", JSON.stringify(updatedNotifications))
-  }
-
-  const deleteNotification = (id: number) => {
-    const updatedNotifications = notifications.filter((n) => n.id !== id)
-    setNotifications(updatedNotifications)
-    localStorage.setItem("ohouse_notifications", JSON.stringify(updatedNotifications))
-  }
-
-  const handleNotificationClick = (notification: any) => {
-    markAsRead(notification.id)
-    if (notification.link) {
-      router.push(notification.link)
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.id) {
+      markAsRead(notification.id)
+      router.push(notification.redirectUrl)
     }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const unreadCount = notifications.filter((n) => !n.isRead).length
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,19 +108,19 @@ export default function NotificationsPage() {
               <div
                 key={notification.id}
                 className={`bg-white rounded-lg border border-divider p-4 transition-all hover:shadow-md ${
-                  !notification.read ? "border-l-4 border-l-primary" : ""
+                  !notification.isRead ? "border-l-4 border-l-primary" : ""
                 }`}
               >
                 <div className="flex items-start gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-medium text-primary px-2 py-1 bg-blue-50 rounded">
-                        {notification.category}
+                        {notification.categoryType}
                       </span>
-                      {!notification.read && (
+                      {!notification.isRead && (
                         <span className="text-xs font-medium text-white px-2 py-1 bg-primary rounded">NEW</span>
                       )}
-                      <span className="text-xs text-text-tertiary ml-auto">{notification.time}</span>
+                      <span className="text-xs text-text-tertiary ml-auto">{notification.createdAt}</span>
                     </div>
                     <h3
                       onClick={() => handleNotificationClick(notification)}
@@ -154,16 +131,16 @@ export default function NotificationsPage() {
                     <p className="text-sm text-text-secondary">{notification.content}</p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {!notification.read && (
+                    {!notification.isRead && (
                       <button
-                        onClick={() => markAsRead(notification.id)}
+                        onClick={() => markAsRead(notification.id!)}
                         className="px-3 py-1 text-xs font-medium text-primary hover:bg-blue-50 rounded transition-colors"
                       >
                         읽음
                       </button>
                     )}
                     <button
-                      onClick={() => deleteNotification(notification.id)}
+                      onClick={() => deleteNotification(notification.id!)}
                       className="px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       삭제
