@@ -10,6 +10,8 @@ import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
 import { useCart } from "@/lib/hooks/use-cart"
 import { useAuthStore } from "@/stores/auth-store"
+import { useNotification } from "@/hooks/use-notification"
+import type { Notification } from '@/types/notification'
 
 
 export function Header() {
@@ -35,48 +37,6 @@ export function Header() {
     if (storedUserType) {
       setUserType(storedUserType as "buyer" | "seller")
     }
-
-    const storedNotifications = localStorage.getItem("ohouse_notifications")
-    if (storedNotifications) {
-      const notifs = JSON.parse(storedNotifications)
-      setNotifications(notifs)
-      setUnreadCount(notifs.filter((n: any) => !n.read).length)
-    } else {
-      const sampleNotifications = [
-        {
-          id: 1,
-          category: "주문/배송",
-          title: "주문이 완료되었습니다",
-          content: "모던 미니멀 소파 주문이 완료되었습니다.",
-          time: "5분 전",
-          read: false,
-          link: "/profile?tab=shopping",
-        },
-        {
-          id: 2,
-          category: "배송",
-          title: "상품이 배송 중입니다",
-          content: "우드 다이닝 테이블이 배송 중입니다.",
-          time: "1시간 전",
-          read: false,
-          link: "/profile?tab=shopping",
-        },
-        {
-          id: 3,
-          category: "이벤트",
-          title: "신규 회원 할인 쿠폰",
-          content: "첫 구매 시 10% 할인 쿠폰이 발급되었습니다.",
-          time: "2시간 전",
-          read: true,
-          link: "/profile",
-        },
-      ]
-      localStorage.setItem("ohouse_notifications", JSON.stringify(sampleNotifications))
-      setNotifications(sampleNotifications)
-      setUnreadCount(sampleNotifications.filter((n) => !n.read).length)
-    }
-
-    // 장바구니 개수는 useCart 훅을 통해 API에서 가져옴
 
     const handleUserTypeUpdate = () => {
       const storedUserType = localStorage.getItem("ohouse_user_type")
@@ -230,11 +190,6 @@ export function Header() {
                     cartCount={cartCount}
                     cartLoading={cartLoading}
                     onLogout={handleLogout}
-                    notificationDropdownProps={{
-                      notifications: notifications,
-                      unreadCount: unreadCount,
-                      onNotificationClick: handleNotificationClick,
-                    }}
                   />
               ) : (
                  <>
@@ -357,28 +312,25 @@ function SearchBar({ className = "" }: SearchBarProps) {
 }
 
 // NotificationDropdown 컴포넌트
-interface Notification {
-  id: number
-  category: string
-  title: string
-  content: string
-  time: string
-  read: boolean
-  link: string
-}
+interface NotificationDropdownProps {}
 
-interface NotificationDropdownProps {
-  notifications: Notification[]
-  unreadCount: number
-  onNotificationClick: (notification: Notification) => void
-}
-
-function NotificationDropdown({ 
-  notifications, 
-  unreadCount, 
-  onNotificationClick 
-}: NotificationDropdownProps) {
+function NotificationDropdown({}: NotificationDropdownProps) {
   const router = useRouter()
+  const { notifications, unreadCount, markAsRead } = useNotification()
+  
+  const formatRelativeTime = (isoString: string): string => {
+    const now = new Date()
+    const time = new Date(isoString)
+    const diffInSeconds = Math.floor((now.getTime() - time.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return '방금 전'
+    const minutes = Math.floor(diffInSeconds / 60)
+    if (minutes < 60) return `${minutes}분 전`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}시간 전`
+    const days = Math.floor(hours / 24)
+    return `${days}일 전`
+  }
 
   return (
     <DropdownMenu>
@@ -411,16 +363,23 @@ function NotificationDropdown({
             notifications.slice(0, 5).map((notification) => (
               <div
                 key={notification.id}
-                onClick={() => onNotificationClick(notification)}
+                onClick={() => {
+                  if (notification.id) {
+                    markAsRead(notification.id)
+                  }
+                  if (notification.redirectUrl) {
+                    router.push(notification.redirectUrl)
+                  }
+                }}
                 className={`px-3 py-3 border-b border-divider last:border-0 cursor-pointer hover:bg-background-section transition-colors ${
-                  !notification.read ? "bg-blue-50" : ""
+                  !notification.isRead ? "bg-blue-50" : ""
                 }`}
               >
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-primary">{notification.category}</span>
-                      {!notification.read && (
+                      <span className="text-xs font-medium text-primary">{notification.categoryType}</span>
+                      {!notification.isRead && (
                         <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                       )}
                     </div>
@@ -428,7 +387,9 @@ function NotificationDropdown({
                       {notification.title}
                     </p>
                     <p className="text-xs text-text-secondary line-clamp-2">{notification.content}</p>
-                    <span className="text-xs text-text-tertiary mt-1 inline-block">{notification.time}</span>
+                    <span className="text-xs text-text-tertiary mt-1 inline-block">
+                      {notification.createdAt ? formatRelativeTime(notification.createdAt) : ''}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -446,7 +407,6 @@ interface UserActionsProps {
   cartCount: number
   cartLoading?: boolean
   onLogout: () => void
-  notificationDropdownProps: NotificationDropdownProps
 }
 
 function UserActions({ 
@@ -454,13 +414,12 @@ function UserActions({
   cartCount, 
   cartLoading = false,
   onLogout,
-  notificationDropdownProps
 }: UserActionsProps) {
   const router = useRouter()
 
   return (
     <div className="flex items-center gap-2">
-      <NotificationDropdown {...notificationDropdownProps} />
+      <NotificationDropdown />
       <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
         <MessageCircle className="h-5 w-5" />
       </Button>
