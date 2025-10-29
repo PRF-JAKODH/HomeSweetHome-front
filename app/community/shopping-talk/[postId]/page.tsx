@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus } from '@/lib/api/community'
+import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -66,6 +66,19 @@ export default function ShoppingTalkDetailPage() {
     queryFn: () => getPostLikeStatus(postId),
     enabled: !isNaN(postId) && !!accessToken
   })
+
+  // ✅ 조회수 증가 (페이지 로드 시 한 번만 실행)
+  useEffect(() => {
+    if (!isNaN(postId)) {
+      increaseViewCount(postId)
+        .then(() => {
+          // 조회수 증가 후 게시글 데이터 다시 불러오기
+          queryClient.invalidateQueries({ queryKey: ['community-post', postId] })
+          queryClient.invalidateQueries({ queryKey: ['community-posts'], refetchType: 'all' })
+        })
+        .catch(err => console.error('조회수 증가 실패:', err))
+    }
+  }, [postId, queryClient])
 
   // ✅ 댓글 작성 API
   const createCommentMutation = useMutation({
@@ -261,8 +274,8 @@ export default function ShoppingTalkDetailPage() {
             >
               {post.category}
             </span>
-            <span className="text-sm text-text-secondary">{post.createdAt}</span>
-            <span className="text-sm text-text-secondary">조회 {post.views}</span>
+            <span className="text-sm text-text-secondary">{postData.createdAt}</span>
+            <span className="text-sm text-text-secondary">조회 {postData.views}</span>
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-6">{post.title}</h1>

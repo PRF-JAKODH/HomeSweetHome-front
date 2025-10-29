@@ -67,6 +67,9 @@ export const COMMUNITY_ENDPOINTS = {
   UPDATE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
   DELETE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
 
+  // 게시글 조회수
+  INCREASE_VIEW_COUNT: (postId: number) => `/api/v1/community/posts/${postId}/views`,
+
   // 게시글 좋아요
   TOGGLE_POST_LIKE: (postId: number) => `/api/v1/community/posts/${postId}/likes`,
   GET_POST_LIKE_STATUS: (postId: number) => `/api/v1/community/posts/${postId}/likes/status`,

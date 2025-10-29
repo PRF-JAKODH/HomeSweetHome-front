@@ -150,6 +150,13 @@ export async function deleteComment(
 }
 
 /**
+ * 게시글 조회수 증가
+ */
+export async function increaseViewCount(postId: number): Promise<ApiResponse<void>> {
+  return apiClient.post<void>(COMMUNITY_ENDPOINTS.INCREASE_VIEW_COUNT(postId))
+}
+
+/**
  * 게시글 좋아요 토글
  */
 export async function togglePostLike(postId: number): Promise<ApiResponse<void>> {
