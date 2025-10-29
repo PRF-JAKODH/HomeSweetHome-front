@@ -336,6 +336,37 @@ export default function ShoppingTalkDetailPage() {
           <div className="prose prose-slate max-w-none">
             <p className="whitespace-pre-wrap text-foreground leading-relaxed">{post.content}</p>
           </div>
+
+          {/* Images */}
+          {post.imagesUrl && post.imagesUrl.length > 0 && (
+            <div className="mt-6 grid gap-4 grid-cols-1 sm:grid-cols-2">
+              {post.imagesUrl.map((imageUrl: string, index: number) => {
+                // S3 URL에서 이중 경로 문제 해결
+                // 예: "https://.../path1/path2" → "https://.../path2" 사용
+                const cleanUrl = imageUrl.split('/').slice(0, 4).join('/') + '/' + imageUrl.split('/').pop()
+
+                return (
+                  <div key={index} className="relative aspect-square overflow-hidden rounded-lg bg-surface">
+                    <img
+                      src={cleanUrl}
+                      alt={`게시글 이미지 ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // 첫 번째 방식 실패시 원본 URL 시도
+                        const target = e.target as HTMLImageElement
+                        if (target.src !== imageUrl) {
+                          target.src = imageUrl
+                        } else {
+                          // 그래도 실패하면 플레이스홀더 표시
+                          target.src = '/placeholder.svg'
+                        }
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Post Actions */}

@@ -6,6 +6,20 @@ import { useCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 
+// 정렬 옵션 타입 정의
+type SortOption = {
+  label: string
+  sort: 'createdAt' | 'viewCount' | 'likeCount'
+  direction: 'asc' | 'desc'
+}
+
+// 정렬 옵션들
+const sortOptions: SortOption[] = [
+  { label: "최신순", sort: "createdAt", direction: "desc" },
+  { label: "조회수순", sort: "viewCount", direction: "desc" },
+  { label: "인기순", sort: "likeCount", direction: "desc" },
+]
+
 const categories = [
   { id: "shopping-talk", name: "쇼핑수다", image: "/shopping-talk-icon-new.png" },
   { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
@@ -90,13 +104,14 @@ const categoryColors: Record<string, string> = {
 
 export default function CommunityPage() {
   const [selectedTab, setSelectedTab] = useState("chat-rooms")
-  
+  const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0]) // 기본값: 최신순
+
   // 🔄 API에서 게시글 데이터 가져오기 (컴포넌트 내부에서 호출!)
   const { data: postsData } = useCommunityPosts({
     page: 0,
     size: 10,
-    sort: 'createdAt',
-    direction: 'desc'
+    sort: selectedSort.sort,
+    direction: selectedSort.direction
   })
 
   return (
@@ -114,14 +129,12 @@ export default function CommunityPage() {
                     <button
                       key={category.id}
                       onClick={() => setSelectedTab(category.id)}
-                      className={`group flex flex-col items-center gap-3 flex-shrink-0 transition-all ${
-                        selectedTab === category.id ? "opacity-100" : "opacity-60 hover:opacity-80"
-                      }`}
+                      className={`group flex flex-col items-center gap-3 flex-shrink-0 transition-all ${selectedTab === category.id ? "opacity-100" : "opacity-60 hover:opacity-80"
+                        }`}
                     >
                       <div
-                        className={`flex h-24 w-24 items-center justify-center rounded-full bg-background-section transition-all ${
-                          selectedTab === category.id ? "ring-2 ring-primary" : ""
-                        }`}
+                        className={`flex h-24 w-24 items-center justify-center rounded-full bg-background-section transition-all ${selectedTab === category.id ? "ring-2 ring-primary" : ""
+                          }`}
                       >
                         <img
                           src={category.image || "/placeholder.svg"}
@@ -130,9 +143,8 @@ export default function CommunityPage() {
                         />
                       </div>
                       <span
-                        className={`text-sm font-medium transition-colors ${
-                          selectedTab === category.id ? "text-primary" : "text-foreground"
-                        }`}
+                        className={`text-sm font-medium transition-colors ${selectedTab === category.id ? "text-primary" : "text-foreground"
+                          }`}
                       >
                         {category.name}
                       </span>
@@ -160,84 +172,124 @@ export default function CommunityPage() {
                   </a>
                 </div>
 
+                {/* Sort Options */}
+                <div className="flex gap-2 mb-6">
+                  {sortOptions.map((option) => (
+                    <Button
+                      key={option.label}
+                      variant={selectedSort.label === option.label ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedSort(option)}
+                      className="text-sm"
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+
                 {/* Posts List */}
                 <div className="space-y-4">
                   {postsData?.content?.map((post) => {
                     const uiPost = mapPostToUI(post)
+                    // 첫 번째 이미지를 썸네일로 사용
+                    const thumbnail = post.imagesUrl?.[0]
+                    // S3 URL 정리
+                    const cleanThumbnail = thumbnail ?
+                      thumbnail.split('/').slice(0, 4).join('/') + '/' + thumbnail.split('/').pop() :
+                      null
+
                     return (
-                        <a
-                          key={uiPost.id}
-                          href={`/community/shopping-talk/${uiPost.id}`}
-                          className="block bg-background border border-divider rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
-                        >
-                          <div className="flex items-start gap-4">
-                            {/* Category Badge */}
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                                categoryColors[uiPost.category] || "bg-gray-100 text-gray-600"
+                      <a
+                        key={uiPost.id}
+                        href={`/community/shopping-talk/${uiPost.id}`}
+                        className="block bg-background border border-divider rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Category Badge */}
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap self-start ${categoryColors[uiPost.category] || "bg-gray-100 text-gray-600"
                               }`}
-                            >
-                              {uiPost.category}
-                            </span>
+                          >
+                            {uiPost.category}
+                          </span>
 
-                            {/* Post Content */}
-                            <div className="flex-1 min-w-0">
-                              <h2 className="text-lg font-semibold text-foreground mb-2 hover:text-primary transition-colors">
-                                {uiPost.title}
-                              </h2>
-                              <p className="text-sm text-text-secondary line-clamp-2 mb-3">{uiPost.content}</p>
+                          {/* Post Content */}
+                          <div className="flex-1 min-w-0">
+                            <h2 className="text-lg font-semibold text-foreground mb-2 hover:text-primary transition-colors">
+                              {uiPost.title}
+                            </h2>
+                            <p className="text-sm text-text-secondary line-clamp-2 mb-3">{uiPost.content}</p>
 
-                              {/* Post Meta */}
-                              <div className="flex items-center gap-4 text-xs text-text-secondary">
-                                <span className="font-medium text-foreground">{uiPost.author}</span>
-                                <span>{uiPost.createdAt}</span>
-                                <div className="flex items-center gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                      />
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                      />
-                                    </svg>
-                                    {uiPost.views}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                                      />
-                                    </svg>
-                                    {uiPost.likes}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                                      />
-                                    </svg>
-                                    {uiPost.comments}
-                                  </span>
-                                </div>
+                            {/* Post Meta */}
+                            <div className="flex items-center gap-4 text-xs text-text-secondary">
+                              <span className="font-medium text-foreground">{uiPost.author}</span>
+                              <span>{uiPost.createdAt}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="flex items-center gap-1">
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
+                                  </svg>
+                                  {uiPost.views}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                                    />
+                                  </svg>
+                                  {uiPost.likes}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                    />
+                                  </svg>
+                                  {uiPost.comments}
+                                </span>
                               </div>
                             </div>
                           </div>
-                        </a>
-                      )
-                    })}
+
+                          {/* Thumbnail Image */}
+                          {cleanThumbnail && (
+                            <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-surface">
+                              <img
+                                src={cleanThumbnail}
+                                alt={uiPost.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  if (target.src !== thumbnail) {
+                                    target.src = thumbnail
+                                  } else {
+                                    target.style.display = 'none'
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             )}
