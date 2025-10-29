@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPost, getComments, createComment, deletePost, updateComment, deleteComment } from '@/lib/api/community'
+import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -42,7 +42,6 @@ export default function ShoppingTalkDetailPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const currentUserId = accessToken ? Number(parseJwt(accessToken)?.sub) : null
 
-  const [isLiked, setIsLiked] = useState(false)
   const [commentText, setCommentText] = useState("")
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentText, setEditingCommentText] = useState("")
@@ -59,6 +58,13 @@ export default function ShoppingTalkDetailPage() {
     queryKey: ['community-comments', postId],
     queryFn: () => getComments(postId),
     enabled: !isNaN(postId)
+  })
+
+  // ✅ 게시글 좋아요 상태 조회
+  const { data: isPostLiked = false } = useQuery({
+    queryKey: ['post-like-status', postId],
+    queryFn: () => getPostLikeStatus(postId),
+    enabled: !isNaN(postId) && !!accessToken
   })
 
   // ✅ 댓글 작성 API
@@ -112,6 +118,31 @@ export default function ShoppingTalkDetailPage() {
     onError: (error) => {
       console.error('댓글 삭제 실패:', error)
       alert('댓글 삭제에 실패했습니다.')
+    }
+  })
+
+  // ✅ 게시글 좋아요 토글 API
+  const togglePostLikeMutation = useMutation({
+    mutationFn: () => togglePostLike(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-like-status', postId] })
+      queryClient.invalidateQueries({ queryKey: ['community-post', postId] })
+    },
+    onError: (error) => {
+      console.error('좋아요 처리 실패:', error)
+      alert('좋아요 처리에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 좋아요 토글 API
+  const toggleCommentLikeMutation = useMutation({
+    mutationFn: (commentId: number) => toggleCommentLike(postId, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+    },
+    onError: (error) => {
+      console.error('댓글 좋아요 처리 실패:', error)
+      alert('댓글 좋아요 처리에 실패했습니다.')
     }
   })
 
@@ -297,12 +328,13 @@ export default function ShoppingTalkDetailPage() {
         {/* Post Actions */}
         <div className="mb-8 flex items-center gap-4 border-y border-divider py-4">
           <button
-            onClick={() => setIsLiked(!isLiked)}
+            onClick={() => togglePostLikeMutation.mutate()}
+            disabled={togglePostLikeMutation.isPending || !accessToken}
             className={`flex items-center gap-2 transition-colors ${
-              isLiked ? "text-red-500" : "text-text-secondary hover:text-foreground"
-            }`}
+              isPostLiked ? "text-red-500" : "text-text-secondary hover:text-foreground"
+            } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <svg className="h-6 w-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -310,7 +342,7 @@ export default function ShoppingTalkDetailPage() {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
-            <span className="text-sm font-medium">{isLiked ? post.likes + 1 : post.likes}</span>
+            <span className="text-sm font-medium">{postData.likes}</span>
           </button>
 
           <div className="flex items-center gap-2 text-text-secondary">
@@ -405,7 +437,13 @@ export default function ShoppingTalkDetailPage() {
                           <p className="text-sm text-foreground leading-relaxed">{comment.content}</p>
 
                           <div className="mt-2 flex items-center gap-3">
-                            <button className="flex items-center gap-1 text-xs text-text-secondary hover:text-foreground transition-colors">
+                            <button
+                              onClick={() => toggleCommentLikeMutation.mutate(comment.id)}
+                              disabled={toggleCommentLikeMutation.isPending || !accessToken}
+                              className={`flex items-center gap-1 text-xs transition-colors ${
+                                !accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                              }`}
+                            >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
                                   strokeLinecap="round"

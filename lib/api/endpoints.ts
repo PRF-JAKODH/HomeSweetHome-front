@@ -66,6 +66,14 @@ export const COMMUNITY_ENDPOINTS = {
   CREATE_COMMENT: (postId: number) => `/api/v1/community/posts/${postId}/comments`,
   UPDATE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
   DELETE_COMMENT: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}`,
+
+  // 게시글 좋아요
+  TOGGLE_POST_LIKE: (postId: number) => `/api/v1/community/posts/${postId}/likes`,
+  GET_POST_LIKE_STATUS: (postId: number) => `/api/v1/community/posts/${postId}/likes/status`,
+
+  // 댓글 좋아요
+  TOGGLE_COMMENT_LIKE: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}/likes`,
+  GET_COMMENT_LIKE_STATUS: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}/likes/status`,
 } as const
 
 // 공통 엔드포인트

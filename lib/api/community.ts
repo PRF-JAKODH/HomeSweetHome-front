@@ -148,3 +148,31 @@ export async function deleteComment(
     COMMUNITY_ENDPOINTS.DELETE_COMMENT(postId, commentId)
   )
 }
+
+/**
+ * 게시글 좋아요 토글
+ */
+export async function togglePostLike(postId: number): Promise<ApiResponse<void>> {
+  return apiClient.post<void>(COMMUNITY_ENDPOINTS.TOGGLE_POST_LIKE(postId))
+}
+
+/**
+ * 게시글 좋아요 상태 확인
+ */
+export async function getPostLikeStatus(postId: number): Promise<boolean> {
+  return apiClient.get<boolean>(COMMUNITY_ENDPOINTS.GET_POST_LIKE_STATUS(postId))
+}
+
+/**
+ * 댓글 좋아요 토글
+ */
+export async function toggleCommentLike(postId: number, commentId: number): Promise<ApiResponse<void>> {
+  return apiClient.post<void>(COMMUNITY_ENDPOINTS.TOGGLE_COMMENT_LIKE(postId, commentId))
+}
+
+/**
+ * 댓글 좋아요 상태 확인
+ */
+export async function getCommentLikeStatus(postId: number, commentId: number): Promise<boolean> {
+  return apiClient.get<boolean>(COMMUNITY_ENDPOINTS.GET_COMMENT_LIKE_STATUS(postId, commentId))
+}
