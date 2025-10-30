@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { useCommunityPosts } from '@/lib/hooks/use-community'
+import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 
@@ -105,14 +105,54 @@ const categoryColors: Record<string, string> = {
 export default function CommunityPage() {
   const [selectedTab, setSelectedTab] = useState("chat-rooms")
   const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0]) // 기본값: 최신순
+  const observerTarget = useRef<HTMLDivElement>(null)
 
-  // 🔄 API에서 게시글 데이터 가져오기 (컴포넌트 내부에서 호출!)
-  const { data: postsData } = useCommunityPosts({
-    page: 0,
+  // 🔄 API에서 게시글 데이터 가져오기 (무한 스크롤)
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteCommunityPosts({
     size: 10,
     sort: selectedSort.sort,
     direction: selectedSort.direction
   })
+
+  // Intersection Observer를 사용한 무한 스크롤 구현
+  useEffect(() => {
+    // 쇼핑수다 탭이 아니면 observer 설정 안 함
+    if (selectedTab !== "shopping-talk") return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          console.log('[무한스크롤] 다음 페이지 로딩 시작')
+          fetchNextPage()
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px' // 하단 100px 전부터 로딩 시작
+      }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+      console.log('[무한스크롤] Observer 설정 완료', { hasNextPage, isFetchingNextPage })
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [selectedTab, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // 모든 페이지의 게시글을 하나의 배열로 합치기
+  const allPosts = data?.pages.flatMap((page) => page.content) ?? []
 
   return (
     <div className="min-h-screen bg-background">
@@ -189,7 +229,12 @@ export default function CommunityPage() {
 
                 {/* Posts List */}
                 <div className="space-y-4">
-                  {postsData?.content?.map((post) => {
+                  {isLoading && (
+                    <div className="text-center py-8 text-text-secondary">
+                      로딩 중...
+                    </div>
+                  )}
+                  {allPosts.map((post: CommunityPost) => {
                     const uiPost = mapPostToUI(post)
                     // 첫 번째 이미지를 썸네일로 사용
                     const thumbnail = post.imagesUrl?.[0]
@@ -290,6 +335,26 @@ export default function CommunityPage() {
                       </a>
                     )
                   })}
+
+                  {/* 무한 스크롤 트리거 - observer target은 항상 렌더링 */}
+                  <div ref={observerTarget} className="py-8">
+                    {isFetchingNextPage && (
+                      <div className="text-center text-sm text-text-secondary flex items-center justify-center gap-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                        더 불러오는 중...
+                      </div>
+                    )}
+                    {!isFetchingNextPage && !hasNextPage && allPosts.length > 0 && (
+                      <div className="text-center text-text-secondary text-sm">
+                        모든 게시글을 불러왔습니다
+                      </div>
+                    )}
+                    {!isLoading && allPosts.length === 0 && (
+                      <div className="text-center py-12 text-text-secondary">
+                        게시글이 없습니다
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
