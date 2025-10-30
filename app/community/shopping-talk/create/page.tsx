@@ -65,6 +65,7 @@ export default function CreateShoppingTalkPage() {
     createMutation.mutate({
       title,
       content,
+      category,
       images: imageFiles.length > 0 ? imageFiles : undefined
     })
   }
@@ -84,7 +85,7 @@ export default function CreateShoppingTalkPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Category Selection */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">주제 선택</label>
+            <label className="block text-sm font-medium text-foreground mb-2">카테고리 선택</label>
             <div className="relative">
               <select
                 value={category}

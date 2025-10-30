@@ -9,7 +9,8 @@ export interface CommunityPost {
   authorName: string
   title: string
   content: string
-  viewCount: number 
+  category?: string  // 추천, 질문, 정보, 후기
+  viewCount: number
   likeCount: number
   commentCount: number
   isModified: boolean
@@ -36,6 +37,7 @@ export interface CommunityComment {
 export interface CreatePostRequest {
   title: string
   content: string
+  category?: string  // 추천, 질문, 정보, 후기
   images?: File[]  // 실제 파일 객체
 }
 
@@ -43,6 +45,7 @@ export interface CreatePostRequest {
 export interface UpdatePostRequest {
   title: string
   content: string
+  category?: string  // 추천, 질문, 정보, 후기
   imageUrls?: string[]
 }
 

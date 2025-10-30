@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
 import { formatRelativeTime } from '@/lib/utils'
+import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
 
 // 정렬 옵션 타입 정의
 type SortOption = {
@@ -34,8 +35,8 @@ const mapPostToUI = (post: CommunityPost) => ({
   views: post.viewCount,
   likes: post.likeCount,
   comments: post.commentCount,
-  // category는 API에 없으므로 기본값 설정
-  category: "일반"
+  category: post.category,  // 카테고리 (백엔드에서 받아옴)
+  keywords: extractKeywords(post.title, post.content, 3)  // 제목과 내용에서 자동으로 키워드 추출
 })
 
 const chatRooms = [
@@ -95,11 +96,12 @@ const chatRooms = [
   },
 ]
 
+// 카테고리 배지 색상
 const categoryColors: Record<string, string> = {
-  추천: "bg-primary/10 text-primary",
-  질문: "bg-accent/10 text-accent",
-  정보: "bg-green-500/10 text-green-600",
-  후기: "bg-purple-500/10 text-purple-600",
+  추천: "bg-blue-600/15 text-blue-700 border border-blue-600/30",
+  질문: "bg-orange-500/15 text-orange-700 border border-orange-500/30",
+  정보: "bg-emerald-600/15 text-emerald-700 border border-emerald-600/30",
+  후기: "bg-violet-600/15 text-violet-700 border border-violet-600/30",
 }
 
 export default function CommunityPage() {
@@ -251,18 +253,30 @@ export default function CommunityPage() {
                       >
                         <div className="flex items-start gap-4">
                           {/* Category Badge */}
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap self-start ${categoryColors[uiPost.category] || "bg-gray-100 text-gray-600"
-                              }`}
-                          >
-                            {uiPost.category}
-                          </span>
+                          {uiPost.category && (
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap self-start ${categoryColors[uiPost.category] || "bg-gray-100 text-gray-600"}`}
+                            >
+                              {uiPost.category}
+                            </span>
+                          )}
 
                           {/* Post Content */}
                           <div className="flex-1 min-w-0">
-                            <h2 className="text-lg font-semibold text-foreground mb-2 hover:text-primary transition-colors">
-                              {uiPost.title}
-                            </h2>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <h2 className="text-lg font-semibold text-foreground hover:text-primary transition-colors">
+                                {uiPost.title}
+                              </h2>
+                              {/* Auto Keywords - 제목 옆에 표시 */}
+                              {uiPost.keywords.map((keyword, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getKeywordStyle(keyword)}`}
+                                >
+                                  #{keyword}
+                                </span>
+                              ))}
+                            </div>
                             <p className="text-sm text-text-secondary line-clamp-2 mb-3">{uiPost.content}</p>
 
                             {/* Post Meta */}

@@ -48,7 +48,7 @@ export async function createPost(data: CreatePostRequest): Promise<ApiResponse<C
 
   // request 부분을 JSON Blob으로 추가
   const requestBlob = new Blob(
-    [JSON.stringify({ title: data.title, content: data.content })],
+    [JSON.stringify({ title: data.title, content: data.content, category: data.category })],
     { type: 'application/json' }
   )
   formData.append('request', requestBlob)
@@ -78,16 +78,17 @@ export async function createPost(data: CreatePostRequest): Promise<ApiResponse<C
 
 /**
  * 게시글 수정
- * 백엔드 DTO는 title, content만 받음 (이미지는 별도 처리)
+ * 백엔드 DTO는 title, content, category 받음 (이미지는 별도 처리)
  */
 export async function updatePost(
   postId: number,
   data: UpdatePostRequest
 ): Promise<ApiResponse<CommunityPost>> {
-  // 백엔드 Request DTO에 맞게 title, content만 전송
+  // 백엔드 Request DTO에 맞게 title, content, category 전송
   const requestData = {
     title: data.title,
     content: data.content,
+    category: data.category,
   }
 
   return apiClient.put<CommunityPost>(

@@ -35,12 +35,15 @@ export default function EditShoppingTalkPage() {
         if (post) {
             setTitle(post.title)
             setContent(post.content)
+            if (post.category) {
+                setCategory(post.category)
+            }
         }
     }, [post])
 
     // ✅ 수정 API mutation
     const updateMutation = useMutation({
-        mutationFn: (data: { title: string; content: string }) => updatePost(postId, data),
+        mutationFn: (data: { title: string; content: string; category: string }) => updatePost(postId, data),
         onSuccess: () => {
             alert('게시글이 수정되었습니다.')
             router.push(`/community/shopping-talk/${postId}`)
@@ -53,7 +56,7 @@ export default function EditShoppingTalkPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        updateMutation.mutate({ title, content })
+        updateMutation.mutate({ title, content, category })
     }
 
     if (isLoading) {
@@ -79,7 +82,7 @@ export default function EditShoppingTalkPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Category Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">주제 선택</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">카테고리 선택</label>
                         <div className="relative">
                             <select
                                 value={category}
