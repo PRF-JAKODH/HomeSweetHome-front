@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit, Package, User, Ban, Play } from 'lucide-react'
+import { Plus, Edit, Package, User, Ban, Play, ImageIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -893,6 +893,17 @@ export default function SellerPage() {
               >
                 <Package className="w-4 h-4 mr-2" />
                 옵션 재고 수정
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/images`)
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                이미지 수정
               </Button>
               <Button
                 onClick={() => setShowEditOptionsModal(false)}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, ImageIcon, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
@@ -19,8 +19,6 @@ import { getCategoryHierarchy } from "@/lib/api/categories"
 export default function EditProductPage() {
   const router = useRouter()
   const params = useParams()
-  const [mainImage, setMainImage] = useState<string | null>(null)
-  const [subImages, setSubImages] = useState<string[]>([])
 
   const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
   const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
@@ -84,17 +82,6 @@ export default function EditProductPage() {
             console.error('카테고리 조회 실패:', error)
           }
         }
-        
-        // 이미지 설정
-        if (productData.images && productData.images.length > 0) {
-          setMainImage(productData.images[0])
-        } else if (productData.imageUrl) {
-          setMainImage(productData.imageUrl)
-        }
-        
-        if (productData.detailImageUrls && productData.detailImageUrls.length > 0) {
-          setSubImages(productData.detailImageUrls)
-        }
       } catch (error) {
         console.error('상품 데이터 로드 실패:', error)
       } finally {
@@ -131,32 +118,6 @@ export default function EditProductPage() {
     setExpandedCategories(newExpanded)
   }
 
-  const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setMainImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleSubImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    files.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setSubImages((prev) => [...prev, reader.result as string])
-      }
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const removeSubImage = (index: number) => {
-    setSubImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
   const calculateFinalPrice = () => {
     const price = Number.parseFloat(originalPrice) || 0
     const discount = Number.parseFloat(discountRate) || 0
@@ -165,11 +126,6 @@ export default function EditProductPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!mainImage) {
-      alert("메인 이미지를 업로드해주세요.")
-      return
-    }
 
     const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
     if (!selectedCategoryId) {
@@ -355,57 +311,6 @@ export default function EditProductPage() {
                   </>
                 )}
               </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <Label className="text-base font-semibold mb-3 block">
-              메인 이미지 <span className="text-red-500">*</span>
-            </Label>
-            <div className="space-y-4">
-              {mainImage ? (
-                <div className="relative aspect-square max-w-md mx-auto rounded-lg overflow-hidden border">
-                  <Image src={mainImage || "/placeholder.svg"} alt="Main product" fill className="object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setMainImage(null)}
-                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center aspect-square max-w-md mx-auto border-2 border-dashed rounded-lg cursor-pointer hover:bg-background-section transition-colors">
-                  <ImageIcon className="w-12 h-12 text-text-tertiary mb-2" />
-                  <span className="text-sm text-text-secondary">클릭하여 이미지 업로드</span>
-                  <input type="file" accept="image/*" onChange={handleMainImageUpload} className="hidden" />
-                </label>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <Label className="text-base font-semibold mb-3 block">서브 이미지 (최대 5장)</Label>
-            <div className="grid grid-cols-5 gap-4">
-              {subImages.map((image, index) => (
-                <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                  <Image src={image || "/placeholder.svg"} alt={`Sub ${index + 1}`} fill className="object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeSubImage(index)}
-                    className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {subImages.length < 5 && (
-                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-background-section transition-colors">
-                  <Upload className="w-6 h-6 text-text-tertiary mb-1" />
-                  <span className="text-xs text-text-secondary">추가</span>
-                  <input type="file" accept="image/*" multiple onChange={handleSubImageUpload} className="hidden" />
-                </label>
-              )}
             </div>
           </Card>
 
