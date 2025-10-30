@@ -48,13 +48,6 @@ export default function SellerPage() {
 
   const settlementRecords: any[] = []
 
-  const totalOrders = settlementRecords.length
-  const totalSales = settlementRecords.reduce((sum, record) => sum + record.salesAmount, 0)
-  const totalCommission = settlementRecords.reduce((sum, record) => sum + record.commission, 0)
-  const totalVat = settlementRecords.reduce((sum, record) => sum + record.vat, 0)
-  const totalRefund = settlementRecords.reduce((sum, record) => sum + record.refundAmount, 0)
-  const totalSettlement = settlementRecords.reduce((sum, record) => sum + record.settlementAmount, 0)
-
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED":
@@ -494,9 +487,18 @@ export default function SellerPage() {
                                 size="sm"
                                 onClick={() => router.push(`/seller/products/${product.id}/edit`)}
                                 className="text-xs px-1 py-1"
-                                title="수정"
+                                title="기본 정보 수정"
                               >
                                 <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push(`/seller/products/${product.id}/stock`)}
+                                className="text-xs px-1 py-1"
+                                title="옵션 재고 수정"
+                              >
+                                <Package className="w-3 h-3" />
                               </Button>
                               {product.status === ProductStatus.OUT_OF_STOCK ? (
                                 <Button

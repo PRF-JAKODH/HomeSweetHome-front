@@ -8,24 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Upload, X, ImageIcon, ChevronRight } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
-import { Category } from "@/types/api/category"
 
-
-type OptionValue = {
-  name: string
-  additionalPrice: number
-  stock: number
-}
-
-type Option = {
-  name: string
-  values: string
-}
 
 export default function EditProductPage() {
   const router = useRouter()
@@ -45,15 +32,7 @@ export default function EditProductPage() {
   const [discountRate, setDiscountRate] = useState("")
   const [shippingType, setShippingType] = useState("free")
   const [shippingFee, setShippingFee] = useState("")
-  const [stock, setStock] = useState("")
   const [description, setDescription] = useState("")
-
-  const [productType, setProductType] = useState<"single" | "option">("single")
-  const [optionCount, setOptionCount] = useState<number>(1)
-  const [options, setOptions] = useState<Option[]>([{ name: "", values: "" }])
-  const [optionCombinations, setOptionCombinations] = useState<OptionValue[]>([])
-  const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
-  const [bulkStock, setBulkStock] = useState("")
 
   // 카테고리 API 훅들
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
@@ -148,82 +127,6 @@ export default function EditProductPage() {
     return Math.floor(price * (1 - discount / 100))
   }
 
-  const addOption = () => {
-    if (options.length < 3) {
-      setOptions([...options, { name: "", values: "" }])
-      setOptionCount(options.length + 1)
-    }
-  }
-
-  const removeOption = (index: number) => {
-    const newOptions = options.filter((_, i) => i !== index)
-    setOptions(newOptions)
-    setOptionCount(newOptions.length)
-  }
-
-  const updateOption = (index: number, field: "name" | "values", value: string) => {
-    const newOptions = [...options]
-    newOptions[index][field] = value
-    setOptions(newOptions)
-  }
-
-  const generateOptionCombinations = () => {
-    const validOptions = options.filter((opt) => opt.name && opt.values)
-
-    if (validOptions.length === 0) {
-      alert("옵션명과 옵션값을 입력해주세요.")
-      return
-    }
-
-    const optionArrays = validOptions.map((opt) => ({
-      name: opt.name,
-      values: opt.values
-        .split(",")
-        .map((v) => v.trim())
-        .filter((v) => v),
-    }))
-
-    const combinations: OptionValue[] = []
-
-    const generateCombos = (current: string[], depth: number) => {
-      if (depth === optionArrays.length) {
-        combinations.push({
-          name: current.join(" / "),
-          additionalPrice: 0,
-          stock: 0,
-        })
-        return
-      }
-
-      for (const value of optionArrays[depth].values) {
-        generateCombos([...current, value], depth + 1)
-      }
-    }
-
-    generateCombos([], 0)
-    setOptionCombinations(combinations)
-  }
-
-  const updateCombination = (index: number, field: "additionalPrice" | "stock", value: string) => {
-    const newCombinations = [...optionCombinations]
-    newCombinations[index][field] = Number(value) || 0
-    setOptionCombinations(newCombinations)
-  }
-
-  const applyBulkAdditionalPrice = () => {
-    if (!bulkAdditionalPrice) return
-    const price = Number(bulkAdditionalPrice)
-    setOptionCombinations(optionCombinations.map((combo) => ({ ...combo, additionalPrice: price })))
-    setBulkAdditionalPrice("")
-  }
-
-  const applyBulkStock = () => {
-    if (!bulkStock) return
-    const stockValue = Number(bulkStock)
-    setOptionCombinations(optionCombinations.map((combo) => ({ ...combo, stock: stockValue })))
-    setBulkStock("")
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -240,16 +143,6 @@ export default function EditProductPage() {
 
     if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
-      return
-    }
-
-    if (productType === "single" && !stock) {
-      alert("수량을 입력해주세요.")
-      return
-    }
-
-    if (productType === "option" && optionCombinations.length === 0) {
-      alert("옵션을 생성해주세요.")
       return
     }
 
@@ -310,7 +203,7 @@ export default function EditProductPage() {
           돌아가기
         </Button>
 
-        <h1 className="text-3xl font-bold mb-8">상품 수정</h1>
+        <h1 className="text-3xl font-bold mb-8">기본 정보 수정</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card className="p-6">
@@ -583,205 +476,6 @@ export default function EditProductPage() {
               )}
             </div>
 
-            <div>
-              <Label className="text-base font-semibold mb-3 block">
-                상품 유형 <span className="text-red-500">*</span>
-              </Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="single"
-                    checked={productType === "single"}
-                    onChange={(e) => setProductType(e.target.value as "single" | "option")}
-                    className="w-4 h-4"
-                  />
-                  <span>단일 상품</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="option"
-                    checked={productType === "option"}
-                    onChange={(e) => setProductType(e.target.value as "single" | "option")}
-                    className="w-4 h-4"
-                  />
-                  <span>옵션 상품</span>
-                </label>
-              </div>
-            </div>
-
-            {productType === "single" ? (
-              <div>
-                <Label htmlFor="stock">
-                  수량 <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  min="0"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="0"
-                  required
-                />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-base font-semibold mb-3 block">옵션 설정</Label>
-                  <div className="flex items-center gap-4 mb-4">
-                    <Select
-                      value={optionCount.toString()}
-                      onValueChange={(value) => {
-                        const count = Number.parseInt(value)
-                        setOptionCount(count)
-                        if (count > options.length) {
-                          setOptions([...options, ...Array(count - options.length).fill({ name: "", values: "" })])
-                        } else {
-                          setOptions(options.slice(0, count))
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="옵션 개수" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1개</SelectItem>
-                        <SelectItem value="2">2개</SelectItem>
-                        <SelectItem value="3">3개</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-3">
-                    {options.map((option, index) => (
-                      <div key={index} className="flex gap-3 items-start">
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-sm mb-1 block">옵션명</Label>
-                            <Input
-                              value={option.name}
-                              onChange={(e) => updateOption(index, "name", e.target.value)}
-                              placeholder="예: 색상"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-sm mb-1 block">옵션값 (쉼표로 구분)</Label>
-                            <Input
-                              value={option.values}
-                              onChange={(e) => updateOption(index, "values", e.target.value)}
-                              placeholder="예: 블랙,화이트,블루"
-                            />
-                          </div>
-                        </div>
-                        {options.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeOption(index)}
-                            className="mt-6"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {index === options.length - 1 && options.length < 3 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={addOption}
-                            className="mt-6 bg-transparent"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={generateOptionCombinations}
-                    className="w-full mt-4 bg-primary hover:bg-primary/90"
-                  >
-                    옵션목록으로 적용
-                  </Button>
-                </div>
-
-                {optionCombinations.length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <Label className="text-base font-semibold">옵션 목록 (총 {optionCombinations.length}개)</Label>
-                      <div className="flex gap-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={bulkAdditionalPrice}
-                            onChange={(e) => setBulkAdditionalPrice(e.target.value)}
-                            placeholder="추가금액"
-                            className="w-32"
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={applyBulkAdditionalPrice}>
-                            추가금액 일괄입력
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={bulkStock}
-                            onChange={(e) => setBulkStock(e.target.value)}
-                            placeholder="재고"
-                            className="w-32"
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={applyBulkStock}>
-                            재고수량 일괄입력
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="border-b bg-background-section">
-                            <th className="p-3 text-left text-sm font-medium">옵션명</th>
-                            <th className="p-3 text-left text-sm font-medium">추가 금액 (원)</th>
-                            <th className="p-3 text-left text-sm font-medium">재고 수량</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {optionCombinations.map((combo, index) => (
-                            <tr key={index} className="border-b hover:bg-background-section">
-                              <td className="p-3 text-sm">{combo.name}</td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  value={combo.additionalPrice}
-                                  onChange={(e) => updateCombination(index, "additionalPrice", e.target.value)}
-                                  className="w-32"
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  value={combo.stock}
-                                  onChange={(e) => updateCombination(index, "stock", e.target.value)}
-                                  className="w-32"
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </Card>
 
           <Card className="p-6">
