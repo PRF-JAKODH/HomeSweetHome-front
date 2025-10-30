@@ -112,7 +112,7 @@ export default function OnboardingPage() {
     try {
       const response = await signup({
         phoneNumber: formData.phone,
-        birthDate: new Date(formData.birthDate),
+        birthDate: "2020-12-23" ,
         address: formData.roadAddress + "/" + formData.detailAddress,
       })
         

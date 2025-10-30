@@ -49,6 +49,6 @@ export interface LoginCredentials {
 // Request Types
 export interface SignupRequest {
   phoneNumber: string;
-  birthDate: Date;
+  birthDate: string;
   address: string;
 }
