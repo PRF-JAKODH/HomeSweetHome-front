@@ -12,6 +12,8 @@ import { ArrowLeft, Upload, X, ImageIcon, ChevronRight } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
+import { getProduct } from "@/lib/api/products"
+import { getCategoryHierarchy } from "@/lib/api/categories"
 
 
 export default function EditProductPage() {
@@ -25,6 +27,7 @@ export default function EditProductPage() {
   const [selectedDetailCategory, setSelectedDetailCategory] = useState<number | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [productName, setProductName] = useState("")
   const [brand, setBrand] = useState("")
@@ -45,28 +48,61 @@ export default function EditProductPage() {
   }, [])
 
   useEffect(() => {
-    // TODO: 실제 상품 데이터를 API에서 가져와서 초기화
-    // const fetchProductData = async () => {
-    //   try {
-    //     const productData = await getProduct(params.productId as string)
-    //     // 상품 데이터로 폼 초기화
-    //     setProductName(productData.name)
-    //     setBrand(productData.brand)
-    //     setOriginalPrice(productData.basePrice.toString())
-    //     setDiscountRate(productData.discountRate.toString())
-    //     setShippingType(productData.shippingPrice === 0 ? "free" : "paid")
-    //     setShippingFee(productData.shippingPrice.toString())
-    //     setDescription(productData.description)
-    //     // 카테고리 설정
-    //     setSelectedMainCategory(productData.categoryId)
-    //     // 이미지 설정
-    //     setMainImage(productData.imageUrl)
-    //     setSubImages(productData.detailImageUrls || [])
-    //   } catch (error) {
-    //     console.error('상품 데이터 로드 실패:', error)
-    //   }
-    // }
-    // fetchProductData()
+    const fetchProductData = async () => {
+      if (!params.productId) return
+      
+      setLoading(true)
+      try {
+        const productResponse = await getProduct(params.productId as string)
+        const productData = (productResponse.data || productResponse) as any
+        
+        console.log('상품 데이터:', productData)
+        
+        // 상품 데이터로 폼 초기화
+        setProductName(productData.name || "")
+        setBrand(productData.brand || "")
+        setOriginalPrice(String(productData.basePrice || productData.price || ""))
+        setDiscountRate(String(productData.discountRate || 0))
+        setShippingType(productData.shippingPrice === 0 ? "free" : "paid")
+        setShippingFee(String(productData.shippingPrice || 0))
+        setDescription(productData.description || "")
+        
+        // 카테고리 설정
+        if (productData.categoryId) {
+          try {
+            const categoryResponse = await getCategoryHierarchy(Number(productData.categoryId))
+            if (categoryResponse && categoryResponse.length > 0) {
+              setSelectedMainCategory(categoryResponse[0].id)
+              if (categoryResponse.length > 1) {
+                setSelectedSubCategory(categoryResponse[1].id)
+              }
+              if (categoryResponse.length > 2) {
+                setSelectedDetailCategory(categoryResponse[2].id)
+              }
+            }
+          } catch (error) {
+            console.error('카테고리 조회 실패:', error)
+          }
+        }
+        
+        // 이미지 설정
+        if (productData.images && productData.images.length > 0) {
+          setMainImage(productData.images[0])
+        } else if (productData.imageUrl) {
+          setMainImage(productData.imageUrl)
+        }
+        
+        if (productData.detailImageUrls && productData.detailImageUrls.length > 0) {
+          setSubImages(productData.detailImageUrls)
+        }
+      } catch (error) {
+        console.error('상품 데이터 로드 실패:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchProductData()
   }, [params.productId])
 
   // 카테고리 선택 핸들러들
@@ -162,7 +198,7 @@ export default function EditProductPage() {
 
 
   // 클라이언트 사이드에서만 렌더링
-  if (!isClient) {
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
