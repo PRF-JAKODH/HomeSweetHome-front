@@ -25,6 +25,8 @@ export interface Product {
   subCategoryId?: string
   tags: string[]
   specifications?: Record<string, any>
+  sellerId?: number // 판매자 ID
+  sellerName?: string // 판매자 이름
   createdAt: string
   updatedAt: string
 }

@@ -17,6 +17,8 @@ import { Product, SkuStockResponse, ProductPreviewResponse } from "@/types/api/p
 import { Category } from "@/types/api/category"
 import { ProductReviewResponse, ProductReviewStatisticsResponse } from "@/types/api/review"
 import { ProductCard } from "@/components/product-card"
+import { useAuth } from "@/hooks/use-auth"
+import { toast } from "@/hooks/use-toast"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -49,6 +51,7 @@ interface ExtendedProduct extends Product {
 export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const router = useRouter()
   const resolvedParams = use(params)
+  const { isAuthenticated } = useAuth()
   const [product, setProduct] = useState<ExtendedProduct | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -165,15 +168,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           productType: stockData.length > 1 ? "options" as const : "single" as const,
           stock: productData.stockQuantity || 0,
           deliveryInfo: productData.shippingPrice === 0 ? "무료배송" : `배송비 ${productData.shippingPrice?.toLocaleString()}원`,
-          category: {
-            main: "카테고리", // 실제로는 categoryId로 조회한 정보
-            sub: "서브카테고리",
-            detail: "상세카테고리"
-          },
-          seller: {
-            id: "seller_id", // 실제로는 API에서 제공
-            name: "판매자명"
-          },
+          category: categoryResponse.length > 0 ? {
+            main: categoryResponse[0]?.name || "카테고리",
+            sub: categoryResponse[1]?.name || "서브카테고리",
+            detail: categoryResponse[2]?.name || categoryResponse[categoryResponse.length - 1]?.name || "상세카테고리"
+          } : undefined,
+          seller: productData.sellerId ? {
+            id: String(productData.sellerId),
+            name: productData.sellerName || "판매자"
+          } : undefined,
           options: stockData.map(sku => ({
             name: sku.options
               .filter(opt => opt.groupName && opt.valueName) // null 옵션 제외
@@ -432,9 +435,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const handleChatWithSeller = () => {
     if (!product) return
     
-    const user = localStorage.getItem("ohouse_user")
-    if (!user) {
-      alert("로그인이 필요한 서비스입니다.")
+    if (!isAuthenticated) {
+      toast({
+        title: "로그인 필요",
+        description: "로그인이 필요한 서비스입니다.",
+        variant: "destructive"
+      })
       router.push("/login")
       return
     }
