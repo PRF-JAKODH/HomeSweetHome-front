@@ -11,7 +11,7 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
-import { getSellerProducts, getProductStock } from "@/lib/api/products"
+import { getSellerProducts, getProductStock, updateProductStatus } from "@/lib/api/products"
 
 export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
 export type SettlementStatus = "carried-over" | "confirmed" | "completed"
@@ -111,17 +111,35 @@ export default function SellerPage() {
     }
   }
 
-  const handleStopSelling = (productId: number) => {
+  const handleStopSelling = async (productId: number) => {
     if (confirm("이 상품의 판매를 중지하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.OUT_OF_STOCK } : product)))
-      alert("상품 판매가 중지되었습니다.")
+      try {
+        await updateProductStatus(productId.toString(), ProductStatus.SUSPENDED)
+        // 성공 시 로컬 상태 업데이트
+        setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.SUSPENDED } : product)))
+        alert("상품 판매가 중지되었습니다.")
+        // 목록 새로고침
+        await fetchSellerProducts()
+      } catch (error) {
+        console.error('판매 중지 실패:', error)
+        alert("판매 중지에 실패했습니다. 다시 시도해주세요.")
+      }
     }
   }
 
-  const handleStartSelling = (productId: number) => {
+  const handleStartSelling = async (productId: number) => {
     if (confirm("이 상품의 판매를 시작하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.ON_SALE } : product)))
-      alert("상품 판매가 시작되었습니다.")
+      try {
+        await updateProductStatus(productId.toString(), ProductStatus.ON_SALE)
+        // 성공 시 로컬 상태 업데이트
+        setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.ON_SALE } : product)))
+        alert("상품 판매가 시작되었습니다.")
+        // 목록 새로고침
+        await fetchSellerProducts()
+      } catch (error) {
+        console.error('판매 시작 실패:', error)
+        alert("판매 시작에 실패했습니다. 다시 시도해주세요.")
+      }
     }
   }
 
@@ -472,12 +490,12 @@ export default function SellerPage() {
                                 product.status === ProductStatus.ON_SALE
                                   ? "bg-green-100 text-green-700"
                                   : product.status === ProductStatus.OUT_OF_STOCK
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-gray-100 text-gray-700"
+                                    ? "bg-gray-100 text-gray-700"
+                                    : "bg-yellow-100 text-yellow-700"
                               }`}
                             >
                               {product.status === ProductStatus.ON_SALE ? "판매중" : 
-                               product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
+                               product.status === ProductStatus.OUT_OF_STOCK ? "품절" : "판매 중지"}
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
@@ -500,7 +518,7 @@ export default function SellerPage() {
                               >
                                 <Package className="w-3 h-3" />
                               </Button>
-                              {product.status === ProductStatus.OUT_OF_STOCK ? (
+                              {product.status === ProductStatus.SUSPENDED ? (
                                 <Button
                                   variant="outline"
                                   size="sm"

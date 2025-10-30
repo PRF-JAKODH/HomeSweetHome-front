@@ -152,8 +152,13 @@ export type GetProductStockResponse = ApiResponse<SkuStockResponse[]>
 // 상품 상태 열거형
 export enum ProductStatus {
   ON_SALE = 'ON_SALE', // 판매중
-  OUT_OF_STOCK = 'OUT_OF_STOCK', // 판매중지
-  SUSPENDED = 'SUSPENDED' // 품절
+  OUT_OF_STOCK = 'OUT_OF_STOCK', // 품절
+  SUSPENDED = 'SUSPENDED' // 판매 중지
+}
+
+// 상품 상태 업데이트 요청
+export interface ProductStatusUpdateRequest {
+  status: ProductStatus
 }
 
 // 판매자 상품 관리 응답

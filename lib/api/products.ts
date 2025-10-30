@@ -21,6 +21,8 @@ import {
   SkuStockResponse,
   GetProductStockResponse,
   ProductManageResponse,
+  ProductStatus,
+  ProductStatusUpdateRequest,
 } from '@/types/api/product'
 import { ApiResponse } from '@/types/api/common'
 
@@ -126,4 +128,13 @@ export const getSellerProducts = async (
 
   const response = await apiClient.get<ProductManageResponse[]>(`${PRODUCT_ENDPOINTS.GET_SELLER_PRODUCTS}?${params}`)
   return response
+}
+
+// 상품 상태 업데이트
+export const updateProductStatus = async (
+  productId: string,
+  status: ProductStatus
+): Promise<void> => {
+  const request: ProductStatusUpdateRequest = { status }
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_STATUS(productId), request)
 }
