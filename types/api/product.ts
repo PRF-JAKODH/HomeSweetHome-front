@@ -173,6 +173,16 @@ export interface ProductStatusUpdateRequest {
   status: ProductStatus
 }
 
+// 상품 기본 정보 업데이트 요청
+export interface ProductBasicInfoUpdateRequest {
+  name: string
+  brand: string
+  basePrice: number
+  discountRate: number
+  description: string
+  shippingPrice: number
+}
+
 // 판매자 상품 관리 응답
 export interface ProductManageResponse {
   id: number

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, ChevronRight } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
-import { getProduct } from "@/lib/api/products"
+import { getProduct, updateProductBasicInfo } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
 
 
@@ -33,6 +33,7 @@ export default function EditProductPage() {
   const [shippingType, setShippingType] = useState("free")
   const [shippingFee, setShippingFee] = useState("")
   const [description, setDescription] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   // 카테고리 API 훅들
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
@@ -123,32 +124,40 @@ export default function EditProductPage() {
     return Math.floor(price * (1 - discount / 100))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
-    if (!selectedCategoryId) {
-      alert("카테고리를 선택해주세요.")
-      return
-    }
 
     if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
       return
     }
 
-    // TODO: 실제 상품 수정 API 호출
-    // try {
-    //   await updateProduct(params.productId as string, productData)
-    //   alert("상품이 수정되었습니다!")
-    //   router.push("/seller")
-    // } catch (error) {
-    //   console.error('상품 수정 실패:', error)
-    //   alert("상품 수정에 실패했습니다. 다시 시도해주세요.")
-    // }
-    
-    alert("상품이 수정되었습니다!")
-    router.push("/seller")
+    setSubmitting(true)
+    try {
+      const requestData = {
+        name: productName,
+        brand: brand,
+        basePrice: parseInt(originalPrice),
+        discountRate: parseFloat(discountRate) || 0,
+        description: description,
+        shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0
+      }
+
+      await updateProductBasicInfo(params.productId as string, requestData)
+      alert("상품이 수정되었습니다!")
+      router.push("/seller")
+    } catch (error: any) {
+      console.error('상품 수정 실패:', error)
+      
+      // 백엔드 유효성 검사 에러 메시지 처리
+      if (error?.response?.data?.message) {
+        alert(error.response.data.message)
+      } else {
+        alert("상품 수정에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
 
@@ -436,8 +445,8 @@ export default function EditProductPage() {
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
               취소
             </Button>
-            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-              수정 완료
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={submitting}>
+              {submitting ? "수정 중..." : "수정 완료"}
             </Button>
           </div>
         </form>
