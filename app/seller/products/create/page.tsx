@@ -462,6 +462,11 @@ export default function CreateProductPage() {
             <Label className="text-base font-semibold mb-3 block">
               카테고리 <span className="text-red-500">*</span>
             </Label>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <p className="text-sm text-red-800">
+                ⚠️ <span className="font-medium">주의:</span> 카테고리는 상품 등록 이후 수정할 수 없습니다.
+              </p>
+            </div>
 
             {/* Selected Category Path */}
             {(selectedMainCategory || selectedSubCategory || selectedDetailCategory) && (
