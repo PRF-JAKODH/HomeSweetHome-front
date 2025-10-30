@@ -23,6 +23,8 @@ import {
   ProductManageResponse,
   ProductStatus,
   ProductStatusUpdateRequest,
+  SkuStockUpdateRequest,
+  ProductSkuUpdateRequest,
 } from '@/types/api/product'
 import { ApiResponse } from '@/types/api/common'
 
@@ -137,4 +139,13 @@ export const updateProductStatus = async (
 ): Promise<void> => {
   const request: ProductStatusUpdateRequest = { status }
   await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_STATUS(productId), request)
+}
+
+// 상품 SKU 재고 업데이트
+export const updateProductSkuStock = async (
+  productId: string,
+  skus: SkuStockUpdateRequest[]
+): Promise<void> => {
+  const request: ProductSkuUpdateRequest = { skus }
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_SKU_STOCK(productId), request)
 }

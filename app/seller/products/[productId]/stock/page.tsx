@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Package } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { SkuStockResponse } from "@/types/api/product"
-import { getProductStock } from "@/lib/api/products"
+import { getProductStock, updateProductSkuStock } from "@/lib/api/products"
 
 type OptionValue = {
+  skuId: number
   name: string
   additionalPrice: number
   stock: number
@@ -22,6 +23,7 @@ export default function EditProductStockPage() {
   const router = useRouter()
   const params = useParams()
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [stockData, setStockData] = useState<SkuStockResponse[]>([])
   const [optionCombinations, setOptionCombinations] = useState<OptionValue[]>([])
   const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
@@ -40,6 +42,7 @@ export default function EditProductStockPage() {
         
         // SKU 데이터를 옵션 조합 형태로 변환
         const combinations: OptionValue[] = data.map((sku) => ({
+          skuId: sku.skuId,
           name: sku.options
             .filter(opt => opt.groupName && opt.valueName)
             .map(opt => `${opt.groupName}: ${opt.valueName}`)
@@ -87,18 +90,24 @@ export default function EditProductStockPage() {
       return
     }
 
-    // TODO: 실제 상품 재고 수정 API 호출
-    // try {
-    //   await updateProductStock(params.productId as string, optionCombinations)
-    //   alert("재고가 수정되었습니다!")
-    //   router.push("/seller")
-    // } catch (error) {
-    //   console.error('재고 수정 실패:', error)
-    //   alert("재고 수정에 실패했습니다. 다시 시도해주세요.")
-    // }
-    
-    alert("재고가 수정되었습니다!")
-    router.push("/seller")
+    setSubmitting(true)
+    try {
+      // API 요청 형식으로 변환
+      const skus = optionCombinations.map((combo) => ({
+        skuId: combo.skuId,
+        stockQuantity: combo.stock,
+        priceAdjustment: combo.additionalPrice
+      }))
+      
+      await updateProductSkuStock(params.productId as string, skus)
+      alert("재고가 수정되었습니다!")
+      router.push("/seller")
+    } catch (error) {
+      console.error('재고 수정 실패:', error)
+      alert("재고 수정에 실패했습니다. 다시 시도해주세요.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const getStockColor = (stock: number) => {
@@ -219,8 +228,8 @@ export default function EditProductStockPage() {
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
               취소
             </Button>
-            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-              수정 완료
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={submitting}>
+              {submitting ? "수정 중..." : "수정 완료"}
             </Button>
           </div>
         </form>

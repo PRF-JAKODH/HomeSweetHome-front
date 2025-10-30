@@ -149,6 +149,18 @@ export interface OptionCombinationResponse {
 // 제품 재고 조회 응답
 export type GetProductStockResponse = ApiResponse<SkuStockResponse[]>
 
+// SKU 재고 업데이트 요청
+export interface SkuStockUpdateRequest {
+  skuId: number
+  stockQuantity: number
+  priceAdjustment?: number
+}
+
+// 상품 SKU 재고 업데이트 요청
+export interface ProductSkuUpdateRequest {
+  skus: SkuStockUpdateRequest[]
+}
+
 // 상품 상태 열거형
 export enum ProductStatus {
   ON_SALE = 'ON_SALE', // 판매중

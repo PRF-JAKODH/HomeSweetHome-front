@@ -25,6 +25,9 @@ export const PRODUCT_ENDPOINTS = {
   // 상품 재고 조회
   GET_PRODUCT_STOCK: (productId: string) => `/api/v1/products/${productId}/stocks`,
   
+  // 상품 SKU 재고 업데이트
+  UPDATE_PRODUCT_SKU_STOCK: (productId: string) => `/api/v1/products/${productId}/skus`,
+  
   // 상품 상태 업데이트
   UPDATE_PRODUCT_STATUS: (productId: string) => `/api/v1/products/${productId}/status`,
   
