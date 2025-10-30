@@ -3,10 +3,20 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+
+// 1:1 채팅방 응답 타입
+interface RoomDto {
+  roomId: number
+  type: "INDIVIDUAL" | "GROUP"
+  name: string
+  pairKey?: string
+  reused: boolean
+}
 
 const categoryColors: Record<string, string> = {
   추천: "bg-primary/10 text-primary",
@@ -206,6 +216,51 @@ export default function ShoppingTalkDetailPage() {
     router.push(`/community/messages/${postData.authorId}`)
   }
 
+//============================= 1:1 채팅방 ================================
+// DM 버튼 클릭 핸들러
+const handleDM = async () => {
+  try {
+    const accessToken = useAuthStore.getState().accessToken
+    const myId = useAuthStore.getState().user?.id
+    const targetId = post.authorId  // 게시글 작성자 ID
+    const targetName = post.author  // 게시글 작성자 이름
+
+    if (!myId || !accessToken) {
+      alert("로그인이 필요합니다.")
+      router.push("/login")
+      return
+    }
+
+    // 1:1 채팅방 생성 또는 재사용
+    const res = await fetch("/api/chat/rooms/individual", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ targetId }),
+    })
+
+    if (!res.ok) throw new Error(`채팅방 생성 실패 (${res.status})`)
+
+    const data: RoomDto = await res.json()
+
+    console.log(
+      data.reused
+        ? `✅ 기존 채팅방 재사용 (roomId=${data.roomId})`
+        : `🆕 새 채팅방 생성 (roomId=${data.roomId})`
+    )
+
+    // ✅ 채팅방으로 이동
+    router.push(`/messages/${data.roomId}?username=${targetName}`)
+  } catch (err) {
+    console.error("❌ DM 생성 실패:", err)
+    alert("채팅방 생성 중 오류가 발생했습니다.")
+  }
+}
+//============================= 1:1 채팅방 ================================
+
+  
   const handleSubmitComment = () => {
     if (commentText.trim()) {
       createCommentMutation.mutate(commentText)

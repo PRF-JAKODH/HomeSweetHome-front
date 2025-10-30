@@ -3,39 +3,39 @@
 import type React from "react"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
+import { connectStomp, disconnectStomp, sendChatMessage } from "@/lib/chat-socket"
+import type { IMessage } from "@stomp/stompjs"
 
-// Mock messages data
-const mockMessages = [
-  {
-    id: 1,
-    senderId: 2,
-    text: "안녕하세요! 집사진 너무 예쁘게 찍으셨네요 😊",
-    timestamp: "오전 10:23",
-    isMe: false,
-  },
-  {
-    id: 2,
-    senderId: 1,
-    text: "감사합니다! 오랜 시간 공들여서 꾸민 공간이라 뿌듯해요",
-    timestamp: "오전 10:25",
-    isMe: true,
-  },
-  {
-    id: 3,
-    senderId: 2,
-    text: "혹시 거실 소파는 어디 제품인가요?",
-    timestamp: "오전 10:26",
-    isMe: false,
-  },
-  {
-    id: 4,
-    senderId: 1,
-    text: "한샘 제품이에요! 링크 보내드릴게요",
-    timestamp: "오전 10:27",
-    isMe: true,
-  },
-]
+
+// export default function ChatRoomPage({ params }: { params: { roomId: string } }) {
+//   // 여기에서 roomId 활용 가능
+//   const roomId = params.roomId
+//   return (
+//     <div>
+//       <h2>채팅방 {roomId}</h2>
+//       <MessagesPage params={params} />
+//     </div>
+//   )
+// }
+
+export type ChatMessageDto = {
+  id: number
+  roomId: number
+  senderId: number
+  text: string
+  sentaAt: string // ✅ LocalDateTime → 문자열(ISO 형식)로 받음
+}
+
+type Message = {
+  id: number
+  senderId: number
+  text: string
+  timestamp: string
+  isMe: boolean
+  images?: string[]
+  status?: "sending" | "sent" | "error"
+}
 
 // SVG Icons as components
 const ArrowLeftIcon = ({ className }: { className?: string }) => (
@@ -72,46 +72,123 @@ const SmileIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-export default function MessagesPage({ params }: { params: { userId: string } }) {
+export default function MessagesPage({ params }: { params: { roomId: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const username = searchParams.get("username") || "사용자"
-  const [messages, setMessages] = useState(mockMessages)
+
+  // React의 상태 관리 (useState)
+  const [messages, setMessages] = useState<Message[]>([]) // 모든 메시지 목록
   const [inputValue, setInputValue] = useState("")
+
+
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+
   const [selectedImages, setSelectedImages] = useState<string[]>([])
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const user = useAuthStore((s) => s.user)       // 현재 로그인 사용자 정보(zustand)
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const imageUrls = Array.from(files).map((file) => URL.createObjectURL(file))
-      setSelectedImages([...selectedImages, ...imageUrls])
-    }
-  }
+   // STOMP 연결 + 구독
+   useEffect(() => {
+    connectStomp({
+      onConnected: () => {
+        console.log("✅ STOMP 연결 완료")
 
+        // 서버 메시지 구독 (/sub/rooms/{roomId})
+        subscribeToTopic(`/sub/rooms/${params.roomId}`, (msg: IMessage) => {
+          const payload = JSON.parse(msg.body) as ChatMessageDto
+          console.log("📩 수신 메시지:", payload)
+
+          setMessages((prev) => {
+            // 이미 같은 id가 있으면 중복 추가 방지
+            if (prev.some((m) => m.id === payload.id)) return prev
+
+            return [
+              ...prev,
+              {
+                id: payload.id,
+                senderId: payload.senderId,
+                text: payload.text,
+                timestamp: new Date(payload.sentAt).toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+                isMe: payload.senderId === user?.id,
+                status: "sent",
+              },
+            ]
+          })
+        })
+      },
+    })
+  
+    // 언마운트 시 연결 해제
+    return () => disconnectStomp()
+  }, [params.roomId, user?.id])
+
+    // 파일 선택 이벤트 (이미지 미리보기)
+  // const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const files = e.target.files
+  //   if (files) {
+  //     const imageUrls = Array.from(files).map((file) => URL.createObjectURL(file))
+  //     setSelectedImages([ ..selectedImages, ...imageUrls])
+  //   }
+  // }
+
+  // 이미지 제거 함수
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index))
   }
 
+  // 메시지 전송 함수
   const handleSendMessage = () => {
     if (!inputValue.trim() && selectedImages.length === 0) return
-
-    const newMessage = {
-      id: messages.length + 1,
-      senderId: 1,
+  
+    //  임시 ID 생성 (로컬 메시지 추적용)
+    const tempId = Date.now()
+  
+    //  로컬에서 즉시 메시지 표시 (Optimistic UI)
+    const newMessage: Message = {
+      id: tempId,
+      senderId: user?.id ?? 1,
       text: inputValue,
-      timestamp: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       isMe: true,
       images: selectedImages.length > 0 ? [...selectedImages] : undefined,
+      status: "sending", // ✅ 전송 중 상태 표시용
     }
-
-    setMessages([...messages, newMessage])
+  
+    setMessages((prev) => [...prev, newMessage])
+  
+    // 3️⃣ 서버로 실제 메시지 전송 (백엔드 DTO와 동일 구조)
+    try {
+      sendChatMessage("/pub/chat.send", {
+        roomId: Number(params.roomId),
+        senderId: user?.id,
+        text: inputValue,
+      })
+    } catch (error) {
+      console.error("❌ 메시지 전송 실패:", error)
+  
+      // 4️⃣ 전송 실패 시 상태 변경
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId ? { ...msg, status: "error" } : msg
+        )
+      )
+    }
+  
+    // 5️⃣ 입력창 초기화
     setInputValue("")
     setSelectedImages([])
   }
 
+  // 엔터키 눌렀을 때 메시지 전송 함수
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -119,6 +196,7 @@ export default function MessagesPage({ params }: { params: { userId: string } })
     }
   }
 
+  // 
   return (
     <div className="flex flex-col h-screen bg-background max-w-[1256px] mx-auto">
       {/* Header */}
@@ -249,7 +327,7 @@ export default function MessagesPage({ params }: { params: { userId: string } })
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.map((message) => (
+        {messages.map((message: Message) => (
           <div key={message.id} className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}>
             <div className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"}`}>
               {!message.isMe && (
@@ -265,7 +343,7 @@ export default function MessagesPage({ params }: { params: { userId: string } })
                 >
                   {message.images && message.images.length > 0 && (
                     <div className="mb-2 grid grid-cols-2 gap-2">
-                      {message.images.map((img, idx) => (
+                      {message.images.map((img: string, idx: number) => (
                         <img
                           key={idx}
                           src={img || "/placeholder.svg"}

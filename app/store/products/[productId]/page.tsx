@@ -17,8 +17,12 @@ import { Product, SkuStockResponse, ProductPreviewResponse } from "@/types/api/p
 import { Category } from "@/types/api/category"
 import { ProductReviewResponse, ProductReviewStatisticsResponse } from "@/types/api/review"
 import { ProductCard } from "@/components/product-card"
+import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { toast } from "@/hooks/use-toast"
+
+
+
+import apiClient from "@/lib/api"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -36,7 +40,7 @@ interface ExtendedProduct extends Product {
     sub: string
     detail: string
   }
-  seller?: {
+  seller?: { // nullable
     id: string
     name: string
   }
@@ -431,11 +435,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     localStorage.setItem("ohouse_checkout_items", JSON.stringify([checkoutItem]))
     router.push("/checkout")
   }
+  
+const handleChatWithSeller = async () => {
 
-  const handleChatWithSeller = () => {
-    if (!product) return
-    
-    if (!isAuthenticated) {
+  console.log("🟦 userData:", userData)
+  console.log("🟨 accessToken:", userData?.accessToken)
+
+  if (!product) return
+
+  if (!isAuthenticated) {
       toast({
         title: "로그인 필요",
         description: "로그인이 필요한 서비스입니다.",
@@ -443,10 +451,33 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       })
       router.push("/login")
       return
+
+  try {
+
+    const response = await apiClient.post("http://localhost:8080/api/chat/rooms/individual", {
+      targetId: Number(product.seller?.id)
+    })
+    console.log(" 채팅방 생성 응답:", response.data)
+
+    //  서버 응답에서 roomId 추출
+    const { roomId, alreadyExists } = response.data
+
+    if(alreadyExists) {
+      console.log(`이미 존재하는 채팅방 (roomId: ${roomId})`)
+    } else {
+      console.log(`새 채팅방 생성(roomId: ${roomId})`)
     }
 
-    router.push(`/community/messages/${product.seller?.id}`)
+    // 채팅방 페이지로 이동
+    router.push(`/community/chat-rooms/${roomId}?username=${product.seller?.name || "판매자"}`)
+
+  } catch (error: any) {
+    console.error("❌ 채팅방 생성 실패:", error)
+    alert("채팅방을 생성하는데 실패했습니다.")
   }
+}
+
+
 
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
