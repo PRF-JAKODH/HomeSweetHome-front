@@ -98,18 +98,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Signup Link */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-text-secondary">
-            아직 계정이 없으신가요?{" "}
-            <a 
-              href="/signup" 
-              className="text-primary hover:underline font-medium"
-            >
-              회원가입하기
-            </a>
-          </p>
-        </div>
+        
       </div>
     </div>
   )
