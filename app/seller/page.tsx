@@ -45,6 +45,8 @@ export default function SellerPage() {
     stockData: SkuStockResponse[]
   } | null>(null)
   const [stockLoading, setStockLoading] = useState(false)
+  const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
+  const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
 
   const settlementRecords: any[] = []
 
@@ -503,20 +505,14 @@ export default function SellerPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => router.push(`/seller/products/${product.id}/edit`)}
+                                onClick={() => {
+                                  setSelectedProductForEdit(product)
+                                  setShowEditOptionsModal(true)
+                                }}
                                 className="text-xs px-1 py-1"
-                                title="기본 정보 수정"
+                                title="수정"
                               >
                                 <Edit className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push(`/seller/products/${product.id}/stock`)}
-                                className="text-xs px-1 py-1"
-                                title="옵션 재고 수정"
-                              >
-                                <Package className="w-3 h-3" />
                               </Button>
                               {product.status === ProductStatus.SUSPENDED ? (
                                 <Button
@@ -532,11 +528,12 @@ export default function SellerPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent text-xs px-1 py-1"
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent text-xs px-2 py-1"
                                   onClick={() => handleStopSelling(product.id)}
                                   title="판매 중지"
                                 >
-                                  <Ban className="w-3 h-3" />
+                                  <Ban className="w-3 h-3 mr-1" />
+                                  판매 중지
                                 </Button>
                               )}
                             </div>
@@ -861,6 +858,48 @@ export default function SellerPage() {
               )}
               <Button onClick={() => setShowStockModal(false)} className="w-full bg-primary hover:bg-primary/90">
                 닫기
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 수정 옵션 선택 모달 */}
+      <Dialog open={showEditOptionsModal} onOpenChange={setShowEditOptionsModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>수정 옵션 선택</DialogTitle>
+          </DialogHeader>
+          {selectedProductForEdit && (
+            <div className="space-y-3">
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/edit`)
+                }}
+                className="w-full bg-primary hover:bg-primary/90"
+                variant="default"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                기본 정보 수정
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/stock`)
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                옵션 재고 수정
+              </Button>
+              <Button
+                onClick={() => setShowEditOptionsModal(false)}
+                className="w-full"
+                variant="ghost"
+              >
+                취소
               </Button>
             </div>
           )}
