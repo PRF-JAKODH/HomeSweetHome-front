@@ -1,6 +1,8 @@
 "use client"
 
 import { Card } from "@/components/ui/card"
+import { useState } from "react"
+import Image from "next/image"
 
 interface ProductCardProps {
   id: string
@@ -29,18 +31,33 @@ export function ProductCard({
   isFreeShipping = false,
   shippingPrice = 0,
 }: ProductCardProps) {
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
+
   return (
     <a href={`/store/products/${id}`} className="block">
       <Card className="group overflow-hidden border-transparent hover:shadow-lg transition-all duration-200 h-full flex flex-col">
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden bg-background-section">
-          <img
+          {imageLoading && !imageError && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary"></div>
+            </div>
+          )}
+          <Image
             src={image || "/placeholder.svg"}
             alt={name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className={`object-cover transition-all duration-300 group-hover:scale-105 ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
+            onLoad={() => setImageLoading(false)}
+            onError={() => {
+              setImageError(true)
+              setImageLoading(false)
+            }}
           />
-
-
         </div>
 
         {/* Product Info */}

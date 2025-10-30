@@ -151,9 +151,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
 
     eventSource.onerror = (error: Event) => {
-      console.error('SSE connection error:', error)
-      // store.getState().setConnectionStatus(false)
-      // eventSource.close()
+      if(error.target instanceof EventSourcePolyfill) {
+      } else {
+        console.error('SSE connection error:', error)
+      }
     }
 
     eventSource.onopen = (_event: Event) => {
