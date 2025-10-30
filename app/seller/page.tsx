@@ -412,15 +412,15 @@ export default function SellerPage() {
                     </div>
                   </div>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[1400px]">
                     <thead className="bg-background-section">
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">이미지</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-48">상품명</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-52">카테고리</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-32">가격</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium w-20">할인율</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-28">할인율</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">재고</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">배송</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">등록일</th>
@@ -430,7 +430,17 @@ export default function SellerPage() {
                     </thead>
                     <tbody className="divide-y">
                       {filteredProducts.map((product) => (
-                        <tr key={product.id} className="hover:bg-background-section/50">
+                        <tr 
+                          key={product.id} 
+                          className="hover:bg-background-section/50 cursor-pointer"
+                          onClick={(e) => {
+                            // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
+                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
+                              return
+                            }
+                            router.push(`/store/products/${product.id}`)
+                          }}
+                        >
                           <td className="px-4 py-3 w-20">
                             <div className="relative w-16 h-16 rounded overflow-hidden">
                               <Image
@@ -457,7 +467,7 @@ export default function SellerPage() {
                               <div className="font-semibold text-sm">₩{Math.round(product.basePrice * (1 - product.discountRate / 100)).toLocaleString()}</div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 w-20">
+                          <td className="px-4 py-3 w-28">
                             {product.discountRate > 0 ? (
                               <span className="text-sm font-semibold text-red-500">{product.discountRate}%</span>
                             ) : (
