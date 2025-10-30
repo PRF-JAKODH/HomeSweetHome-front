@@ -11,14 +11,26 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Upload, X, ImageIcon } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
-import { getProduct } from "@/lib/api/products"
+import { getProduct, updateProductImages } from "@/lib/api/products"
 
+
+type SubImageItem = {
+  preview: string
+  file?: File
+  originalUrl?: string
+}
 
 export default function EditProductImagesPage() {
   const router = useRouter()
   const params = useParams()
   const [mainImage, setMainImage] = useState<string | null>(null)
-  const [subImages, setSubImages] = useState<string[]>([])
+  const [subImages, setSubImages] = useState<SubImageItem[]>([])
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null)
+  
+  // 원본 이미지 URL들 추적 (삭제할 이미지용)
+  const [originalMainImageUrl, setOriginalMainImageUrl] = useState<string | null>(null)
+  const [originalSubImageUrls, setOriginalSubImageUrls] = useState<string[]>([])
+  
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -37,12 +49,19 @@ export default function EditProductImagesPage() {
         // 이미지 설정
         if (productData.images && productData.images.length > 0) {
           setMainImage(productData.images[0])
+          setOriginalMainImageUrl(productData.images[0])
         } else if (productData.imageUrl) {
           setMainImage(productData.imageUrl)
+          setOriginalMainImageUrl(productData.imageUrl)
         }
         
         if (productData.detailImageUrls && productData.detailImageUrls.length > 0) {
-          setSubImages(productData.detailImageUrls)
+          const subImageItems: SubImageItem[] = productData.detailImageUrls.map((url: string) => ({
+            preview: url,
+            originalUrl: url
+          }))
+          setSubImages(subImageItems)
+          setOriginalSubImageUrls(productData.detailImageUrls)
         }
       } catch (error) {
         console.error('상품 이미지 데이터 로드 실패:', error)
@@ -57,6 +76,7 @@ export default function EditProductImagesPage() {
   const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setMainImageFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
         setMainImage(reader.result as string)
@@ -67,10 +87,14 @@ export default function EditProductImagesPage() {
 
   const handleSubImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
+    
     files.forEach((file) => {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setSubImages((prev) => [...prev, reader.result as string])
+        setSubImages((prev) => [...prev, {
+          preview: reader.result as string,
+          file: file
+        }])
       }
       reader.readAsDataURL(file)
     })
@@ -78,6 +102,22 @@ export default function EditProductImagesPage() {
 
   const removeSubImage = (index: number) => {
     setSubImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve) => {
+      const arr = base64String.split(',')
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const file = new File([u8arr], filename, { type: mime })
+      resolve(file)
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,11 +130,44 @@ export default function EditProductImagesPage() {
 
     setSubmitting(true)
     try {
-      // TODO: 실제 이미지 수정 API 호출
-      // await updateProductImages(params.productId as string, mainImage, subImages)
+      // 삭제할 URL 수집
+      const deleteUrls: string[] = []
+      
+      // 메인 이미지가 변경된 경우 이전 URL 추가
+      if (mainImageFile && originalMainImageUrl) {
+        deleteUrls.push(originalMainImageUrl)
+      }
+      
+      // 현재 유지된 원본 상세 이미지 URL 목록
+      const currentOriginalUrls = subImages
+        .filter(img => img.originalUrl)
+        .map(img => img.originalUrl) as string[]
+      
+      // 원본에는 있었지만 현재는 없는 이미지 = 삭제된 이미지
+      const removedImageUrls = originalSubImageUrls.filter(url => !currentOriginalUrls.includes(url))
+      deleteUrls.push(...removedImageUrls)
+      
+      // 새로 추가된 파일들 (file 속성이 있는 것들)
+      const newDetailImages = subImages
+        .filter(img => img.file !== undefined)
+        .map(img => img.file) as File[]
+      
+      // 메인 이미지가 File인 경우 변환
+      let mainImageToSend: File | undefined
+      if (mainImageFile) {
+        mainImageToSend = mainImageFile
+      }
+      
+      const requestData = {
+        mainImage: mainImageToSend,
+        detailImages: newDetailImages.length > 0 ? newDetailImages : undefined,
+        deleteDetailImageUrls: deleteUrls.length > 0 ? deleteUrls : undefined
+      }
+      
+      await updateProductImages(params.productId as string, requestData)
       alert("이미지가 수정되었습니다!")
       router.push("/seller")
-    } catch (error) {
+    } catch (error: any) {
       console.error('이미지 수정 실패:', error)
       alert("이미지 수정에 실패했습니다. 다시 시도해주세요.")
     } finally {
@@ -134,7 +207,10 @@ export default function EditProductImagesPage() {
                   <Image src={mainImage || "/placeholder.svg"} alt="Main product" fill className="object-cover" />
                   <button
                     type="button"
-                    onClick={() => setMainImage(null)}
+                    onClick={() => {
+                      setMainImage(null)
+                      setMainImageFile(null)
+                    }}
                     className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
                   >
                     <X className="w-4 h-4" />
@@ -155,7 +231,7 @@ export default function EditProductImagesPage() {
             <div className="grid grid-cols-5 gap-4">
               {subImages.map((image, index) => (
                 <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                  <Image src={image || "/placeholder.svg"} alt={`Sub ${index + 1}`} fill className="object-cover" />
+                  <Image src={image.preview || "/placeholder.svg"} alt={`Sub ${index + 1}`} fill className="object-cover" />
                   <button
                     type="button"
                     onClick={() => removeSubImage(index)}

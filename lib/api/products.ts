@@ -24,6 +24,7 @@ import {
   ProductStatus,
   ProductStatusUpdateRequest,
   ProductBasicInfoUpdateRequest,
+  ProductImageUpdateRequest,
   SkuStockUpdateRequest,
   ProductSkuUpdateRequest,
 } from '@/types/api/product'
@@ -157,4 +158,34 @@ export const updateProductBasicInfo = async (
   data: ProductBasicInfoUpdateRequest
 ): Promise<void> => {
   await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT(productId), data)
+}
+
+// 상품 이미지 업데이트
+export const updateProductImages = async (
+  productId: string,
+  data: ProductImageUpdateRequest
+): Promise<void> => {
+  const formData = new FormData()
+  
+  if (data.mainImage) {
+    formData.append('mainImage', data.mainImage)
+  }
+  
+  if (data.detailImages) {
+    data.detailImages.forEach((image) => {
+      formData.append('detailImages', image)
+    })
+  }
+  
+  if (data.deleteDetailImageUrls) {
+    data.deleteDetailImageUrls.forEach((url) => {
+      formData.append('deleteDetailImageUrls', url)
+    })
+  }
+  
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_IMAGES(productId), formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }

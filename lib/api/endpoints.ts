@@ -31,6 +31,9 @@ export const PRODUCT_ENDPOINTS = {
   // 상품 상태 업데이트
   UPDATE_PRODUCT_STATUS: (productId: string) => `/api/v1/products/${productId}/status`,
   
+  // 상품 이미지 업데이트
+  UPDATE_PRODUCT_IMAGES: (productId: string) => `/api/v1/products/${productId}/images`,
+  
   // 판매자 상품 관리
   GET_SELLER_PRODUCTS: '/api/v1/products/seller',
 } as const

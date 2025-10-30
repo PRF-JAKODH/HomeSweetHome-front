@@ -183,6 +183,13 @@ export interface ProductBasicInfoUpdateRequest {
   shippingPrice: number
 }
 
+// 상품 이미지 업데이트 요청
+export interface ProductImageUpdateRequest {
+  mainImage?: File
+  detailImages?: File[]
+  deleteDetailImageUrls?: string[]
+}
+
 // 판매자 상품 관리 응답
 export interface ProductManageResponse {
   id: number
