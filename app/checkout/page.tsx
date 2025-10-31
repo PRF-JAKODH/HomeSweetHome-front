@@ -6,37 +6,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useState, useEffect } from "react"
+import { loadTossPayments } from "@tosspayments/payment-sdk"
 import { useRouter } from "next/navigation"
+import { useAuthStore } from '@/stores/auth-store';
+import axios from "axios"
+import { Address, CartResponse, ScrollResponse, CreateOrderRequestDto, OrderItemDetail, OrderReadyResponseDto } from "@/types/order"
 
-interface CartItem {
-  id: string
-  productId: string
-  name: string
-  brand: string
-  image: string
-  price: number
-  option: string
-  quantity: number
-}
-
-interface Address {
-  id: string
-  name: string
-  phone: string
-  roadAddress: string
-  detailAddress: string
-  isDefault: boolean
-}
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const [orderItems, setOrderItems] = useState<CartItem[]>([])
+  const [orderItems, setOrderItems] = useState<CartResponse[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedAddress, setSelectedAddress] = useState<string>("")
-  const [paymentMethod, setPaymentMethod] = useState<string>("card")
   const [usePoints, setUsePoints] = useState<number>(0)
   const [availablePoints, setAvailablePoints] = useState<number>(5000)
   const [showAddressForm, setShowAddressForm] = useState(false)
+  const accessToken = useAuthStore((state) => state.accessToken);
+
   const [newAddress, setNewAddress] = useState({
     name: "",
     phone: "",
@@ -45,61 +31,104 @@ export default function CheckoutPage() {
     isDefault: false,
   })
 
+  // 결제 계산 변수들
+  const [finalPrice, setFinalPrice] = useState<number>(0) // 최종 결제 금액
+  const [totalPrice, setTotalPrice] = useState<number>(0) // 상품 총 금액
+  const [shippingFee, setShippingFee] = useState<number>(0)// 배송비
+  const [discount, setDiscount] = useState<number>(0) // 할인 금액
+
+  // 최종 결제 금액이 바뀌는 경우? -> 수량 변경, point 적용
   useEffect(() => {
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      const selected = cart.filter((item: CartItem & { selected: boolean }) => item.selected)
-      setOrderItems(selected)
-    }
+    const totalPrice = orderItems.reduce((sum, item) => sum + item.finalPrice * item.quantity, 0)
+    const discount = usePoints // point
+    setTotalPrice(totalPrice)
+    setDiscount(discount)
+  }, [orderItems, usePoints])
 
-    const storedAddresses = localStorage.getItem("ohouse_addresses")
-    if (storedAddresses) {
-      const parsedAddresses = JSON.parse(storedAddresses)
-      setAddresses(parsedAddresses)
-      const defaultAddr = parsedAddresses.find((addr: Address) => addr.isDefault)
-      if (defaultAddr) setSelectedAddress(defaultAddr.id)
-    }
-  }, [])
+  // 최종 결제 금액 변경
+  useEffect(() => {
+    setFinalPrice(totalPrice + shippingFee - discount)
+  }, [totalPrice, shippingFee, discount])
 
-  const updateQuantity = (itemId: string, change: number) => {
-    setOrderItems((prev) => {
-      const updated = prev.map((item) => {
-        if (item.id === itemId) {
-          const newQuantity = Math.max(1, item.quantity + change)
-          return { ...item, quantity: newQuantity }
-        }
-        return item
-      })
+  // 결제 진행 상태
+  const [isLoading, setIsLoading] = useState(false);
 
-      const storedCart = localStorage.getItem("ohouse_cart")
-      if (storedCart) {
-        const cart = JSON.parse(storedCart)
-        const updatedCart = cart.map((item: CartItem & { selected: boolean }) => {
-          const updatedItem = updated.find((u) => u.id === item.id)
-          if (updatedItem) {
-            return { ...item, quantity: updatedItem.quantity }
-          }
-          return item
-        })
-        localStorage.setItem("ohouse_cart", JSON.stringify(updatedCart))
+
+  // ---( 서버에서 장바구니 정보 가져오기 useEffect )---
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const fetchCartItems = async () => {
+      if (!accessToken) {
+        console.warn("로그인되지 않음, 장바구니 조회 스킵");
+        return;
+      }
+      if (!apiUrl) {
+        console.error('API URL이 설정되지 않았습니다.');
+        return;
       }
 
-      return updated
-    })
-  }
+      try {
+        console.log("GET /api/v1/carts 호출 시작...");
+        const response = await axios.get<ScrollResponse<CartResponse>>(
+          `${apiUrl}/api/v1/carts`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            params: { size: 100 }
+          }
+        );
 
+        console.log("장바구니 응답:", response.data);
+        setOrderItems(response.data.contents || []);
+
+      } catch (error) {
+        console.error("장바구니 조회 실패:", error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+          router.push("/login");
+        } else {
+          alert("장바구니 정보를 불러오는 데 실패했습니다.");
+        }
+      }
+    };
+
+    const storedAddresses = localStorage.getItem("ohouse_addresses");
+    if (storedAddresses) {
+      const parsedAddresses = JSON.parse(storedAddresses);
+      setAddresses(parsedAddresses);
+      const defaultAddr = parsedAddresses.find((addr: Address) => addr.isDefault);
+      if (defaultAddr) setSelectedAddress(defaultAddr.id);
+    }
+
+    fetchCartItems();
+
+  }, [accessToken, router]);
+  // --- (데이터 조회 useEffect 끝) ---
+
+
+  // --- (수량 변경 핸들러 함수) ---
+  const updateQuantity = (itemId: number, change: number) => {
+    setOrderItems((prev) => {
+      return prev.map((item) => {
+        if (item.id === itemId) {
+          const newQuantity = Math.max(1, item.quantity + change);
+          console.log("TODO: API로 수량 변경 필요", item.id, newQuantity);
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      });
+    });
+  };
+
+  // --- (배송지 추가 핸들러 함수) ---
   const handleAddAddress = () => {
     if (!newAddress.roadAddress || !newAddress.name || !newAddress.phone) {
       alert("필수 정보를 입력해주세요")
       return
     }
-
     const address: Address = {
       id: Date.now().toString(),
       ...newAddress,
     }
-
     const updatedAddresses = [...addresses, address]
     setAddresses(updatedAddresses)
     localStorage.setItem("ohouse_addresses", JSON.stringify(updatedAddresses))
@@ -109,46 +138,117 @@ export default function CheckoutPage() {
   }
 
   const openAddressSearch = () => {
-    ;new (window as any).daum.Postcode({
+    ; new (window as any).daum.Postcode({
       oncomplete: (data: any) => {
         setNewAddress((prev) => ({ ...prev, roadAddress: data.roadAddress }))
       },
     }).open()
   }
+  // --- (기존 핸들러 함수들 끝) ---
 
-  const handlePayment = () => {
+  // 결제창 SDK 사용 (위젯 제거)
+
+
+  // --- ( 결제하기 버튼 눌렀을 때 함수 ) ---
+  const handlePayment = async () => {
+    // 버튼 다시 클릭 방지용 로딩 안내
+    setIsLoading(true);
+
+    // 기본 검증
     if (!selectedAddress) {
       alert("배송지를 선택해주세요")
-      return
+      return;
+    }
+    const currentAddress = addresses.find((addr) => addr.id === selectedAddress);
+    if (!currentAddress) {
+      alert("선택된 배송지 정보를 찾을 수 없습니다.")
+      return;
     }
 
-    const order = {
-      orderId: `ORD${Date.now()}`,
-      items: orderItems,
-      address: addresses.find((addr) => addr.id === selectedAddress),
-      paymentMethod,
-      usedPoints: usePoints,
-      totalAmount: finalPrice,
-      orderDate: new Date().toISOString(),
+    const orderReadyResponse = await createOrderAPI(currentAddress)
+    console.log(orderReadyResponse)
+
+    // DTO 파싱
+
+
+    // Toss 결제창 띄우기 준비
+    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+    if (!clientKey) {
+      alert("TOSS_CLIENT_KEY 환경 변수가 설정되지 않았습니다.");
+      setIsLoading(false);
+      return;
     }
 
-    localStorage.setItem("ohouse_last_order", JSON.stringify(order))
+    try {
+      const tossPayments = await loadTossPayments(clientKey);
+      // const orderId = 'ORDER-123'
+      // const orderId = `ORDER-${Date.now()}`;
+      // if ( orderReadyResponse?.orderId == null){
 
-    const storedCart = localStorage.getItem("ohouse_cart")
-    if (storedCart) {
-      const cart = JSON.parse(storedCart)
-      const remaining = cart.filter((item: CartItem & { selected: boolean }) => !item.selected)
-      localStorage.setItem("ohouse_cart", JSON.stringify(remaining))
+      // }
+      const orderId = orderReadyResponse?.orderNumber ?? "error";
+      // const orderName = orderItems.length > 0 ? `${orderItems[0].productName} 외 ${Math.max(orderItems.length - 1, 0)}건` : "주문 상품";
+      const orderName = orderReadyResponse?.orderName ?? "error";
+      const successUrl = `${window.location.origin}/checkout/success`;
+      const failUrl = `${window.location.origin}/checkout/fail`;
+
+      await tossPayments.requestPayment("CARD", {
+        amount: finalPrice,
+        orderId,
+        orderName,
+        customerName: currentAddress.name,
+        successUrl,
+        failUrl,
+      });
+      // 성공 시 결제창이 successUrl 로 이동
+    } catch (error) {
+      console.error("결제 요청 실패:", error);
+      alert("결제 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      setIsLoading(false);
     }
+  };
+  // --- (handlePayment 끝) ---
 
-    router.push("/checkout/complete")
+  // ---(서버 API 호출 ) ----
+  const createOrderAPI = async (currentAddress: Address) => {
+    const requestData: CreateOrderRequestDto = {
+      orderItems: orderItems.map(item => ({
+        skuId: item.skuId,
+        quantity: item.quantity,
+      })),
+      recipientName: currentAddress.name,
+      recipientPhone: currentAddress.phone,
+      shippingAddress: `${currentAddress.roadAddress} ${currentAddress.detailAddress}`.trim(),
+      shippingRequest: "",
+    };
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      console.log('API 1 요청 데이터:', requestData);
+      const response = await axios.post<OrderReadyResponseDto>(
+        `${apiUrl}/api/v1/orders`,
+        requestData,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+      console.log('API 1 응답 데이터:', response.data);
+      const { orderId, orderNumber, totalAmount, username, orderItems } = response.data;
+      const orderName = orderItems.length > 0 ? orderItems[0].productName : "주문 상품";
+      return { orderName, orderNumber}
+
+    } catch (error) {
+      console.error('주문 생성 요청 실패:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        alert(`오류: ${error.response.data.message || '주문 생성 중 오류 발생'}`);
+      } else {
+        alert('주문 생성 중 알 수 없는 오류가 발생했습니다.');
+      }
+    }
   }
 
-  const totalPrice = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const shippingFee = totalPrice >= 50000 ? 0 : 3000
-  const discount = usePoints
-  const finalPrice = totalPrice + shippingFee - discount
 
+  // --- (JSX 렌더링: 기존과 동일) ---
   return (
     <div className="min-h-screen bg-background">
       <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" async />
@@ -157,23 +257,23 @@ export default function CheckoutPage() {
         <h1 className="mb-8 text-3xl font-bold text-foreground">주문/결제</h1>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Left Column - Order Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Order Items */}
+
+            {/* 주문 상품 (기존과 동일) */}
             <Card className="p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">주문 상품</h2>
               <div className="space-y-4">
                 {orderItems.map((item) => (
                   <div key={item.id} className="flex gap-4 pb-4 border-b border-divider last:border-0 last:pb-0">
                     <img
-                      src={item.image || "/placeholder.svg"}
-                      alt={item.name}
+                      src={item.imageUrl || "/placeholder.svg"}
+                      alt={item.productName}
                       className="h-20 w-20 rounded-lg object-cover bg-background-section"
                     />
                     <div className="flex-1">
                       <div className="mb-1 text-xs text-text-secondary">{item.brand}</div>
-                      <h3 className="mb-1 text-sm font-medium text-foreground line-clamp-2">{item.name}</h3>
-                      <div className="text-xs text-text-secondary">옵션: {item.option}</div>
+                      <h3 className="mb-1 text-sm font-medium text-foreground line-clamp-2">{item.productName}</h3>
+                      <div className="text-xs text-text-secondary">옵션: {item.optionSummary}</div>
                       <div className="mt-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <button
@@ -183,6 +283,7 @@ export default function CheckoutPage() {
                             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                             </svg>
+
                           </button>
                           <span className="text-sm text-foreground w-8 text-center">{item.quantity}</span>
                           <button
@@ -195,7 +296,7 @@ export default function CheckoutPage() {
                           </button>
                         </div>
                         <span className="text-base font-bold text-foreground">
-                          {(item.price * item.quantity).toLocaleString()}원
+                          {(item.finalPrice * item.quantity).toLocaleString()}원
                         </span>
                       </div>
                     </div>
@@ -204,7 +305,7 @@ export default function CheckoutPage() {
               </div>
             </Card>
 
-            {/* Shipping Address */}
+            {/* 배송지 (기존과 동일) */}
             <Card className="p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-foreground">배송지</h2>
@@ -212,7 +313,6 @@ export default function CheckoutPage() {
                   {showAddressForm ? "취소" : "새 배송지 추가"}
                 </Button>
               </div>
-
               {showAddressForm && (
                 <div className="mb-6 space-y-4 rounded-lg border border-divider p-4 bg-background-section">
                   <div>
@@ -292,57 +392,9 @@ export default function CheckoutPage() {
               )}
             </Card>
 
-            {/* Payment Method */}
-            <Card className="p-6">
-              <h2 className="mb-4 text-lg font-bold text-foreground">결제 수단</h2>
-              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
-                    <RadioGroupItem value="card" id="card" />
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
-                      <svg className="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                        />
-                      </svg>
-                    </div>
-                    <label htmlFor="card" className="flex-1 cursor-pointer">
-                      <div className="font-medium text-foreground">신용카드</div>
-                      <div className="text-sm text-text-secondary">모든 카드 사용 가능</div>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
-                    <RadioGroupItem value="naverpay" id="naverpay" />
-                    <img src="/naverpay-logo.png" alt="네이버페이" className="h-10 w-10 rounded-lg object-cover" />
-                    <label htmlFor="naverpay" className="flex-1 cursor-pointer">
-                      <div className="font-medium text-foreground">네이버페이</div>
-                      <div className="text-sm text-text-secondary">간편결제</div>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
-                    <RadioGroupItem value="tosspay" id="tosspay" />
-                    <img src="/tosspay-logo.png" alt="토스페이" className="h-10 w-auto object-contain" />
-                    <label htmlFor="tosspay" className="flex-1 cursor-pointer">
-                      <div className="font-medium text-foreground">토스페이</div>
-                      <div className="text-sm text-text-secondary">간편결제</div>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-lg border border-divider p-4 hover:border-primary cursor-pointer">
-                    <RadioGroupItem value="kakaopay" id="kakaopay" />
-                    <img src="/kakaopay-logo.png" alt="카카오페이" className="h-10 w-auto object-contain" />
-                    <label htmlFor="kakaopay" className="flex-1 cursor-pointer">
-                      <div className="font-medium text-foreground">카카오페이</div>
-                      <div className="text-sm text-text-secondary">간편결제</div>
-                    </label>
-                  </div>
-                </div>
-              </RadioGroup>
-            </Card>
+            {/* [제거] 결제 수단 Card (솔루션 1) */}
 
-            {/* Points */}
+            {/* 포인트 사용 (기존과 동일) */}
             <Card className="p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">포인트 사용</h2>
               <div className="space-y-3">
@@ -377,7 +429,7 @@ export default function CheckoutPage() {
             </Card>
           </div>
 
-          {/* Right Column - Payment Summary */}
+          {/* 결제 정보 (sticky, 우측) */}
           <div className="lg:col-span-1">
             <Card className="sticky top-24 p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">결제 정보</h2>
@@ -407,13 +459,17 @@ export default function CheckoutPage() {
                 <p className="mb-1">• 주문 완료 시 {Math.floor(finalPrice * 0.01).toLocaleString()}P 적립</p>
                 <p>• 결제 완료 후 취소/변경은 고객센터로 문의해주세요</p>
               </div>
+
+              {/* 토스 위젯 UI는 오버레이에서 렌더링됩니다. */}
+
+              {/* 결제하기 버튼 */}
               <Button
                 size="lg"
                 className="w-full bg-primary hover:bg-primary-dark text-white"
                 onClick={handlePayment}
-                disabled={!selectedAddress || orderItems.length === 0}
+                disabled={!selectedAddress || orderItems.length === 0 || isLoading}
               >
-                {finalPrice.toLocaleString()}원 결제하기
+                {isLoading ? '처리 중...' : `${finalPrice.toLocaleString()}원 결제하기`}
               </Button>
             </Card>
           </div>

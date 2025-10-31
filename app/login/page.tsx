@@ -1,39 +1,31 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/hooks/use-auth"
+import { toast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
+  
+  const { login, isLoading, error, clearError } = useAuth()
+  const router = useRouter()
+
+  // 에러가 있으면 토스트 표시
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "로그인 오류",
+        description: error,
+        variant: "destructive",
+      })
+      clearError()
+    }
+  }, [error, clearError])
 
   const handleGoogleLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      const user = {
-        id: "google_user_123",
-        name: "구글 사용자",
-        email: "user@gmail.com",
-        provider: "google",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=google",
-      }
-      localStorage.setItem("ohouse_user", JSON.stringify(user))
-      window.location.href = "/"
-    }, 1000)
-  }
-
-  const handleKakaoLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      const user = {
-        id: "kakao_user_456",
-        name: "카카오 사용자",
-        email: "user@kakao.com",
-        provider: "kakao",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=kakao",
-      }
-      localStorage.setItem("ohouse_user", JSON.stringify(user))
-      window.location.href = "/"
-    }, 1000)
+    login('google')
   }
 
   return (
@@ -42,16 +34,13 @@ export default function LoginPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <svg width="60" height="60" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M20 5L5 17V35H15V25H25V35H35V17L20 5Z"
-                stroke="#35C5F0"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </svg>
+            <Image
+              src="/house-logo.png"
+              alt="홈스윗홈 로고"
+              width={60}
+              height={60}
+              className="object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
             홈스윗<span className="text-primary">홈</span>
@@ -89,21 +78,7 @@ export default function LoginPage() {
               {isLoading ? "로그인 중..." : "구글로 시작하기"}
             </Button>
 
-            {/* Kakao Login Button */}
-            <Button
-              onClick={handleKakaoLogin}
-              disabled={isLoading}
-              className="w-full h-12 font-medium flex items-center justify-center gap-3"
-              style={{ backgroundColor: "#FEE500", color: "#000000" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M10 0C4.477 0 0 3.582 0 8c0 2.89 1.897 5.43 4.736 6.863l-.946 3.465a.5.5 0 00.727.577l4.15-2.49c.44.058.892.085 1.333.085 5.523 0 10-3.582 10-8S15.523 0 10 0z"
-                  fill="#000000"
-                />
-              </svg>
-              {isLoading ? "로그인 중..." : "카카오로 시작하기"}
-            </Button>
+           
           </div>
 
           <div className="mt-6 text-center text-sm text-text-secondary">
@@ -122,6 +97,8 @@ export default function LoginPage() {
             에 동의하게 됩니다.
           </div>
         </div>
+
+        
       </div>
     </div>
   )

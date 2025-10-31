@@ -1,4 +1,4 @@
-name: 긴급 수정 (Hotfix)
+name: ❗ 긴급 수정 (Hotfix)
 description: 운영 중 긴급한 버그 수정을 위한 템플릿
 title: "[Hotfix]: "
 labels: ["hotfix"]
@@ -7,45 +7,24 @@ body:
     id: branch_keyword
     attributes:
       label: "Branch Keyword"
-      description: "긴급 수정 내용을 간결한 브랜치명으로 입력하세요 (예: login-error, payment-bug)"
-      placeholder: "예: login-error"
+      description: "영문 소문자로 간결한 브랜치 명을 입력하세요 (예: employee, login-modal)"
     validations:
       required: true
-
   - type: textarea
-    id: issue_description
     attributes:
-      label: "문제 설명"
-      description: "발생한 문제를 구체적으로 작성해주세요"
-      placeholder: |
-        - 현상:
-        - 영향 범위:
-        - 발생 조건:
-
+      label: 📄 설명
+      description: 버그에 대한 설명을 작성해 주세요.
+      placeholder: 자세히 적을수록 좋습니다.
+    validations:
+      required: true
   - type: textarea
-    id: fix_summary
     attributes:
-      label: "수정 내용"
-      description: "해결 방안 및 수정된 코드를 간단히 요약해주세요"
-      placeholder: |
-        - 원인:
-        - 수정 사항:
-        - 추가 조치:
-
+      label: ✅ 개선할 내용
+      description: 할 일을 체크박스 형태로 작성해주세요.
+      placeholder: 최대한 세분화 해서 적어주세요.
+    validations:
+      required: true
   - type: textarea
-    id: verification_plan
     attributes:
-      label: "검증 및 테스트 계획"
-      description: "수정된 부분을 어떻게 검증할지 명시해주세요"
-      value: |
-        - [ ] 로컬 환경 테스트
-        - [ ] Staging 환경 검증
-        - [ ] 배포 후 모니터링 로그 확인
-        - [ ] develop 브랜치 역병합(Back-merge) 예정
-
-  - type: markdown
-    attributes:
-      value: |
-        ---
-        ### Branch Keyword
-        ${{ inputs.branch_keyword }}
+      label: 🙋🏻 참고 자료
+      description: 참고 자료가 있다면 작성해 주세요.

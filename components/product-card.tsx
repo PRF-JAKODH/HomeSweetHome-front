@@ -1,7 +1,8 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { useState } from "react"
+import Image from "next/image"
 
 interface ProductCardProps {
   id: string
@@ -13,8 +14,8 @@ interface ProductCardProps {
   discountRate?: number
   rating: number
   reviewCount: number
-  isLiked?: boolean
   isFreeShipping?: boolean
+  shippingPrice?: number
 }
 
 export function ProductCard({
@@ -27,86 +28,75 @@ export function ProductCard({
   discountRate,
   rating,
   reviewCount,
-  isLiked = false,
   isFreeShipping = false,
+  shippingPrice = 0,
 }: ProductCardProps) {
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
+
   return (
     <a href={`/store/products/${id}`} className="block">
-      <Card className="group overflow-hidden border-transparent hover:shadow-lg transition-all duration-200">
+      <Card className="group overflow-hidden border-transparent hover:shadow-lg transition-all duration-200 h-full flex flex-col">
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden bg-background-section">
-          <img
-            src={image || "/placeholder.svg"}
-            alt={name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-
-          {/* Discount Badge */}
-          {discountRate && (
-            <div className="absolute left-2 top-2 rounded bg-secondary px-2 py-1 text-xs font-bold text-white">
-              {discountRate}%
+          {imageLoading && !imageError && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary"></div>
             </div>
           )}
-
-          {/* Like Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 top-2 h-8 w-8 rounded-full bg-white/90 hover:bg-white"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
+          <Image
+            src={image || "/placeholder.svg"}
+            alt={name}
+            fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className={`object-cover transition-all duration-300 group-hover:scale-105 ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
+            onLoad={() => setImageLoading(false)}
+            onError={() => {
+              setImageError(true)
+              setImageLoading(false)
             }}
-          >
-            <svg
-              className={`h-4 w-4 ${isLiked ? "fill-error text-error" : "text-text-secondary"}`}
-              fill={isLiked ? "currentColor" : "none"}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </Button>
+          />
         </div>
 
         {/* Product Info */}
-        <div className="p-3">
+        <div className="p-3 flex flex-col flex-grow">
           {/* Brand */}
-          <div className="mb-1 text-xs font-medium text-text-secondary">{brand}</div>
+          <div className="mb-1 text-sm font-medium text-gray-500">{brand}</div>
 
           {/* Product Name */}
-          <h3 className="mb-2 line-clamp-2 text-sm font-medium text-foreground leading-relaxed">{name}</h3>
+          <h3 className="mb-2 line-clamp-2 text-base font-medium text-foreground leading-relaxed">{name}</h3>
 
           {/* Price */}
           <div className="mb-2 flex items-center gap-2">
-            {discountRate && <span className="text-base font-bold text-secondary">{discountRate}%</span>}
-            <span className="text-base font-bold text-foreground">{price.toLocaleString()}원</span>
+            {discountRate && <span className="text-lg font-bold text-primary">{discountRate}%</span>}
+            <span className="text-lg font-bold text-foreground">{price?.toLocaleString() || '0'}</span>
           </div>
 
           {originalPrice && (
-            <div className="mb-2 text-xs text-text-secondary line-through">{originalPrice.toLocaleString()}원</div>
+            <div className="mb-2 text-sm text-text-secondary line-through">{originalPrice?.toLocaleString() || '0'}</div>
           )}
 
           {/* Rating & Reviews */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-sm">
             <div className="flex items-center gap-1">
-              <span className="text-warning">★</span>
+              <span className="text-sky-400">★</span>
               <span className="font-medium text-foreground">{rating}</span>
             </div>
             <span className="text-text-secondary">리뷰 {reviewCount.toLocaleString()}</span>
           </div>
 
-          {/* Free Shipping Badge */}
-          {isFreeShipping && (
-            <div className="mt-2 inline-block rounded bg-background-section px-2 py-1 text-xs text-text-secondary">
-              무료배송
-            </div>
-          )}
+          {/* Shipping Info */}
+          <div className="mt-1 mt-auto">
+            {isFreeShipping ? (
+              <div className="inline-block rounded bg-gray-100 px-2 py-1 text-sm font-medium text-gray-700">
+                무료배송
+              </div>
+            ) : (
+              <span className="text-sm text-text-secondary">배송비 {shippingPrice.toLocaleString()}원</span>
+            )}
+          </div>
         </div>
       </Card>
     </a>

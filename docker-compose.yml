@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hsweet-frontend:latest
+    container_name: hsweet-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # 호스트:컨테이너
+    environment:
+      # 배포 시 도메인으로 설정 (Nginx 프록시 사용 가정)
+      NEXT_PUBLIC_API_URL: "https://www.hsweet.shop"
+      NEXT_PUBLIC_API_BASE_URL: "https://www.hsweet.shop"
+      # 결제 키 등 민감 정보는 실제 값으로 교체하거나 .env 파일 사용
+      NEXT_PUBLIC_TOSS_CLIENT_KEY: "replace-with-real-key"
+    # EC2의 Nginx가 80/443을 받아 3000으로 프록시하도록 구성 권장
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+
