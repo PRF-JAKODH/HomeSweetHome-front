@@ -37,7 +37,7 @@ interface ExtendedProduct extends Product {
     sub: string
     detail: string
   }
-  seller?: { // nullable
+  seller?: {
     id: string
     name: string
   }
@@ -47,6 +47,7 @@ interface ExtendedProduct extends Product {
     stock: number
   }>
 }
+
 
 export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const router = useRouter()
@@ -431,7 +432,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     localStorage.setItem("ohouse_checkout_items", JSON.stringify([checkoutItem]))
     router.push("/checkout")
   }
-  
+
+// ==================================== 채팅 ====================================
 const handleChatWithSeller = async () => {
   // 상품이 없으면 실행 중단
   if (!product) return
@@ -484,116 +486,117 @@ const handleChatWithSeller = async () => {
     })
   }
 }
+// ==================================== 채팅 ====================================
 
-  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      const file = files[0] // 첫 번째 파일만 사용
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setReviewImages([reader.result as string]) // 기존 이미지를 대체
-      }
-      reader.readAsDataURL(file)
+const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files
+  if (files && files.length > 0) {
+    const file = files[0] // 첫 번째 파일만 사용
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setReviewImages([reader.result as string]) // 기존 이미지를 대체
     }
+    reader.readAsDataURL(file)
+  }
+}
+
+const handleSubmitReview = async () => {
+  if (reviewRating === 0) {
+    alert("별점을 선택해주세요.")
+    return
+  }
+  if (!reviewContent.trim()) {
+    alert("리뷰 내용을 입력해주세요.")
+    return
   }
 
-  const handleSubmitReview = async () => {
-    if (reviewRating === 0) {
-      alert("별점을 선택해주세요.")
-      return
+  setSubmittingReview(true)
+  try {
+    let imageFile: File
+    
+    if (reviewImages.length > 0) {
+      // Base64 이미지를 File 객체로 변환
+      imageFile = await base64ToFile(reviewImages[0], 'review-image.jpg')
+    } else {
+      // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
+      imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
     }
-    if (!reviewContent.trim()) {
-      alert("리뷰 내용을 입력해주세요.")
-      return
+    
+    const reviewData = {
+      rating: reviewRating,
+      comment: reviewContent,
+      image: imageFile
     }
 
-    setSubmittingReview(true)
-    try {
-      let imageFile: File
-      
-      if (reviewImages.length > 0) {
-        // Base64 이미지를 File 객체로 변환
-        imageFile = await base64ToFile(reviewImages[0], 'review-image.jpg')
-      } else {
-        // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
-        imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
-      }
-      
-      const reviewData = {
-        rating: reviewRating,
-        comment: reviewContent,
-        image: imageFile
-      }
-
-      const newReview = await createProductReview(resolvedParams.productId, reviewData)
-      
-      setUserReviews([newReview, ...userReviews])
-      setShowReviewForm(false)
-      setReviewRating(0)
-      setReviewContent("")
-      setReviewImages([])
-      alert("리뷰가 등록되었습니다.")
-    } catch (error: any) {
-      console.error('리뷰 등록 실패:', error)
-      
-      // 409 에러 (이미 리뷰 작성한 경우) 처리
-      if (error?.response?.status === 409) {
-        alert(error?.response?.data?.message || "이미 해당 상품에 대한 리뷰를 작성했습니다.")
-      } else {
-        alert("리뷰 등록에 실패했습니다. 다시 시도해주세요.")
-      }
-    } finally {
-      setSubmittingReview(false)
+    const newReview = await createProductReview(resolvedParams.productId, reviewData)
+    
+    setUserReviews([newReview, ...userReviews])
+    setShowReviewForm(false)
+    setReviewRating(0)
+    setReviewContent("")
+    setReviewImages([])
+    alert("리뷰가 등록되었습니다.")
+  } catch (error: any) {
+    console.error('리뷰 등록 실패:', error)
+    
+    // 409 에러 (이미 리뷰 작성한 경우) 처리
+    if (error?.response?.status === 409) {
+      alert(error?.response?.data?.message || "이미 해당 상품에 대한 리뷰를 작성했습니다.")
+    } else {
+      alert("리뷰 등록에 실패했습니다. 다시 시도해주세요.")
     }
+  } finally {
+    setSubmittingReview(false)
   }
+}
 
-  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
-  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
-    return new Promise((resolve) => {
-      const arr = base64String.split(',')
-      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
-      const bstr = atob(arr[1])
-      let n = bstr.length
-      const u8arr = new Uint8Array(n)
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n)
-      }
-      const file = new File([u8arr], filename, { type: mime })
-      resolve(file)
-    })
-  }
+// Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+  return new Promise((resolve) => {
+    const arr = base64String.split(',')
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+    const bstr = atob(arr[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const file = new File([u8arr], filename, { type: mime })
+    resolve(file)
+  })
+}
 
-  // 로딩 상태
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <main className="mx-auto max-w-[1256px] px-4 py-8">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              <p className="text-text-secondary">상품 정보를 불러오는 중...</p>
-            </div>
+// 로딩 상태
+if (loading) {
+  return (
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto max-w-[1256px] px-4 py-8">
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <p className="text-text-secondary">상품 정보를 불러오는 중...</p>
           </div>
-        </main>
-      </div>
-    )
-  }
+        </div>
+      </main>
+    </div>
+  )
+}
 
-  // 에러 상태
-  if (error && !product) {
-    return (
-      <div className="min-h-screen bg-background">
-        <main className="mx-auto max-w-[1256px] px-4 py-8">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <p className="mb-4 text-lg text-red-500">{error}</p>
-              <Button onClick={() => window.location.reload()}>다시 시도</Button>
-            </div>
+// 에러 상태
+if (error && !product) {
+  return (
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto max-w-[1256px] px-4 py-8">
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="mb-4 text-lg text-red-500">{error}</p>
+            <Button onClick={() => window.location.reload()}>다시 시도</Button>
           </div>
-        </main>
-      </div>
-    )
-  }
+        </div>
+      </main>
+    </div>
+  )
+}
 
   // 상품이 없는 경우
   if (!product) {
