@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function LoginPage() {
   
@@ -33,16 +34,13 @@ export default function LoginPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <svg width="60" height="60" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M20 5L5 17V35H15V25H25V35H35V17L20 5Z"
-                stroke="#35C5F0"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </svg>
+            <Image
+              src="/house-logo.png"
+              alt="홈스윗홈 로고"
+              width={60}
+              height={60}
+              className="object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
             홈스윗<span className="text-primary">홈</span>
@@ -100,18 +98,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Signup Link */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-text-secondary">
-            아직 계정이 없으신가요?{" "}
-            <a 
-              href="/signup" 
-              className="text-primary hover:underline font-medium"
-            >
-              회원가입하기
-            </a>
-          </p>
-        </div>
+        
       </div>
     </div>
   )

@@ -149,11 +149,45 @@ export interface OptionCombinationResponse {
 // 제품 재고 조회 응답
 export type GetProductStockResponse = ApiResponse<SkuStockResponse[]>
 
+// SKU 재고 업데이트 요청
+export interface SkuStockUpdateRequest {
+  skuId: number
+  stockQuantity: number
+  priceAdjustment?: number
+}
+
+// 상품 SKU 재고 업데이트 요청
+export interface ProductSkuUpdateRequest {
+  skus: SkuStockUpdateRequest[]
+}
+
 // 상품 상태 열거형
 export enum ProductStatus {
   ON_SALE = 'ON_SALE', // 판매중
-  OUT_OF_STOCK = 'OUT_OF_STOCK', // 판매중지
-  SUSPENDED = 'SUSPENDED' // 품절
+  OUT_OF_STOCK = 'OUT_OF_STOCK', // 품절
+  SUSPENDED = 'SUSPENDED' // 판매 중지
+}
+
+// 상품 상태 업데이트 요청
+export interface ProductStatusUpdateRequest {
+  status: ProductStatus
+}
+
+// 상품 기본 정보 업데이트 요청
+export interface ProductBasicInfoUpdateRequest {
+  name: string
+  brand: string
+  basePrice: number
+  discountRate: number
+  description: string
+  shippingPrice: number
+}
+
+// 상품 이미지 업데이트 요청
+export interface ProductImageUpdateRequest {
+  mainImage?: File
+  detailImages?: File[]
+  deleteDetailImageUrls?: string[]
 }
 
 // 판매자 상품 관리 응답

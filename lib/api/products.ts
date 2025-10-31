@@ -21,6 +21,12 @@ import {
   SkuStockResponse,
   GetProductStockResponse,
   ProductManageResponse,
+  ProductStatus,
+  ProductStatusUpdateRequest,
+  ProductBasicInfoUpdateRequest,
+  ProductImageUpdateRequest,
+  SkuStockUpdateRequest,
+  ProductSkuUpdateRequest,
 } from '@/types/api/product'
 import { ApiResponse } from '@/types/api/common'
 
@@ -126,4 +132,60 @@ export const getSellerProducts = async (
 
   const response = await apiClient.get<ProductManageResponse[]>(`${PRODUCT_ENDPOINTS.GET_SELLER_PRODUCTS}?${params}`)
   return response
+}
+
+// 상품 상태 업데이트
+export const updateProductStatus = async (
+  productId: string,
+  status: ProductStatus
+): Promise<void> => {
+  const request: ProductStatusUpdateRequest = { status }
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_STATUS(productId), request)
+}
+
+// 상품 SKU 재고 업데이트
+export const updateProductSkuStock = async (
+  productId: string,
+  skus: SkuStockUpdateRequest[]
+): Promise<void> => {
+  const request: ProductSkuUpdateRequest = { skus }
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_SKU_STOCK(productId), request)
+}
+
+// 상품 기본 정보 업데이트
+export const updateProductBasicInfo = async (
+  productId: string,
+  data: ProductBasicInfoUpdateRequest
+): Promise<void> => {
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT(productId), data)
+}
+
+// 상품 이미지 업데이트
+export const updateProductImages = async (
+  productId: string,
+  data: ProductImageUpdateRequest
+): Promise<void> => {
+  const formData = new FormData()
+  
+  if (data.mainImage) {
+    formData.append('mainImage', data.mainImage)
+  }
+  
+  if (data.detailImages) {
+    data.detailImages.forEach((image) => {
+      formData.append('detailImages', image)
+    })
+  }
+  
+  if (data.deleteDetailImageUrls) {
+    data.deleteDetailImageUrls.forEach((url) => {
+      formData.append('deleteDetailImageUrls', url)
+    })
+  }
+  
+  await apiClient.patch(PRODUCT_ENDPOINTS.UPDATE_PRODUCT_IMAGES(productId), formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }

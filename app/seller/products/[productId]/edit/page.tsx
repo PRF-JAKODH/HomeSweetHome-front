@@ -8,36 +8,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Upload, X, ImageIcon, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
-import Image from "next/image"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
-import { Category } from "@/types/api/category"
+import { getProduct, updateProductBasicInfo } from "@/lib/api/products"
+import { getCategoryHierarchy } from "@/lib/api/categories"
 
-
-type OptionValue = {
-  name: string
-  additionalPrice: number
-  stock: number
-}
-
-type Option = {
-  name: string
-  values: string
-}
 
 export default function EditProductPage() {
   const router = useRouter()
   const params = useParams()
-  const [mainImage, setMainImage] = useState<string | null>(null)
-  const [subImages, setSubImages] = useState<string[]>([])
 
   const [selectedMainCategory, setSelectedMainCategory] = useState<number | null>(null)
   const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null)
   const [selectedDetailCategory, setSelectedDetailCategory] = useState<number | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [productName, setProductName] = useState("")
   const [brand, setBrand] = useState("")
@@ -45,15 +32,8 @@ export default function EditProductPage() {
   const [discountRate, setDiscountRate] = useState("")
   const [shippingType, setShippingType] = useState("free")
   const [shippingFee, setShippingFee] = useState("")
-  const [stock, setStock] = useState("")
   const [description, setDescription] = useState("")
-
-  const [productType, setProductType] = useState<"single" | "option">("single")
-  const [optionCount, setOptionCount] = useState<number>(1)
-  const [options, setOptions] = useState<Option[]>([{ name: "", values: "" }])
-  const [optionCombinations, setOptionCombinations] = useState<OptionValue[]>([])
-  const [bulkAdditionalPrice, setBulkAdditionalPrice] = useState("")
-  const [bulkStock, setBulkStock] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   // 카테고리 API 훅들
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
@@ -66,28 +46,50 @@ export default function EditProductPage() {
   }, [])
 
   useEffect(() => {
-    // TODO: 실제 상품 데이터를 API에서 가져와서 초기화
-    // const fetchProductData = async () => {
-    //   try {
-    //     const productData = await getProduct(params.productId as string)
-    //     // 상품 데이터로 폼 초기화
-    //     setProductName(productData.name)
-    //     setBrand(productData.brand)
-    //     setOriginalPrice(productData.basePrice.toString())
-    //     setDiscountRate(productData.discountRate.toString())
-    //     setShippingType(productData.shippingPrice === 0 ? "free" : "paid")
-    //     setShippingFee(productData.shippingPrice.toString())
-    //     setDescription(productData.description)
-    //     // 카테고리 설정
-    //     setSelectedMainCategory(productData.categoryId)
-    //     // 이미지 설정
-    //     setMainImage(productData.imageUrl)
-    //     setSubImages(productData.detailImageUrls || [])
-    //   } catch (error) {
-    //     console.error('상품 데이터 로드 실패:', error)
-    //   }
-    // }
-    // fetchProductData()
+    const fetchProductData = async () => {
+      if (!params.productId) return
+      
+      setLoading(true)
+      try {
+        const productResponse = await getProduct(params.productId as string)
+        const productData = (productResponse.data || productResponse) as any
+        
+        console.log('상품 데이터:', productData)
+        
+        // 상품 데이터로 폼 초기화
+        setProductName(productData.name || "")
+        setBrand(productData.brand || "")
+        setOriginalPrice(String(productData.basePrice || productData.price || ""))
+        setDiscountRate(String(productData.discountRate || 0))
+        setShippingType(productData.shippingPrice === 0 ? "free" : "paid")
+        setShippingFee(String(productData.shippingPrice || 0))
+        setDescription(productData.description || "")
+        
+        // 카테고리 설정
+        if (productData.categoryId) {
+          try {
+            const categoryResponse = await getCategoryHierarchy(Number(productData.categoryId))
+            if (categoryResponse && categoryResponse.length > 0) {
+              setSelectedMainCategory(categoryResponse[0].id)
+              if (categoryResponse.length > 1) {
+                setSelectedSubCategory(categoryResponse[1].id)
+              }
+              if (categoryResponse.length > 2) {
+                setSelectedDetailCategory(categoryResponse[2].id)
+              }
+            }
+          } catch (error) {
+            console.error('카테고리 조회 실패:', error)
+          }
+        }
+      } catch (error) {
+        console.error('상품 데이터 로드 실패:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchProductData()
   }, [params.productId])
 
   // 카테고리 선택 핸들러들
@@ -116,160 +118,51 @@ export default function EditProductPage() {
     setExpandedCategories(newExpanded)
   }
 
-  const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setMainImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleSubImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    files.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setSubImages((prev) => [...prev, reader.result as string])
-      }
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const removeSubImage = (index: number) => {
-    setSubImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
   const calculateFinalPrice = () => {
     const price = Number.parseFloat(originalPrice) || 0
     const discount = Number.parseFloat(discountRate) || 0
     return Math.floor(price * (1 - discount / 100))
   }
 
-  const addOption = () => {
-    if (options.length < 3) {
-      setOptions([...options, { name: "", values: "" }])
-      setOptionCount(options.length + 1)
-    }
-  }
-
-  const removeOption = (index: number) => {
-    const newOptions = options.filter((_, i) => i !== index)
-    setOptions(newOptions)
-    setOptionCount(newOptions.length)
-  }
-
-  const updateOption = (index: number, field: "name" | "values", value: string) => {
-    const newOptions = [...options]
-    newOptions[index][field] = value
-    setOptions(newOptions)
-  }
-
-  const generateOptionCombinations = () => {
-    const validOptions = options.filter((opt) => opt.name && opt.values)
-
-    if (validOptions.length === 0) {
-      alert("옵션명과 옵션값을 입력해주세요.")
-      return
-    }
-
-    const optionArrays = validOptions.map((opt) => ({
-      name: opt.name,
-      values: opt.values
-        .split(",")
-        .map((v) => v.trim())
-        .filter((v) => v),
-    }))
-
-    const combinations: OptionValue[] = []
-
-    const generateCombos = (current: string[], depth: number) => {
-      if (depth === optionArrays.length) {
-        combinations.push({
-          name: current.join(" / "),
-          additionalPrice: 0,
-          stock: 0,
-        })
-        return
-      }
-
-      for (const value of optionArrays[depth].values) {
-        generateCombos([...current, value], depth + 1)
-      }
-    }
-
-    generateCombos([], 0)
-    setOptionCombinations(combinations)
-  }
-
-  const updateCombination = (index: number, field: "additionalPrice" | "stock", value: string) => {
-    const newCombinations = [...optionCombinations]
-    newCombinations[index][field] = Number(value) || 0
-    setOptionCombinations(newCombinations)
-  }
-
-  const applyBulkAdditionalPrice = () => {
-    if (!bulkAdditionalPrice) return
-    const price = Number(bulkAdditionalPrice)
-    setOptionCombinations(optionCombinations.map((combo) => ({ ...combo, additionalPrice: price })))
-    setBulkAdditionalPrice("")
-  }
-
-  const applyBulkStock = () => {
-    if (!bulkStock) return
-    const stockValue = Number(bulkStock)
-    setOptionCombinations(optionCombinations.map((combo) => ({ ...combo, stock: stockValue })))
-    setBulkStock("")
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!mainImage) {
-      alert("메인 이미지를 업로드해주세요.")
-      return
-    }
-
-    const selectedCategoryId = selectedDetailCategory || selectedSubCategory || selectedMainCategory
-    if (!selectedCategoryId) {
-      alert("카테고리를 선택해주세요.")
-      return
-    }
 
     if (!productName || !brand || !originalPrice) {
       alert("필수 항목을 모두 입력해주세요.")
       return
     }
 
-    if (productType === "single" && !stock) {
-      alert("수량을 입력해주세요.")
-      return
-    }
+    setSubmitting(true)
+    try {
+      const requestData = {
+        name: productName,
+        brand: brand,
+        basePrice: parseInt(originalPrice),
+        discountRate: parseFloat(discountRate) || 0,
+        description: description,
+        shippingPrice: shippingType === "free" ? 0 : parseInt(shippingFee) || 0
+      }
 
-    if (productType === "option" && optionCombinations.length === 0) {
-      alert("옵션을 생성해주세요.")
-      return
+      await updateProductBasicInfo(params.productId as string, requestData)
+      alert("상품이 수정되었습니다!")
+      router.push("/seller")
+    } catch (error: any) {
+      console.error('상품 수정 실패:', error)
+      
+      // 백엔드 유효성 검사 에러 메시지 처리
+      if (error?.response?.data?.message) {
+        alert(error.response.data.message)
+      } else {
+        alert("상품 수정에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setSubmitting(false)
     }
-
-    // TODO: 실제 상품 수정 API 호출
-    // try {
-    //   await updateProduct(params.productId as string, productData)
-    //   alert("상품이 수정되었습니다!")
-    //   router.push("/seller")
-    // } catch (error) {
-    //   console.error('상품 수정 실패:', error)
-    //   alert("상품 수정에 실패했습니다. 다시 시도해주세요.")
-    // }
-    
-    alert("상품이 수정되었습니다!")
-    router.push("/seller")
   }
 
 
   // 클라이언트 사이드에서만 렌더링
-  if (!isClient) {
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -310,7 +203,7 @@ export default function EditProductPage() {
           돌아가기
         </Button>
 
-        <h1 className="text-3xl font-bold mb-8">상품 수정</h1>
+        <h1 className="text-3xl font-bold mb-8">기본 정보 수정</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card className="p-6">
@@ -429,57 +322,6 @@ export default function EditProductPage() {
             </div>
           </Card>
 
-          <Card className="p-6">
-            <Label className="text-base font-semibold mb-3 block">
-              메인 이미지 <span className="text-red-500">*</span>
-            </Label>
-            <div className="space-y-4">
-              {mainImage ? (
-                <div className="relative aspect-square max-w-md mx-auto rounded-lg overflow-hidden border">
-                  <Image src={mainImage || "/placeholder.svg"} alt="Main product" fill className="object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setMainImage(null)}
-                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center aspect-square max-w-md mx-auto border-2 border-dashed rounded-lg cursor-pointer hover:bg-background-section transition-colors">
-                  <ImageIcon className="w-12 h-12 text-text-tertiary mb-2" />
-                  <span className="text-sm text-text-secondary">클릭하여 이미지 업로드</span>
-                  <input type="file" accept="image/*" onChange={handleMainImageUpload} className="hidden" />
-                </label>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <Label className="text-base font-semibold mb-3 block">서브 이미지 (최대 5장)</Label>
-            <div className="grid grid-cols-5 gap-4">
-              {subImages.map((image, index) => (
-                <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                  <Image src={image || "/placeholder.svg"} alt={`Sub ${index + 1}`} fill className="object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeSubImage(index)}
-                    className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {subImages.length < 5 && (
-                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-background-section transition-colors">
-                  <Upload className="w-6 h-6 text-text-tertiary mb-1" />
-                  <span className="text-xs text-text-secondary">추가</span>
-                  <input type="file" accept="image/*" multiple onChange={handleSubImageUpload} className="hidden" />
-                </label>
-              )}
-            </div>
-          </Card>
-
           <Card className="p-6 space-y-4">
             <div>
               <Label htmlFor="productName">
@@ -583,205 +425,6 @@ export default function EditProductPage() {
               )}
             </div>
 
-            <div>
-              <Label className="text-base font-semibold mb-3 block">
-                상품 유형 <span className="text-red-500">*</span>
-              </Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="single"
-                    checked={productType === "single"}
-                    onChange={(e) => setProductType(e.target.value as "single" | "option")}
-                    className="w-4 h-4"
-                  />
-                  <span>단일 상품</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="option"
-                    checked={productType === "option"}
-                    onChange={(e) => setProductType(e.target.value as "single" | "option")}
-                    className="w-4 h-4"
-                  />
-                  <span>옵션 상품</span>
-                </label>
-              </div>
-            </div>
-
-            {productType === "single" ? (
-              <div>
-                <Label htmlFor="stock">
-                  수량 <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  min="0"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="0"
-                  required
-                />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-base font-semibold mb-3 block">옵션 설정</Label>
-                  <div className="flex items-center gap-4 mb-4">
-                    <Select
-                      value={optionCount.toString()}
-                      onValueChange={(value) => {
-                        const count = Number.parseInt(value)
-                        setOptionCount(count)
-                        if (count > options.length) {
-                          setOptions([...options, ...Array(count - options.length).fill({ name: "", values: "" })])
-                        } else {
-                          setOptions(options.slice(0, count))
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="옵션 개수" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1개</SelectItem>
-                        <SelectItem value="2">2개</SelectItem>
-                        <SelectItem value="3">3개</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-3">
-                    {options.map((option, index) => (
-                      <div key={index} className="flex gap-3 items-start">
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-sm mb-1 block">옵션명</Label>
-                            <Input
-                              value={option.name}
-                              onChange={(e) => updateOption(index, "name", e.target.value)}
-                              placeholder="예: 색상"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-sm mb-1 block">옵션값 (쉼표로 구분)</Label>
-                            <Input
-                              value={option.values}
-                              onChange={(e) => updateOption(index, "values", e.target.value)}
-                              placeholder="예: 블랙,화이트,블루"
-                            />
-                          </div>
-                        </div>
-                        {options.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeOption(index)}
-                            className="mt-6"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {index === options.length - 1 && options.length < 3 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={addOption}
-                            className="mt-6 bg-transparent"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={generateOptionCombinations}
-                    className="w-full mt-4 bg-primary hover:bg-primary/90"
-                  >
-                    옵션목록으로 적용
-                  </Button>
-                </div>
-
-                {optionCombinations.length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <Label className="text-base font-semibold">옵션 목록 (총 {optionCombinations.length}개)</Label>
-                      <div className="flex gap-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={bulkAdditionalPrice}
-                            onChange={(e) => setBulkAdditionalPrice(e.target.value)}
-                            placeholder="추가금액"
-                            className="w-32"
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={applyBulkAdditionalPrice}>
-                            추가금액 일괄입력
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={bulkStock}
-                            onChange={(e) => setBulkStock(e.target.value)}
-                            placeholder="재고"
-                            className="w-32"
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={applyBulkStock}>
-                            재고수량 일괄입력
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="border-b bg-background-section">
-                            <th className="p-3 text-left text-sm font-medium">옵션명</th>
-                            <th className="p-3 text-left text-sm font-medium">추가 금액 (원)</th>
-                            <th className="p-3 text-left text-sm font-medium">재고 수량</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {optionCombinations.map((combo, index) => (
-                            <tr key={index} className="border-b hover:bg-background-section">
-                              <td className="p-3 text-sm">{combo.name}</td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  value={combo.additionalPrice}
-                                  onChange={(e) => updateCombination(index, "additionalPrice", e.target.value)}
-                                  className="w-32"
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  value={combo.stock}
-                                  onChange={(e) => updateCombination(index, "stock", e.target.value)}
-                                  className="w-32"
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </Card>
 
           <Card className="p-6">
@@ -802,8 +445,8 @@ export default function EditProductPage() {
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
               취소
             </Button>
-            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-              수정 완료
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={submitting}>
+              {submitting ? "수정 중..." : "수정 완료"}
             </Button>
           </div>
         </form>

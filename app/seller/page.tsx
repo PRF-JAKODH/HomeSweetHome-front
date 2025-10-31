@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit, Package, User, Ban, Play } from 'lucide-react'
+import { Plus, Edit, Package, User, Ban, Play, ImageIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,7 +11,7 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
-import { getSellerProducts, getProductStock } from "@/lib/api/products"
+import { getSellerProducts, getProductStock, updateProductStatus } from "@/lib/api/products"
 
 export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
 export type SettlementStatus = "carried-over" | "confirmed" | "completed"
@@ -45,15 +45,10 @@ export default function SellerPage() {
     stockData: SkuStockResponse[]
   } | null>(null)
   const [stockLoading, setStockLoading] = useState(false)
+  const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
+  const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
 
   const settlementRecords: any[] = []
-
-  const totalOrders = settlementRecords.length
-  const totalSales = settlementRecords.reduce((sum, record) => sum + record.salesAmount, 0)
-  const totalCommission = settlementRecords.reduce((sum, record) => sum + record.commission, 0)
-  const totalVat = settlementRecords.reduce((sum, record) => sum + record.vat, 0)
-  const totalRefund = settlementRecords.reduce((sum, record) => sum + record.refundAmount, 0)
-  const totalSettlement = settlementRecords.reduce((sum, record) => sum + record.settlementAmount, 0)
 
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
@@ -118,17 +113,35 @@ export default function SellerPage() {
     }
   }
 
-  const handleStopSelling = (productId: number) => {
+  const handleStopSelling = async (productId: number) => {
     if (confirm("이 상품의 판매를 중지하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.OUT_OF_STOCK } : product)))
-      alert("상품 판매가 중지되었습니다.")
+      try {
+        await updateProductStatus(productId.toString(), ProductStatus.SUSPENDED)
+        // 성공 시 로컬 상태 업데이트
+        setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.SUSPENDED } : product)))
+        alert("상품 판매가 중지되었습니다.")
+        // 목록 새로고침
+        await fetchSellerProducts()
+      } catch (error) {
+        console.error('판매 중지 실패:', error)
+        alert("판매 중지에 실패했습니다. 다시 시도해주세요.")
+      }
     }
   }
 
-  const handleStartSelling = (productId: number) => {
+  const handleStartSelling = async (productId: number) => {
     if (confirm("이 상품의 판매를 시작하시겠습니까?")) {
-      setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.ON_SALE } : product)))
-      alert("상품 판매가 시작되었습니다.")
+      try {
+        await updateProductStatus(productId.toString(), ProductStatus.ON_SALE)
+        // 성공 시 로컬 상태 업데이트
+        setProducts(products.map((product) => (product.id === productId ? { ...product, status: ProductStatus.ON_SALE } : product)))
+        alert("상품 판매가 시작되었습니다.")
+        // 목록 새로고침
+        await fetchSellerProducts()
+      } catch (error) {
+        console.error('판매 시작 실패:', error)
+        alert("판매 시작에 실패했습니다. 다시 시도해주세요.")
+      }
     }
   }
 
@@ -399,15 +412,15 @@ export default function SellerPage() {
                     </div>
                   </div>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[1400px]">
                     <thead className="bg-background-section">
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">이미지</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-48">상품명</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-52">카테고리</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-32">가격</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium w-20">할인율</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-28">할인율</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">재고</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">배송</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">등록일</th>
@@ -417,7 +430,17 @@ export default function SellerPage() {
                     </thead>
                     <tbody className="divide-y">
                       {filteredProducts.map((product) => (
-                        <tr key={product.id} className="hover:bg-background-section/50">
+                        <tr 
+                          key={product.id} 
+                          className="hover:bg-background-section/50 cursor-pointer"
+                          onClick={(e) => {
+                            // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
+                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
+                              return
+                            }
+                            router.push(`/store/products/${product.id}`)
+                          }}
+                        >
                           <td className="px-4 py-3 w-20">
                             <div className="relative w-16 h-16 rounded overflow-hidden">
                               <Image
@@ -444,7 +467,7 @@ export default function SellerPage() {
                               <div className="font-semibold text-sm">₩{Math.round(product.basePrice * (1 - product.discountRate / 100)).toLocaleString()}</div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 w-20">
+                          <td className="px-4 py-3 w-28">
                             {product.discountRate > 0 ? (
                               <span className="text-sm font-semibold text-red-500">{product.discountRate}%</span>
                             ) : (
@@ -479,12 +502,12 @@ export default function SellerPage() {
                                 product.status === ProductStatus.ON_SALE
                                   ? "bg-green-100 text-green-700"
                                   : product.status === ProductStatus.OUT_OF_STOCK
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-gray-100 text-gray-700"
+                                    ? "bg-gray-100 text-gray-700"
+                                    : "bg-yellow-100 text-yellow-700"
                               }`}
                             >
                               {product.status === ProductStatus.ON_SALE ? "판매중" : 
-                               product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
+                               product.status === ProductStatus.OUT_OF_STOCK ? "품절" : "판매 중지"}
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
@@ -492,13 +515,16 @@ export default function SellerPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => router.push(`/seller/products/${product.id}/edit`)}
+                                onClick={() => {
+                                  setSelectedProductForEdit(product)
+                                  setShowEditOptionsModal(true)
+                                }}
                                 className="text-xs px-1 py-1"
                                 title="수정"
                               >
                                 <Edit className="w-3 h-3" />
                               </Button>
-                              {product.status === ProductStatus.OUT_OF_STOCK ? (
+                              {product.status === ProductStatus.SUSPENDED ? (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -512,11 +538,12 @@ export default function SellerPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent text-xs px-1 py-1"
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 bg-transparent text-xs px-2 py-1"
                                   onClick={() => handleStopSelling(product.id)}
                                   title="판매 중지"
                                 >
-                                  <Ban className="w-3 h-3" />
+                                  <Ban className="w-3 h-3 mr-1" />
+                                  판매 중지
                                 </Button>
                               )}
                             </div>
@@ -841,6 +868,59 @@ export default function SellerPage() {
               )}
               <Button onClick={() => setShowStockModal(false)} className="w-full bg-primary hover:bg-primary/90">
                 닫기
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 수정 옵션 선택 모달 */}
+      <Dialog open={showEditOptionsModal} onOpenChange={setShowEditOptionsModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>수정 옵션 선택</DialogTitle>
+          </DialogHeader>
+          {selectedProductForEdit && (
+            <div className="space-y-3">
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/edit`)
+                }}
+                className="w-full bg-primary hover:bg-primary/90"
+                variant="default"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                기본 정보 수정
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/stock`)
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                옵션 재고 수정
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditOptionsModal(false)
+                  router.push(`/seller/products/${selectedProductForEdit.id}/images`)
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                이미지 수정
+              </Button>
+              <Button
+                onClick={() => setShowEditOptionsModal(false)}
+                className="w-full"
+                variant="ghost"
+              >
+                취소
               </Button>
             </div>
           )}

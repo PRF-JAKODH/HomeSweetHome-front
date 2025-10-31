@@ -61,6 +61,7 @@ export default function CreateProductPage() {
     type: "top" | "sub" | "detail"
     parentId?: number
   } | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   // 카테고리 API 훅들
   const { data: topCategories = [], isLoading: topCategoriesLoading, error: topCategoriesError } = useTopCategories()
@@ -224,15 +225,18 @@ export default function CreateProductPage() {
     }
 
     if (!newCategoryName.trim()) {
-      alert("카테고리명을 입력해주세요.")
       return
     }
 
     if (!editingCategory) return
 
     // 이미 생성 중이면 중복 실행 방지
-    if (createCategoryMutation.isPending) return
+    if (isCreating || createCategoryMutation.isPending) {
+      console.log('중복 실행 방지됨')
+      return
+    }
 
+    setIsCreating(true)
     try {
       const categoryData = {
         name: newCategoryName.trim(),
@@ -259,6 +263,8 @@ export default function CreateProductPage() {
     } catch (error: any) {
       console.error('카테고리 생성 실패:', error)
       alert("카테고리 생성에 실패했습니다. 다시 시도해주세요.")
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -462,6 +468,11 @@ export default function CreateProductPage() {
             <Label className="text-base font-semibold mb-3 block">
               카테고리 <span className="text-red-500">*</span>
             </Label>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <p className="text-sm text-red-800">
+                ⚠️ <span className="font-medium">주의:</span> 카테고리는 상품 등록 이후 수정할 수 없습니다.
+              </p>
+            </div>
 
             {/* Selected Category Path */}
             {(selectedMainCategory || selectedSubCategory || selectedDetailCategory) && (
@@ -520,9 +531,11 @@ export default function CreateProductPage() {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault()
+                                e.stopPropagation()
                                 handleCreateCategory(e)
                               } else if (e.key === "Escape") {
                                 e.preventDefault()
+                                e.stopPropagation()
                                 cancelCreatingCategory()
                               }
                             }}
@@ -531,7 +544,7 @@ export default function CreateProductPage() {
                             type="button"
                             size="sm"
                             onClick={handleCreateCategory}
-                            disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                            disabled={!newCategoryName.trim() || isCreating || createCategoryMutation.isPending}
                             className="px-2"
                           >
                             ✓
@@ -601,9 +614,11 @@ export default function CreateProductPage() {
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     e.preventDefault()
+                                    e.stopPropagation()
                                     handleCreateCategory(e)
                                   } else if (e.key === "Escape") {
                                     e.preventDefault()
+                                    e.stopPropagation()
                                     cancelCreatingCategory()
                                   }
                                 }}
@@ -612,7 +627,7 @@ export default function CreateProductPage() {
                                 type="button"
                                 size="sm"
                                 onClick={handleCreateCategory}
-                                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                                disabled={!newCategoryName.trim() || isCreating || createCategoryMutation.isPending}
                                 className="px-2"
                               >
                                 ✓
@@ -680,9 +695,11 @@ export default function CreateProductPage() {
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     e.preventDefault()
+                                    e.stopPropagation()
                                     handleCreateCategory(e)
                                   } else if (e.key === "Escape") {
                                     e.preventDefault()
+                                    e.stopPropagation()
                                     cancelCreatingCategory()
                                   }
                                 }}
@@ -691,7 +708,7 @@ export default function CreateProductPage() {
                                 type="button"
                                 size="sm"
                                 onClick={handleCreateCategory}
-                                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                                disabled={!newCategoryName.trim() || isCreating || createCategoryMutation.isPending}
                                 className="px-2"
                               >
                                 ✓
@@ -887,6 +904,11 @@ export default function CreateProductPage() {
             <Label className="text-base font-semibold">
               상품 유형 <span className="text-red-500">*</span>
             </Label>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                ⚠️ <span className="font-medium">주의:</span> 옵션 유형은 등록 후 수정할 수 없습니다.
+              </p>
+            </div>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -911,6 +933,14 @@ export default function CreateProductPage() {
                 <span>옵션 상품</span>
               </label>
             </div>
+
+            {productType === "option" && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  ⚠️ <span className="font-medium">주의:</span> 옵션명은 등록 이후 수정할 수 없습니다.
+                </p>
+              </div>
+            )}
 
             {productType === "single" ? (
               <div>
