@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ProfileInputField, ProfileAddressField } from '@/app/profile/profile-input-field'
@@ -11,11 +11,12 @@ interface ProfileData {
   roadAddress: string
   detailAddress: string
   profileImage: string
+  profileImageFile: File | null
 }
 
 interface SettingsSectionProps {
   profileData: ProfileData
-  setProfileData: (data: ProfileData) => void
+  setProfileData: React.Dispatch<React.SetStateAction<ProfileData>>
   onAddressSearch: () => void
   onSaveProfile: () => void
   onCancel: () => void
@@ -28,6 +29,39 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   onSaveProfile,
   onCancel,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImageChange = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      
+      // 파일 타입 검증
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.')
+        return
+      }
+
+      // 파일 크기 검증 (5MB 제한)
+      const maxSize = 5 * 1024 * 1024 // 5MB
+      if (file.size > maxSize) {
+        alert('파일 크기는 5MB 이하만 업로드 가능합니다.')
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result as string
+        setProfileData({ ...profileData, profileImage: result, profileImageFile: file })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,7 +93,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 </div>
               )}
             </div>
-            <Button variant="outline">이미지 변경</Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button variant="outline" onClick={handleImageChange}>
+              이미지 변경
+            </Button>
           </div>
         </div>
 
@@ -69,7 +112,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           label="이름"
           value={profileData.name}
           placeholder="이름을 입력하세요"
-          onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+          readOnly
         />
 
         {/* Email */}
@@ -79,7 +122,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           type="email"
           value={profileData.email}
           placeholder="이메일을 입력하세요"
-          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+          readOnly
         />
 
         {/* Phone */}
@@ -99,7 +142,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           type="date"
           value={profileData.birthdate}
           placeholder=""
-          onChange={(e) => setProfileData({ ...profileData, birthdate: e.target.value })}
+          readOnly
         />
 
         {/* Address */}
