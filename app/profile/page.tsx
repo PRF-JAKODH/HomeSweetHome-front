@@ -44,7 +44,7 @@ export default function ProfilePage() {
   const [termsAgreed, setTermsAgreed] = useState(false)
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
-
+  const [isLoading, setIsLoading] = useState(false); // 로딩 상태 추가
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -74,23 +74,6 @@ export default function ProfilePage() {
     setCancelDialogOpen(true)
   }
 
-  const confirmCancelOrder = () => {
-    if (!cancelReason.trim()) {
-      alert("취소 사유를 입력해주세요.")
-      return
-    }
-
-    setMyOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.orderId === selectedOrderId ? { ...order, orderStatus: "CANCELED", deliveryStatus: "CANCELED" } : order
-      ),
-    )
-    setCancelDialogOpen(false)
-    setCancelReason("")
-    setSelectedOrderId(null)
-    alert("주문이 취소되었습니다.")
-  }
-
   const getStatusText = (orderStatus: string, deliveryStatus: string): string => {
     if (orderStatus === 'FAILED' || deliveryStatus === 'CANCELLED') return '취소/환불';
     if (orderStatus === 'PENDING') return '결제 대기중';
@@ -102,20 +85,33 @@ export default function ProfilePage() {
     return '상태 확인중'; // 기본값
 };
 
-  const filteredOrders = myOrders
-  .map(order => ({
+const filteredOrders = myOrders
+.map(order => {
+  // 백엔드 상태값을 프론트엔드 UI 상태값(소문자)으로 변환
+  let uiStatus = "ordered"; // 기본값 '주문완료'
+  if (order.deliveryStatus === 'DELIVERING') {
+      uiStatus = "shipping";
+  } else if (order.deliveryStatus === 'DELIVERED') {
+      uiStatus = "delivered";
+  } else if (order.deliveryStatus === 'CANCELLED' || order.orderStatus === 'FAILED') {
+      uiStatus = "cancelled";
+  }
+
+  return {
     ...order,
-    status: order.deliveryStatus,
+    status: uiStatus, // ★ status 필드에 소문자 UI 상태값 매핑
     statusText: getStatusText(order.orderStatus, order.deliveryStatus)
-  }))
-  .filter((order) => {
-    if (orderFilter === "all") return true;
-    if (orderFilter === "cancelled") return order.deliveryStatus === "CANCELLED";
-    if (orderFilter === "ordered") return order.deliveryStatus === "BEFORE_SHIPMENT";
-    if (orderFilter === "shipping") return order.deliveryStatus === "DELIVERING";
-    if (orderFilter === "delivered") return order.deliveryStatus === "DELIVERED";
-    return false;
-  });
+  };
+})
+.filter((order) => {
+  if (orderFilter === "all") return true;
+  // ★ 필터링도 소문자 UI 상태값(status) 기준으로 변경
+  if (orderFilter === "cancelled") return order.status === "cancelled";
+  if (orderFilter === "ordered") return order.status === "ordered";
+  if (orderFilter === "shipping") return order.status === "shipping";
+  if (orderFilter === "delivered") return order.status === "delivered";
+  return false;
+});
 
   const handleSaveProfile = async () => {
     if (!user) return
@@ -292,35 +288,85 @@ export default function ProfilePage() {
     }
   }
 
+  
+  const fetchMyOrders = useCallback(async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!accessToken || !apiUrl) {
+      if (!accessToken) console.warn("로그인되지 않음, 주문 목록 조회 스킵");
+      return;
+    }
+    try {
+      console.log("GET /api/v1/orders 호출 시작...");
+      const response = await apiClient.get<MyOrder[]>(
+        `${apiUrl}/api/v1/orders`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+      console.log("주문 목록 응답:", response);
+      setMyOrders(response);
+    } catch (error) {
+      console.error("주문 목록 조회 실패:", error);
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+         alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+         router.push("/login");
+      } else {
+         alert("주문 목록을 불러오는 데 실패했습니다.");
+      }
+    }
+  }, [accessToken, router]); // apiClient, router 등 의존성 추가
+  
+  // ▼▼▼ 2. confirmCancelOrder 함수 수정 (API 호출) ▼▼▼
+  const confirmCancelOrder = async () => { // async 추가
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!selectedOrderId || !apiUrl || !accessToken) {
+      alert("주문 ID가 없거나 API 주소 또는 로그인 정보가 없습니다.");
+      return;
+    }
+
+    // (참고: user_138에서 cancelReason은 선택 사항으로 변경함)
+    // if (!cancelReason.trim()) {
+    //   alert("취소 사유를 입력해주세요.")
+    //   return
+    // }
+
+    try {
+      setIsLoading(true); // (필요 시 로딩 상태 추가)
+      
+      // 1. 백엔드 API 3 (주문 취소) 호출
+      console.log(`POST /api/v1/orders/${selectedOrderId}/cancel 호출...`);
+      await apiClient.post(
+        `${apiUrl}/api/v1/orders/${selectedOrderId}/cancel`,
+        { cancelReason: cancelReason }, // OrderCancelRequest DTO 전송
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+
+      // 2. 성공 시
+      alert("주문이 성공적으로 취소되었습니다.");
+      setCancelDialogOpen(false);
+      setCancelReason("");
+      setSelectedOrderId(null);
+      
+      // 3. (중요) 주문 목록 새로고침
+      await fetchMyOrders(); 
+
+    } catch (error) {
+      console.error("주문 취소 실패:", error);
+      if (axios.isAxiosError(error) && error.response) {
+        alert(`오류: ${error.response.data.message || '주문 취소에 실패했습니다.'}`);
+      } else {
+        alert('주문 취소 중 알 수 없는 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    // --- 나의 주문 목록 조회 ---
-    const fetchMyOrders = async () => {
-      if (!accessToken || !apiUrl) {
-        if (!accessToken) console.warn("로그인되지 않음, 주문 목록 조회 스킵");
-        return;
-      }
-      try {
-        console.log("GET /api/v1/orders 호출 시작...");
-        const response = await apiClient.get<MyOrder[]>(
-          `${apiUrl}/api/v1/orders`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          }
-        );
-        console.log("주문 목록 응답:", response);
-        setMyOrders(response);
-      } catch (error) {
-        console.error("주문 목록 조회 실패:", error);
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-           alert("세션이 만료되었습니다. 다시 로그인해주세요.");
-           router.push("/login");
-        } else {
-           alert("주문 목록을 불러오는 데 실패했습니다.");
-        }
-      }
-    };
 
     const fetchUserData = async () => {
       try {
@@ -360,7 +406,7 @@ export default function ProfilePage() {
     if (storedGrade) {
       setSellerGrade(storedGrade)
     }
-  }, [router, accessToken]);
+  }, [router, accessToken, fetchMyOrders]);
 
   // 리뷰 관련 useEffect 제거 - ReviewsSection에서 처리
 
