@@ -1,13 +1,14 @@
 "use client"
 
-import { User, UserResponse } from "@/types/auth";
-import { updateUser as updateUserApi, updateUserRole as updateUserRoleApi, fetchUser as fetchUserApi } from "@/api/user-api";
+import { User, UserResponse } from "@/types/auth"
+import { updateUser as updateUserApi, updateUserRole as updateUserRoleApi, fetchUser as fetchUserApi, updateUserMultipart as updateUserMultipartApi } from "@/api/user-api"
 import { useAuthStore } from "@/stores/auth-store";
 
 type UserAction = {
     editUserInfo: (user: User) => Promise<boolean>;
     makeSeller: () => Promise<boolean>;
     fetchUser: () => Promise<UserResponse>;
+    uploadUserProfile: (formData: FormData) => Promise<boolean>;
 }
 
 type UserState = {
@@ -16,37 +17,47 @@ type UserState = {
 
 type UseUser = UserAction & UserState;
 export function useUser(): UseUser {
-    const setUser = useAuthStore((s) => s.setUser);
-    const user = useAuthStore((s) => s.user);
+    const setUser = useAuthStore((s) => s.setUser)
+    const user = useAuthStore((s) => s.user)
 
     const editUserInfo = async (user: User) => {
-        const response = await updateUserApi(user);
+        const response = await updateUserApi(user)
         if (response.status === 200 && response.data) {
-            setUser(response.data);
-            return true;
+            setUser(response.data)
+            return true
         } else {
-            return false;
+            return false
+        }
+    }
+
+    const uploadUserProfile = async (formData: FormData) => {
+        const response = await updateUserMultipartApi(formData)
+        if (response.status === 200 && response.data) {
+            setUser(response.data)
+            return true
+        } else {
+            return false
         }
     }
 
     const makeSeller = async (): Promise<boolean> => {
-        const response = await updateUserRoleApi('SELLER');
+        const response = await updateUserRoleApi('SELLER')
         if (response.status === 200 && response.data) {
-            setUser(response.data);
-            return true;
+            setUser(response.data)
+            return true
         } else {    
-            return false;
+            return false
         }
     }
 
     const fetchUser = async (): Promise<UserResponse> => {
-        const response = await fetchUserApi();
+        const response = await fetchUserApi()
         if (response.status === 200 && response.data) {
             // 사용자 정보를 store에 저장
-            setUser(response.data);
-            return response.data;
+            setUser({ ...response.data, phone: response.data.phoneNumber })
+            return response.data
         } else {
-            throw new Error('Failed to fetch user info');
+            throw new Error('Failed to fetch user info')
         }
     }
 
@@ -54,6 +65,7 @@ export function useUser(): UseUser {
         editUserInfo,
         makeSeller,
         fetchUser,
+        uploadUserProfile,
         user,
     }
 }

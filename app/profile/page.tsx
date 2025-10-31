@@ -50,7 +50,7 @@ type OrderDetail = {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { fetchUser, editUserInfo, makeSeller, user } = useUser()
+  const { fetchUser, makeSeller, uploadUserProfile, user } = useUser()
   const [selectedMenu, setSelectedMenu] = useState("shopping")
   const [orderFilter, setOrderFilter] = useState("all")
   const [userPoints, setUserPoints] = useState(15000)
@@ -74,6 +74,7 @@ export default function ProfilePage() {
     roadAddress: "",
     detailAddress: "",
     profileImage: "",
+    profileImageFile: null as File | null,
   })
 
   const [myOrders, setMyOrders] = useState<OrderDetail[]>([
@@ -186,17 +187,32 @@ export default function ProfilePage() {
   const handleSaveProfile = async () => {
     if (!user) return
 
-    const updatedUser = {
-      ...user,
-      profileImageUrl: profileData.profileImage,
+    // 백엔드 @RequestPart("request") UpdateUserRequest에 맞춰 JSON 구성
+    const requestPayload = {
+      name: profileData.name,
+      email: profileData.email,
+      phoneNumber: profileData.phone,
+      birthDate: profileData.birthdate || '',
       address: `${profileData.roadAddress}/${profileData.detailAddress}`,
     }
 
-    const success = await editUserInfo(updatedUser)
+    const formData = new FormData()
+    formData.append('request', new Blob([JSON.stringify(requestPayload)], { type: "application/json" }))
+    if (profileData.profileImageFile) {
+      const originalFile = profileData.profileImageFile
+      const mimeType = originalFile.type || 'image/jpeg'
+      const typeExt = mimeType.includes('/') ? mimeType.split('/')[1] : ''
+      const nameExt = originalFile.name.includes('.') ? originalFile.name.split('.').pop() || '' : ''
+      const ext = (typeExt || nameExt || 'jpg').toLowerCase()
+      const renamedFile = new File([originalFile], `profile.${ext}` , { type: mimeType })
+      formData.append('profileImage', renamedFile)
+    }
+
+    const success = await uploadUserProfile(formData)
     if (success) {
-      alert("프로필이 저장되었습니다.")
+      alert('프로필이 저장되었습니다.')
     } else {
-      alert("프로필 저장에 실패했습니다. 다시 시도해주세요.")
+      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.')
     }
   }
 
@@ -305,6 +321,7 @@ export default function ProfilePage() {
             roadAddress: road,
             detailAddress: detail,
             profileImage: userData.profileImageUrl || "/placeholder.svg",
+            profileImageFile: null,
           }))
         }
       } catch (error) {
