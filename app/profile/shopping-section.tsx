@@ -1,22 +1,23 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
+import { MyOrder } from '@/types/order'
 
-interface OrderDetail {
-  id: number
-  orderNumber: string
-  productName: string
-  productImage: string
-  price: number
-  orderDate: string
-  status: string
-  statusText: string
-}
+// interface OrderDetail {
+//   id: number
+//   orderNumber: string
+//   productName: string
+//   productImage: string
+//   price: number
+//   orderDate: string
+//   status: string
+//   statusText: string
+// }
 
 interface ShoppingSectionProps {
   userPoints: number
   orderFilter: string
   setOrderFilter: (filter: string) => void
-  filteredOrders: OrderDetail[]
+  filteredOrders: (MyOrder & { status: string; statusText: string })[]
   onViewOrderDetail: (orderId: number) => void
   onCancelOrder: (orderId: number) => void
   onNavigateToPoints: () => void
@@ -99,7 +100,7 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
         ) : (
           filteredOrders.map((order) => (
             <div
-              key={order.id}
+              key={order.orderId}
               className="border border-divider rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex gap-4">
@@ -129,7 +130,7 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onViewOrderDetail(order.id)}>
+                  <Button variant="outline" size="sm" onClick={() => onViewOrderDetail(order.orderId)}>
                     주문 상세
                   </Button>
                   {order.status === "delivered" && (
@@ -142,7 +143,7 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => onCancelOrder(order.id)}
+                      onClick={() => onCancelOrder(order.orderId)}
                     >
                       주문 취소
                     </Button>
