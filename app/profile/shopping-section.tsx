@@ -134,9 +134,19 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
                     주문 상세
                   </Button>
                   {order.status === "delivered" && (
+                    <>
                     <Button variant="outline" size="sm">
                       리뷰 작성
                     </Button>
+                    <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => onCancelOrder(order.orderId)}
+                  >
+                    주문 취소
+                  </Button>
+                  </>
                   )}
                   {(order.status === "ordered" || order.status === "shipping") && (
                     <Button
