@@ -2,9 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react" // useCallback으로 메모이제이션
 import { useRouter } from "next/navigation"
-// 리뷰 관련 import 제거 - ReviewsSection에서 처리
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -22,35 +21,18 @@ import { ShoppingSection } from "@/app/profile/shopping-section"
 import { ReviewsSection } from "@/app/profile/reviews-section"
 import { SellerApplySection } from "@/app/profile/seller-apply-section"
 import { SettingsSection } from "@/app/profile/settings-section"
+import { useAuthStore } from "@/stores/auth-store"
+import { apiClient } from "@/lib/api/client"
+import axios from "axios"
+import { OrderDetailResponseDto, MyOrder, OrderDetail } from "@/types/order"
 
 type SellerGrade = "VVIP" | "VIP" | "GOLD" | "SILVER"
 
-type OrderDetail = {
-  id: number
-  orderNumber: string
-  productName: string
-  productImage: string
-  price: number
-  orderDate: string
-  status: string
-  statusText: string
-  // Order details
-  customerName: string
-  customerPhone: string
-  customerEmail: string
-  shippingAddress: string
-  detailAddress: string
-  option: string
-  quantity: number
-  shippingFee: number
-  sellerName: string
-  pointsUsed: number
-  paymentMethod: string
-}
 
 export default function ProfilePage() {
   const router = useRouter()
   const { fetchUser, makeSeller, uploadUserProfile, user } = useUser()
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [selectedMenu, setSelectedMenu] = useState("shopping")
   const [orderFilter, setOrderFilter] = useState("all")
   const [userPoints, setUserPoints] = useState(15000)
@@ -63,9 +45,6 @@ export default function ProfilePage() {
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
 
-  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
-
-
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -77,71 +56,7 @@ export default function ProfilePage() {
     profileImageFile: null as File | null,
   })
 
-  const [myOrders, setMyOrders] = useState<OrderDetail[]>([
-    {
-      id: 1,
-      orderNumber: "20250110-001",
-      productName: "모던 미니멀 소파",
-      productImage: "/modern-minimalist-sofa.png",
-      price: 890000,
-      orderDate: "2025-01-10",
-      status: "delivered",
-      statusText: "배송 완료",
-      customerName: "홍길동",
-      customerPhone: "010-1234-5678",
-      customerEmail: "hong@example.com",
-      shippingAddress: "서울특별시 강남구 테헤란로 123",
-      detailAddress: "456호",
-      option: "그레이 / 3인용",
-      quantity: 1,
-      shippingFee: 0,
-      sellerName: "모던가구",
-      pointsUsed: 10000,
-      paymentMethod: "신용카드",
-    },
-    {
-      id: 2,
-      orderNumber: "20250108-002",
-      productName: "원목 다이닝 테이블",
-      productImage: "/wooden-dining-table.png",
-      price: 450000,
-      orderDate: "2025-01-08",
-      status: "shipping",
-      statusText: "배송 중",
-      customerName: "홍길동",
-      customerPhone: "010-1234-5678",
-      customerEmail: "hong@example.com",
-      shippingAddress: "서울특별시 강남구 테헤란로 123",
-      detailAddress: "456호",
-      option: "-",
-      quantity: 1,
-      shippingFee: 3000,
-      sellerName: "우드스토리",
-      pointsUsed: 5000,
-      paymentMethod: "네이버페이",
-    },
-    {
-      id: 3,
-      orderNumber: "20250105-003",
-      productName: "모던 펜던트 조명",
-      productImage: "/modern-pendant-lamp.jpg",
-      price: 120000,
-      orderDate: "2025-01-05",
-      status: "ordered",
-      statusText: "주문 완료",
-      customerName: "홍길동",
-      customerPhone: "010-1234-5678",
-      customerEmail: "hong@example.com",
-      shippingAddress: "서울특별시 강남구 테헤란로 123",
-      detailAddress: "456호",
-      option: "블랙 / 중형",
-      quantity: 2,
-      shippingFee: 2500,
-      sellerName: "라이팅플러스",
-      pointsUsed: 0,
-      paymentMethod: "카카오페이",
-    },
-  ])
+  const [myOrders, setMyOrders] = useState<MyOrder[]>([])
 
   const handleAddressSearch = () => {
     ; new (window as any).daum.Postcode({
@@ -153,9 +68,6 @@ export default function ProfilePage() {
       },
     }).open()
   }
-
-
-  // 리뷰 관련 상태 제거 - ReviewsSection에서 처리
 
   const handleCancelOrder = (orderId: number) => {
     setSelectedOrderId(orderId)
@@ -170,19 +82,40 @@ export default function ProfilePage() {
 
     setMyOrders((prevOrders) =>
       prevOrders.map((order) =>
-        order.id === selectedOrderId ? { ...order, status: "cancelled", statusText: "취소/반품" } : order,
+        order.orderId === selectedOrderId ? { ...order, orderStatus: "CANCELED", deliveryStatus: "CANCELED" } : order
       ),
     )
-
     setCancelDialogOpen(false)
     setCancelReason("")
     setSelectedOrderId(null)
     alert("주문이 취소되었습니다.")
   }
 
-  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
+  const getStatusText = (orderStatus: string, deliveryStatus: string): string => {
+    if (orderStatus === 'FAILED' || deliveryStatus === 'CANCELLED') return '취소/환불';
+    if (orderStatus === 'PENDING') return '결제 대기중';
+    if (orderStatus === 'COMPLETED') {
+        if (deliveryStatus === 'BEFORE_SHIPMENT') return '배송 준비중';
+        if (deliveryStatus === 'DELIVERING') return '배송 중';
+        if (deliveryStatus === 'DELIVERED') return '배송 완료';
+    }
+    return '상태 확인중'; // 기본값
+};
 
-  const filteredOrders = orderFilter === "all" ? myOrders : myOrders.filter((order) => order.status === orderFilter)
+  const filteredOrders = myOrders
+  .map(order => ({
+    ...order,
+    status: order.deliveryStatus,
+    statusText: getStatusText(order.orderStatus, order.deliveryStatus)
+  }))
+  .filter((order) => {
+    if (orderFilter === "all") return true;
+    if (orderFilter === "cancelled") return order.deliveryStatus === "CANCELLED";
+    if (orderFilter === "ordered") return order.deliveryStatus === "BEFORE_SHIPMENT";
+    if (orderFilter === "shipping") return order.deliveryStatus === "DELIVERING";
+    if (orderFilter === "delivered") return order.deliveryStatus === "DELIVERED";
+    return false;
+  });
 
   const handleSaveProfile = async () => {
     if (!user) return
@@ -248,15 +181,72 @@ export default function ProfilePage() {
     }
   }
 
-  const handleViewOrderDetail = (orderId: number) => {
-    const order = myOrders.find((o) => o.id === orderId)
-    if (order) {
-      setSelectedOrder(order)
-      setOrderDetailOpen(true)
+  const handleViewOrderDetail = async (orderId: number) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl || !accessToken) {
+      alert("API 주소 또는 로그인 정보가 없습니다.");
+      return;
+    }
+
+    try {
+      // 1. 백엔드 API 2 (주문 상세 조회) 호출
+      // (수정) API 응답 타입을 백엔드 DTO와 일치하는 'OrderDetailResponseDto'로 수정
+      console.log(`GET /api/v1/orders/${orderId} 호출 시작...`);
+      const backendData = await apiClient.get<OrderDetailResponseDto>(
+        `${apiUrl}/api/v1/orders/${orderId}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+      
+      console.log("주문 상세 응답:", backendData);
+      
+      // 2. 백엔드 DTO(backendData)를 프론트엔드 모달 타입(OrderDetail)으로 변환
+      
+      // (임시) 상세 모달은 대표 상품 1개만 보여준다고 가정 (기존 Mock 데이터 기준)
+      // TODO: 모달 UI가 여러 상품(orderItems)을 표시하도록 수정 필요
+      const firstItem = backendData.orderItems[0]; 
+      
+      const orderForModal: OrderDetail = {
+        id: backendData.orderId,
+        orderNumber: backendData.orderNumber,
+        orderDate: backendData.orderDate,
+        
+        // --- (수정) 백엔드 DTO의 실제 상태값으로 status/statusText 생성 ---
+        status: backendData.deliveryStatus, 
+        statusText: getStatusText(backendData.orderStatus, backendData.deliveryStatus),
+        
+        // --- (수정) 백엔드 데이터로 채우기 ---
+        customerName: backendData.customerName,
+        customerPhone: backendData.customerPhone,
+        customerEmail: backendData.customerEmail,
+        shippingAddress: backendData.shippingAddress,
+        detailAddress: "", // (백엔드 DTO에 detailAddress가 없으므로 빈 값 처리)
+        paymentMethod: backendData.paymentMethod,
+        pointsUsed: backendData.usedPoint,
+        
+        // --- (수정) 첫 번째 아이템 정보로 모달 채우기 (임시) ---
+        productName: firstItem?.productName || "상품 정보 없음",
+        productImage: firstItem?.productImage || "/placeholder.svg",
+        price: backendData.totalAmount, // (모달 UI와 협의 필요 - 상품금액? 총결제금액?)
+        option: firstItem?.optionName || "-",
+        quantity: firstItem?.quantity || 0,
+        shippingFee: backendData.totalShippingPrice, // 상품별 배송비가 아닌 총 배송비로 우선 대체
+        sellerName: firstItem?.sellerName || "-",
+      };
+
+      setSelectedOrder(orderForModal); // 3. 상태 저장
+      setOrderDetailOpen(true); // 4. 모달 열기
+
+    } catch (error) {
+      console.error("주문 상세 조회 실패:", error);
+      if (axios.isAxiosError(error) && error.response) {
+        alert(`오류: ${error.response.data.message || '주문 상세 정보를 불러오는 데 실패했습니다.'}`);
+      } else {
+        alert('주문 상세 조회 중 알 수 없는 오류가 발생했습니다.');
+      }
     }
   }
-
-  // 리뷰 관련 함수 제거 - ReviewsSection에서 처리
 
   const renderContent = () => {
     switch (selectedMenu) {
@@ -303,6 +293,35 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    // --- 나의 주문 목록 조회 ---
+    const fetchMyOrders = async () => {
+      if (!accessToken || !apiUrl) {
+        if (!accessToken) console.warn("로그인되지 않음, 주문 목록 조회 스킵");
+        return;
+      }
+      try {
+        console.log("GET /api/v1/orders 호출 시작...");
+        const response = await apiClient.get<MyOrder[]>(
+          `${apiUrl}/api/v1/orders`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          }
+        );
+        console.log("주문 목록 응답:", response);
+        setMyOrders(response);
+      } catch (error) {
+        console.error("주문 목록 조회 실패:", error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+           alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+           router.push("/login");
+        } else {
+           alert("주문 목록을 불러오는 데 실패했습니다.");
+        }
+      }
+    };
+
     const fetchUserData = async () => {
       try {
         const userData = await fetchUser()
@@ -329,7 +348,8 @@ export default function ProfilePage() {
         // 에러가 발생해도 페이지는 표시하도록 함
       }
     }
-    fetchUserData()
+    fetchUserData();
+    fetchMyOrders();
 
     const storedUserType = localStorage.getItem("ohouse_user_type") as "buyer" | "seller" | null
     if (storedUserType) {
@@ -340,7 +360,7 @@ export default function ProfilePage() {
     if (storedGrade) {
       setSellerGrade(storedGrade)
     }
-  }, [router])
+  }, [router, accessToken]);
 
   // 리뷰 관련 useEffect 제거 - ReviewsSection에서 처리
 
