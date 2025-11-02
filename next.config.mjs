@@ -16,9 +16,20 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'shopping-phinf.pstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ssl.pstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'phinf.pstatic.net',
       },
     ],
+    // 이미지 로더 설정 (필요시)
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   reactStrictMode: false,
   experimental: {
