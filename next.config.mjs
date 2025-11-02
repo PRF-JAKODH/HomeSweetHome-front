@@ -26,6 +26,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'phinf.pstatic.net',
       },
+      {
+        protocol: 'https',
+        hostname: 'hsweet-bucket-1007.s3.ap-northeast-2.amazonaws.com',
+      },
     ],
     // 이미지 로더 설정 (필요시)
     dangerouslyAllowSVG: true,
