@@ -28,7 +28,7 @@ export const getNotifications = async (): Promise<Notification[]> => {
  * @param notificationIds - 읽음 처리할 알림 ID 배열
  */
 export const markAsRead = async (notificationIds: number[]): Promise<void> => {
-  await apiClient.post<void>(`${NOTIFICATION_API_BASE}/read`, notificationIds);
+  await apiClient.patch<void>(`${NOTIFICATION_API_BASE}/read`, notificationIds);
 };
 
 /**

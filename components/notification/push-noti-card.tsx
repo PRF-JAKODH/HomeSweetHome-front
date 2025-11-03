@@ -27,23 +27,23 @@ export function PushNotificationCard({ notification, onAction }: PushNotificatio
     return `${days}일 전`
   }
 
-  const handleChevronClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    console.log(notification.redirectUrl)
-    if (!notification.redirectUrl) return
-    router.push(notification.redirectUrl)
+  const handleCardClick = () => {
+    if (onAction) onAction()
+    if (notification.redirectUrl) {
+      router.push(notification.redirectUrl)
+    }
   }
 
   return (
     <div
       className={`
-        relative flex gap-3 p-4 rounded-lg border transition-all
+        relative flex gap-3 p-4 rounded-lg border transition-all cursor-pointer
         ${!notification.isRead 
           ? 'bg-blue-50 border-blue-200 shadow-md' 
           : 'bg-white border-gray-200 hover:shadow-md'
         }
       `}
-      onClick={onAction}
+      onClick={handleCardClick}
       style={{ zIndex: 80 }}
     >
       {/* 아이콘 */}
@@ -83,15 +83,6 @@ export function PushNotificationCard({ notification, onAction }: PushNotificatio
           </button>
         )}
       </div>
-      <button
-        type="button"
-        aria-label="알림 링크로 이동"
-        className="self-center p-2 ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors flex-shrink-0"
-        onClick={handleChevronClick}
-        disabled={!notification.redirectUrl}
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
     </div>
   )
 }
