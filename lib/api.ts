@@ -195,6 +195,8 @@ class ApiClient {
   async get<T = any>(url: string, config?: ApiRequestConfig): Promise<AxiosResponse<T>> {
     const authType = config?.authType || AuthType.ACCESS_TOKEN
     const client = this.getClient(authType)
+
+  console.log("🟦 ApiClient GET:", client.defaults.baseURL, url, config?.params)
     return client.get<T>(url, config)
   }
 
