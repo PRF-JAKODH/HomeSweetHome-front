@@ -16,7 +16,7 @@ import type { IMessage } from "@stomp/stompjs"
 // ============================================
 // 타입 정의
 // ============================================
-export type ChatMessageDto = {
+export type ChatMessageResponse = {
   messageId: number
   roomId: number
   senderId: number
@@ -31,20 +31,41 @@ export type ChatMessageDto = {
 // 채팅방 정보 응답 타입
 type ChatRoomDetailResponse = {
   roomId: number
-  text: string
   partnerId: number
   partnerName: string
   thumbnailUrl: string
 }
 
 type Message = {
-  id: number
+  messageId: number
   senderId: number
   text: string
   timestamp: string
   isMe: boolean
   images?: string[]
   status?: "sending" | "sent" | "error"
+}
+
+export type ChatMessageDto = {
+  messageId: number
+  roomId: number
+  senderId: number
+  text: string
+  sentAt: string
+  senderName: string
+  profileImageUrl: string
+}
+
+// 이전 메시지 응답 (PreMessageResponse)
+export type PreMessageResponse = {
+  messages: ChatMessageDto[]
+  hasNext: boolean
+}
+
+// 방 입장 응답 (RoomEnterResponse)
+export type RoomEnterResponse = {
+  roomInfo: ChatRoomDetailResponse
+  preMessages: PreMessageResponse
 }
 
 // ============================================
@@ -76,7 +97,7 @@ const SmileIcon = ({ className }: { className?: string }) => (
 // ============================================
 // 메인 컴포넌트
 // ============================================
-export default function MessagesPage({ params }: { params: Promise<{ roomId: string }> }) {
+export default function MessagesPage({ params }: { params: Promise<{roomId:string}> }) {
   // ------------------------------------------
   // 1. 기본 설정 및 상태 초기화
   // ------------------------------------------
@@ -96,6 +117,9 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   const [inputValue, setInputValue] = useState("")
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [isConnected, setIsConnected] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [lastMessageId, setLastMessageId] = useState<number | null>(null)
+
   
   // UI 상태
   const [partnerName, setPartnerName] = useState<string>("상대방")
@@ -106,7 +130,9 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   // Ref
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const isSubscribedRef = useRef(false)  
 
+  const [loadingMore, setLoadingMore] = useState(false)
   // ------------------------------------------
   // 3. 채팅방 정보 로드 및 웹소켓 연결
   // ------------------------------------------
@@ -123,7 +149,15 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
           onConnected: () => {
             if (!mounted) return
             setIsConnected(true)
+             
+            if (isSubscribedRef.current) {
+              console.log("⚠️ 이미 구독 중 - 스킵")
+              return
+            }
+
             subscribeToTopic(`/sub/rooms/${roomId}`, handleMessageReceived)
+            isSubscribedRef.current = true  // ✅ 구독 완료 표시
+            console.log("✅ 구독 완료")
           },
           onError: (error) => {
             console.error("❌ 웹소켓 연결 실패:", error)
@@ -139,7 +173,12 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   
     return () => {
       mounted = false
-      unsubscribeFromTopic(`/sub/rooms/${roomId}`)
+
+      if (isSubscribedRef.current){
+        console.log("구독 해제")
+        unsubscribeFromTopic(`/sub/rooms/${roomId}`)
+        isSubscribedRef.current = false
+      }
     }
   }, [roomId, accessToken])
 
@@ -151,25 +190,57 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
    * 채팅방 정보 조회 
    */
   const fetchChatRoomInfo = async () => {
+    const myUserId = useAuthStore.getState().user?.id
+
+
     try {
       console.log("📤 채팅방 정보 요청 - roomId:", roomId)
-      
-      // ✅ 절대 경로 사용 (상품 페이지와 동일)
-      const response = await apiClient.get(
-        `http://localhost:8080/api/v1/chat/rooms/${roomId}`
-      )
+            const response = await apiClient.get(`http://localhost:8080/api/v1/chat/rooms/${roomId}/enter`, {
+        headers: {
+          Authorization: `Bearer ${accessToken},`
+        },
+      })
 
-      
       console.log("✅ 채팅방 정보 응답:", response)
+
+// ✅ 응답 본문
+const roomData = response.data
+if (!roomData) {
+  console.error("⚠️ roomData가 undefined입니다:", response)
+  return
+}
+
+  // ✅ 구조 분해 (안전하게 처리)
+  const { roomInfo, preMessages } = roomData
+  if (!preMessages) {
+    console.error("⚠️ preMessages가 undefined입니다:", roomData)
+    return
+  }
+
+  const myUserId = useAuthStore.getState().user?.id
+
+  // ✅ 메시지 변환 (내 메시지 구분)
+  const parsedMessages = preMessages.messages
+    .slice()
+    .reverse()
+    .map((msg: ChatMessageDto) => ({
+    ...msg,
+    isMe: msg.senderId === myUserId, 
+  }))
+
+  console.log("🏠 roomInfo:", roomInfo)
+  console.log("💬 parsedMessages:", parsedMessages)
+
+
+      if (!preMessages) {
+        console.error("⚠️ preMessages가 undefined입니다:", roomData)
+        return
+      }
       
-      // ✅ response.data로 접근 (상품 페이지와 동일)
-      const roomData = response.data
-      
-      console.log("📦 채팅방 데이터:", roomData)
-      
-      setPartnerName(roomData.partnerName || "상대방")
-      setPartnerProfileImg(roomData.thumbnailUrl || "")
-      
+      setPartnerName(roomData.roomInfo.partnerName || "상대방")
+      setPartnerProfileImg(roomData.roomInfo.thumbnailUrl || "")
+      setMessages(parsedMessages)
+
     } catch (error: any) {
       console.error("❌ 채팅방 정보 로드 실패:", {
         status: error.response?.status,
@@ -197,9 +268,9 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
 
       // 새 메시지를 목록에 추가
       const newMessage: Message = {
-        id: payload.messageId,
+        messageId: payload.messageId,
         senderId: payload.senderId,
-        text: payload.content,
+        text: payload.text,
         timestamp: formatTimestamp(payload.sentAt),
         isMe: false,
         status: "sent",
@@ -226,7 +297,7 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
 
     // UI 메시지 생성 (Optimistic UI)
     const tempMessage: Message = {
-      id: Date.now(),
+      messageId: Date.now(),
       senderId: user?.id ?? 0,
       text: inputValue,
       timestamp: formatTimestamp(new Date().toISOString()),
@@ -245,13 +316,13 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
         text: inputValue,
         senderId: user?.id
       })
-      console.log("📤 메시지 전송 완료")
+      console.log("📤 메시지 전송 완료 " + inputValue)
     } catch (error) {
       console.error("❌ 메시지 전송 실패:", error)
       // 실패한 메시지 상태 업데이트
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === tempMessage.id ? { ...msg, status: "error" } : msg
+          msg.messageId === tempMessage.messageId ? { ...msg, status: "error" } : msg
         )
       )
     }
@@ -261,15 +332,73 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
     setSelectedImages([])
   }
 
-  /**
-   * Enter 키 입력 처리
+    /**
+   * 스크롤을 최하단으로 이동
    */
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+
+useEffect(() => {
+  const container = chatContainerRef.current
+  if (!container) return
+
+  const handleScroll = async () => {
+    // 최상단에 도달한 경우
+    if (container.scrollTop === 0 && hasMore) {
+      const firstMessageId = messages[0]?.messageId
+      if (!firstMessageId) return
+      await fetchOlderMessages(firstMessageId)
     }
   }
+
+  container.addEventListener("scroll", handleScroll)
+  return () => container.removeEventListener("scroll", handleScroll)
+}, [loadingMore, hasMore])
+
+
+
+const fetchOlderMessages = async (lastMessageId: number) => {
+  try {
+    const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/messages`, {
+      params: { lastMessageId, size: 30 },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+
+    // 구조분해할당으로 꺼냄
+    const { messages: newMessages, hasMore: newHasMore } = response.data
+
+    // 기존 메시지 위에 추가
+    setMessages((prev) => [...newMessages.reverse(), ...prev])
+    setHasMore(newHasMore)
+
+    if (newMessages.length > 0) {
+      setLastMessageId(newMessages[0].messageId)
+    }
+
+  } catch (error) {
+    console.error("❌ 이전 메시지 불러오기 실패:", error)
+  }
+}
+
+
+ /*
+  * Enter 키 입력 처리 (한글 중복 전송 방지)
+  */
+ const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+   // 한글 조합 중일 때는 무시
+   if (e.nativeEvent.isComposing) {
+     return
+   }
+   
+   if (e.key === "Enter" && !e.shiftKey) {
+     e.preventDefault()
+     handleSendMessage()
+   }
+ }
 
   /**
    * 이미지 선택 처리
@@ -299,13 +428,6 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
       hour: "2-digit",
       minute: "2-digit",
     })
-  }
-
-  /**
-   * 스크롤을 최하단으로 이동
-   */
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
   /**
@@ -492,10 +614,11 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
       )}
 
       {/* ========== 메시지 목록 ========== */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <main ref = {chatContainerRef}
+       className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.map((message) => (
           <div
-            key={message.id}
+            key={message.messageId}
             className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}
           >
             <div
@@ -568,7 +691,7 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
         ))}
         
         {/* 스크롤 최하단 참조 */}
-        <div ref={messagesEndRef} />
+        <div />
       </main>
 
       {/* ========== 입력 영역 ========== */}

@@ -205,30 +205,22 @@ const filteredOrders = myOrders
       
       const orderForModal: OrderDetail = {
         id: backendData.orderId,
-        orderNumber: backendData.orderNumber,
-        orderDate: backendData.orderDate,
-        
-        // --- (수정) 백엔드 DTO의 실제 상태값으로 status/statusText 생성 ---
-        status: backendData.deliveryStatus, 
-        statusText: getStatusText(backendData.orderStatus, backendData.deliveryStatus),
-        
-        // --- (수정) 백엔드 데이터로 채우기 ---
-        customerName: backendData.customerName,
-        customerPhone: backendData.customerPhone,
-        customerEmail: backendData.customerEmail,
-        shippingAddress: backendData.shippingAddress,
-        detailAddress: "", // (백엔드 DTO에 detailAddress가 없으므로 빈 값 처리)
-        paymentMethod: backendData.paymentMethod,
-        pointsUsed: backendData.usedPoint,
-        
-        // --- (수정) 첫 번째 아이템 정보로 모달 채우기 (임시) ---
-        productName: firstItem?.productName || "상품 정보 없음",
-        productImage: firstItem?.productImage || "/placeholder.svg",
-        price: backendData.totalAmount, // (모달 UI와 협의 필요 - 상품금액? 총결제금액?)
-        option: firstItem?.optionName || "-",
-        quantity: firstItem?.quantity || 0,
-        shippingFee: backendData.totalShippingPrice, // 상품별 배송비가 아닌 총 배송비로 우선 대체
-        sellerName: firstItem?.sellerName || "-",
+      orderNumber: backendData.orderNumber,
+      orderDate: backendData.orderDate,
+      status: backendData.deliveryStatus, 
+      statusText: getStatusText(backendData.orderStatus, backendData.deliveryStatus),
+      customerName: backendData.customerName,
+      customerPhone: backendData.customerPhone,
+      customerEmail: backendData.customerEmail,
+      shippingAddress: backendData.shippingAddress,
+      detailAddress: "", // (필요시 백엔드 DTO에 추가)
+      paymentMethod: backendData.paymentMethod,
+      pointsUsed: backendData.usedPoint,
+
+      orderItems: backendData.orderItems, // ★★★ 'orderItems' 배열 통째로 전달 ★★★
+
+      totalAmount: backendData.totalAmount,
+      totalShippingPrice: backendData.totalShippingPrice,
       };
 
       setSelectedOrder(orderForModal); // 3. 상태 저장
@@ -490,72 +482,86 @@ const filteredOrders = myOrders
 
               {/* Order Product */}
               <div className="border border-divider rounded-lg p-4 space-y-3">
-                <h3 className="font-semibold text-foreground text-lg mb-3">주문 상품</h3>
-                <div className="flex gap-4">
-                  <img
-                    src={selectedOrder.productImage || "/placeholder.svg"}
-                    alt={selectedOrder.productName}
-                    className="w-24 h-24 object-cover rounded-lg"
-                  />
-                  <div className="flex-1 space-y-2">
-                    <h4 className="font-semibold text-foreground">{selectedOrder.productName}</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-text-secondary">옵션</p>
-                        <p className="text-foreground font-medium">{selectedOrder.option}</p>
-                      </div>
-                      <div>
-                        <p className="text-text-secondary">수량</p>
-                        <p className="text-foreground font-medium">{selectedOrder.quantity}개</p>
-                      </div>
-                      <div>
-                        <p className="text-text-secondary">배송비</p>
-                        <p className="text-foreground font-medium">
-                          {selectedOrder.shippingFee === 0 ? "무료" : `${selectedOrder.shippingFee.toLocaleString()}원`}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-text-secondary">판매자</p>
-                        <p className="text-foreground font-medium">{selectedOrder.sellerName}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      <h3 className="font-semibold text-foreground text-lg mb-3">주문 상품</h3>
+
+      {/* ★ selectedOrder.orderItems 배열을 map으로 순회 ★ */}
+      {selectedOrder.orderItems.map((item) => (
+        <div key={item.orderItemId} className="flex gap-4 pb-4 border-b last:border-b-0">
+          <img
+            src={item.productImage || "/placeholder.svg"}
+            alt={item.productName}
+            className="w-24 h-24 object-cover rounded-lg"
+          />
+          <div className="flex-1 space-y-2">
+            <h4 className="font-semibold text-foreground">{item.productName}</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-text-secondary">옵션</p>
+                <p className="text-foreground font-medium">{item.optionName}</p>
               </div>
+              <div>
+                <p className="text-text-secondary">수량</p>
+                <p className="text-foreground font-medium">{item.quantity}개</p>
+              </div>
+              <div>
+                <p className="text-text-secondary">배송비</p>
+                <p className="text-foreground font-medium">
+                  {item.shippingFee === 0 ? "무료" : `${item.shippingFee.toLocaleString()}원`}
+                </p>
+              </div>
+              <div>
+                <p className="text-text-secondary">판매자</p>
+                <p className="text-foreground font-medium">{item.sellerName}</p>
+              </div>
+               <div>
+                <p className="text-text-secondary">상품 금액</p>
+                <p className="text-foreground font-medium">
+                  {(item.price * item.quantity).toLocaleString()}원
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
 
               {/* Payment Information */}
               <div className="border border-divider rounded-lg p-4 space-y-3">
-                <h3 className="font-semibold text-foreground text-lg mb-3">결제 정보</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">상품 금액</span>
-                    <span className="text-foreground font-medium">{selectedOrder.price.toLocaleString()}원</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">배송비</span>
-                    <span className="text-foreground font-medium">
-                      {selectedOrder.shippingFee === 0 ? "무료" : `${selectedOrder.shippingFee.toLocaleString()}원`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">포인트 사용</span>
-                    <span className="text-red-600 font-medium">-{selectedOrder.pointsUsed.toLocaleString()}P</span>
-                  </div>
-                  <div className="border-t border-divider pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-foreground">최종 결제 금액</span>
-                      <span className="text-xl font-bold text-primary">
-                        {(selectedOrder.price + selectedOrder.shippingFee - selectedOrder.pointsUsed).toLocaleString()}
-                        원
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between text-sm pt-2">
-                    <span className="text-text-secondary">결제 수단</span>
-                    <span className="text-foreground font-medium">{selectedOrder.paymentMethod}</span>
-                  </div>
-                </div>
-              </div>
+      <h3 className="font-semibold text-foreground text-lg mb-3">결제 정보</h3>
+      <div className="space-y-2">
+
+        {/* (상품 금액, 배송비 - DTO 구조에 따라 totalAmount/totalShippingPrice로 대체) */}
+        <div className="flex justify-between text-sm">
+          <span className="text-text-secondary">총 상품 금액</span>
+          {/* (totalAmount - totalShippingPrice로 계산) */}
+          <span className="text-foreground font-medium">
+            {(selectedOrder.totalAmount - selectedOrder.totalShippingPrice).toLocaleString()}원
+          </span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-text-secondary">총 배송비</span>
+          <span className="text-foreground font-medium">
+            {selectedOrder.totalShippingPrice === 0 ? "무료" : `${selectedOrder.totalShippingPrice.toLocaleString()}원`}
+          </span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-text-secondary">포인트 사용</span>
+          <span className="text-red-600 font-medium">-{selectedOrder.pointsUsed.toLocaleString()}P</span>
+        </div>
+        <div className="border-t border-divider pt-2 mt-2">
+          <div className="flex justify-between">
+            <span className="font-semibold text-foreground">최종 결제 금액</span>
+            <span className="text-xl font-bold text-primary">
+              {selectedOrder.totalAmount.toLocaleString()}원
+            </span>
+          </div>
+        </div>
+        <div className="flex justify-between text-sm pt-2">
+          <span className="text-text-secondary">결제 수단</span>
+          <span className="text-foreground font-medium">{selectedOrder.paymentMethod}</span>
+        </div>
+      </div>
+    </div>
             </div>
           )}
 

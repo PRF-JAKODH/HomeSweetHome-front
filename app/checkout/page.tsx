@@ -11,11 +11,13 @@ import { useRouter } from "next/navigation"
 import { useAuthStore } from '@/stores/auth-store';
 import axios from "axios"
 import { Address, CartResponse, ScrollResponse, CreateOrderRequestDto, OrderItemDetail, OrderReadyResponseDto } from "@/types/order"
-
+import { useCheckoutStore } from '@/stores/checkout-store'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const [orderItems, setOrderItems] = useState<CartResponse[]>([]);
+  
+  const orderItems = useCheckoutStore((state) => state.items);
+  
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedAddress, setSelectedAddress] = useState<string>("")
   const [usePoints, setUsePoints] = useState<number>(0)
@@ -31,66 +33,25 @@ export default function CheckoutPage() {
     isDefault: false,
   })
 
-  // 결제 계산 변수들
-  const [finalPrice, setFinalPrice] = useState<number>(0) // 최종 결제 금액
-  const [totalPrice, setTotalPrice] = useState<number>(0) // 상품 총 금액
-  const [shippingFee, setShippingFee] = useState<number>(0)// 배송비
-  const [discount, setDiscount] = useState<number>(0) // 할인 금액
+  const [finalPrice, setFinalPrice] = useState<number>(0)
+  const [totalPrice, setTotalPrice] = useState<number>(0)
+  const [shippingFee, setShippingFee] = useState<number>(0)
+  const [discount, setDiscount] = useState<number>(0)
 
-  // 최종 결제 금액이 바뀌는 경우? -> 수량 변경, point 적용
   useEffect(() => {
     const totalPrice = orderItems.reduce((sum, item) => sum + item.finalPrice * item.quantity, 0)
-    const discount = usePoints // point
+    const discount = usePoints
     setTotalPrice(totalPrice)
     setDiscount(discount)
   }, [orderItems, usePoints])
 
-  // 최종 결제 금액 변경
   useEffect(() => {
     setFinalPrice(totalPrice + shippingFee - discount)
   }, [totalPrice, shippingFee, discount])
 
-  // 결제 진행 상태
   const [isLoading, setIsLoading] = useState(false);
 
-
-  // ---( 서버에서 장바구니 정보 가져오기 useEffect )---
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const fetchCartItems = async () => {
-      if (!accessToken) {
-        console.warn("로그인되지 않음, 장바구니 조회 스킵");
-        return;
-      }
-      if (!apiUrl) {
-        console.error('API URL이 설정되지 않았습니다.');
-        return;
-      }
-
-      try {
-        console.log("GET /api/v1/carts 호출 시작...");
-        const response = await axios.get<ScrollResponse<CartResponse>>(
-          `${apiUrl}/api/v1/carts`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            params: { size: 100 }
-          }
-        );
-
-        console.log("장바구니 응답:", response.data);
-        setOrderItems(response.data.contents || []);
-
-      } catch (error) {
-        console.error("장바구니 조회 실패:", error);
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          alert("세션이 만료되었습니다. 다시 로그인해주세요.");
-          router.push("/login");
-        } else {
-          alert("장바구니 정보를 불러오는 데 실패했습니다.");
-        }
-      }
-    };
-
     const storedAddresses = localStorage.getItem("ohouse_addresses");
     if (storedAddresses) {
       const parsedAddresses = JSON.parse(storedAddresses);
@@ -98,28 +59,25 @@ export default function CheckoutPage() {
       const defaultAddr = parsedAddresses.find((addr: Address) => addr.isDefault);
       if (defaultAddr) setSelectedAddress(defaultAddr.id);
     }
+    
+    // (Zustand 스토어가 sessionStorage에서 orderItems를 자동으로 불러옴)
+    // (API 호출 및 localStorage 로직 모두 제거)
+    
+  }, []); // 의존성 배열 비우기
 
-    fetchCartItems();
-
-  }, [accessToken, router]);
-  // --- (데이터 조회 useEffect 끝) ---
-
-
-  // --- (수량 변경 핸들러 함수) ---
   const updateQuantity = (itemId: number, change: number) => {
-    setOrderItems((prev) => {
-      return prev.map((item) => {
-        if (item.id === itemId) {
-          const newQuantity = Math.max(1, item.quantity + change);
-          console.log("TODO: API로 수량 변경 필요", item.id, newQuantity);
-          return { ...item, quantity: newQuantity };
-        }
-        return item;
-      });
+    const currentItems = useCheckoutStore.getState().items;
+    const updatedItems = currentItems.map((item) => {
+      if (item.id === itemId) {
+        const newQuantity = Math.max(1, item.quantity + change);
+        console.log("TODO: API로 수량 변경 필요 (checkout 페이지)", item.id, newQuantity);
+        return {...item, quantity: newQuantity};
+      }
+      return item;
     });
+    useCheckoutStore.getState().setItems(updatedItems);
   };
 
-  // --- (배송지 추가 핸들러 함수) ---
   const handleAddAddress = () => {
     if (!newAddress.roadAddress || !newAddress.name || !newAddress.phone) {
       alert("필수 정보를 입력해주세요")
@@ -144,17 +102,10 @@ export default function CheckoutPage() {
       },
     }).open()
   }
-  // --- (기존 핸들러 함수들 끝) ---
 
-  // 결제창 SDK 사용 (위젯 제거)
-
-
-  // --- ( 결제하기 버튼 눌렀을 때 함수 ) ---
   const handlePayment = async () => {
-    // 버튼 다시 클릭 방지용 로딩 안내
     setIsLoading(true);
 
-    // 기본 검증
     if (!selectedAddress) {
       alert("배송지를 선택해주세요")
       return;
@@ -166,12 +117,19 @@ export default function CheckoutPage() {
     }
 
     const orderReadyResponse = await createOrderAPI(currentAddress)
+
+    const orderId = orderReadyResponse?.orderNumber ?? "error";
+    const orderName = orderReadyResponse?.orderName ?? "error";
+    const totalAmount = orderReadyResponse?.totalAmount;
+    const customerName = orderReadyResponse?.username ?? currentAddress.name;
+
+    if (totalAmount === undefined) {
+        alert("주문 생성에 실패했거나, 응답이 올바르지 않습니다.");
+        setIsLoading(false);
+        return;
+    }
     console.log(orderReadyResponse)
 
-    // DTO 파싱
-
-
-    // Toss 결제창 띄우기 준비
     const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
     if (!clientKey) {
       alert("TOSS_CLIENT_KEY 환경 변수가 설정되지 않았습니다.");
@@ -181,35 +139,24 @@ export default function CheckoutPage() {
 
     try {
       const tossPayments = await loadTossPayments(clientKey);
-      // const orderId = 'ORDER-123'
-      // const orderId = `ORDER-${Date.now()}`;
-      // if ( orderReadyResponse?.orderId == null){
-
-      // }
-      const orderId = orderReadyResponse?.orderNumber ?? "error";
-      // const orderName = orderItems.length > 0 ? `${orderItems[0].productName} 외 ${Math.max(orderItems.length - 1, 0)}건` : "주문 상품";
-      const orderName = orderReadyResponse?.orderName ?? "error";
       const successUrl = `${window.location.origin}/checkout/success`;
       const failUrl = `${window.location.origin}/checkout/fail`;
 
       await tossPayments.requestPayment("CARD", {
-        amount: finalPrice,
+        amount: totalAmount,
         orderId,
         orderName,
-        customerName: currentAddress.name,
+        customerName: customerName,
         successUrl,
         failUrl,
       });
-      // 성공 시 결제창이 successUrl 로 이동
     } catch (error) {
       console.error("결제 요청 실패:", error);
       alert("결제 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       setIsLoading(false);
     }
   };
-  // --- (handlePayment 끝) ---
 
-  // ---(서버 API 호출 ) ----
   const createOrderAPI = async (currentAddress: Address) => {
     const requestData: CreateOrderRequestDto = {
       orderItems: orderItems.map(item => ({
@@ -235,7 +182,7 @@ export default function CheckoutPage() {
       console.log('API 1 응답 데이터:', response.data);
       const { orderId, orderNumber, totalAmount, username, orderItems } = response.data;
       const orderName = orderItems.length > 0 ? orderItems[0].productName : "주문 상품";
-      return { orderName, orderNumber}
+      return { orderName, orderNumber, totalAmount, username }
 
     } catch (error) {
       console.error('주문 생성 요청 실패:', error);
@@ -247,8 +194,6 @@ export default function CheckoutPage() {
     }
   }
 
-
-  // --- (JSX 렌더링: 기존과 동일) ---
   return (
     <div className="min-h-screen bg-background">
       <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" async />
@@ -259,7 +204,6 @@ export default function CheckoutPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
 
-            {/* 주문 상품 (기존과 동일) */}
             <Card className="p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">주문 상품</h2>
               <div className="space-y-4">
@@ -305,7 +249,6 @@ export default function CheckoutPage() {
               </div>
             </Card>
 
-            {/* 배송지 (기존과 동일) */}
             <Card className="p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-foreground">배송지</h2>
@@ -392,9 +335,6 @@ export default function CheckoutPage() {
               )}
             </Card>
 
-            {/* [제거] 결제 수단 Card (솔루션 1) */}
-
-            {/* 포인트 사용 (기존과 동일) */}
             <Card className="p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">포인트 사용</h2>
               <div className="space-y-3">
@@ -429,7 +369,6 @@ export default function CheckoutPage() {
             </Card>
           </div>
 
-          {/* 결제 정보 (sticky, 우측) */}
           <div className="lg:col-span-1">
             <Card className="sticky top-24 p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">결제 정보</h2>
@@ -460,9 +399,6 @@ export default function CheckoutPage() {
                 <p>• 결제 완료 후 취소/변경은 고객센터로 문의해주세요</p>
               </div>
 
-              {/* 토스 위젯 UI는 오버레이에서 렌더링됩니다. */}
-
-              {/* 결제하기 버튼 */}
               <Button
                 size="lg"
                 className="w-full bg-primary hover:bg-primary-dark text-white"

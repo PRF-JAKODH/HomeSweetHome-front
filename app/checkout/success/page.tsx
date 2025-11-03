@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'; // 필요 시 UI 컴포넌트 �
 import { Card } from '@/components/ui/card'; // 필요 시 UI 컴포넌트 사용
 import { useRouter } from 'next/navigation'; // 페이지 이동용
 import { apiClient } from '@/lib/api/client';
-// --- 타입 정의 ---
+import { useCheckoutStore } from '@/stores/checkout-store';
 // API 2 응답 타입 (OrderService의 PaymentConfirmResponse와 일치)
 interface PaymentConfirmResponseDto {
     merchantUid: string;
@@ -19,6 +19,8 @@ interface PaymentConfirmResponseDto {
 function SuccessPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter(); // 페이지 이동용
+
+    const clearCheckoutItems = useCheckoutStore((state) => state.clearItems);
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -51,31 +53,19 @@ function SuccessPageContent() {
             }
 
             try {
-
                 // --- 백엔드 API 2 호출 ---
                 console.log('API 2 요청 데이터:', { paymentKey, orderId, amount });
                 const response = await apiClient.post<PaymentConfirmResponseDto>(
                     `${apiUrl}/api/v1/orders/payments/confirm`, // 백엔드 결제 검증 API 주소
                     { paymentKey, orderId, amount }
                 )
-
-                // const response = await axios.post<PaymentConfirmResponseDto>(
-                //     `${apiUrl}/api/v1/orders/payments/confirm`, // 백엔드 결제 검증 API 주소
-                //     { paymentKey, orderId, amount },
-                //     {
-                //         headers: { Authorization: `Bearer ${accessToken}` }
-                //     }
-
-                    // (인증 필요 시 헤더 추가)
-                // );
                 console.log('API 2 응답 데이터:', response.data);
 
-                setOrderResult(response.data); // 성공 결과 저장
+                setOrderResult(response.data);
 
-                // --- (선택) 결제 완료 후 장바구니 비우기 ---
-                // TODO: Zustand 스토어의 장바구니 비우는 액션 호출 등
-                localStorage.removeItem("ohouse_cart"); // 임시 로컬 스토리지 비우기
-
+                clearCheckoutItems();
+                // TODO: DB 장바구니 비우기 API 호출 (localStorage.removeItem 대신)
+                localStorage.removeItem("ohouse_cart");
 
             } catch (err) {
                 console.error('결제 검증 실패:', err);
@@ -92,7 +82,7 @@ function SuccessPageContent() {
 
         confirmPayment(); // useEffect에서 비동기 함수 즉시 호출
 
-    }, [searchParams]); // searchParams가 변경될 때마다(실제로는 페이지 로드 시 한 번) 실행
+    }, [searchParams, clearCheckoutItems]); // searchParams가 변경될 때마다(실제로는 페이지 로드 시 한 번) 실행
 
     // --- 렌더링 ---
     if (isLoading) {
@@ -120,11 +110,7 @@ function SuccessPageContent() {
             </div>
             <h1 className="text-2xl font-bold mb-2">결제가 성공적으로 완료되었습니다!</h1>
             <p className="text-gray-600 mb-6">주문해주셔서 감사합니다.</p>
-            <Card className="p-6 inline-block">
-                <p className="mb-2">주문 번호: <span className="font-mono font-semibold">{orderResult?.merchantUid}</span></p>
-                <p>주문 상태: <span className="font-semibold">{orderResult?.status === 'DELIVERED' ? '배송 준비 중' : orderResult?.status}</span></p>
-                {/* 필요 시 더 많은 주문 정보 표시 */}
-            </Card>
+            
             <div className="mt-8 flex justify-center gap-4">
                 <Button variant="outline" onClick={() => router.push('/profile?tab=shopping')}>주문 내역 보기</Button>
                 <Button onClick={() => router.push('/')}>홈으로 가기</Button>

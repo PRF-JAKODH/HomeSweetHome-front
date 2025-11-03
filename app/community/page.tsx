@@ -23,7 +23,7 @@ const sortOptions: SortOption[] = [
 
 const categories = [
   { id: "shopping-talk", name: "쇼핑수다", image: "/shopping-talk-icon-new.png" },
-  { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
+  // { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
 ]
 
 const mapPostToUI = (post: CommunityPost) => ({
