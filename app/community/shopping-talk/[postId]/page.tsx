@@ -7,6 +7,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAuth } from "@/hooks/use-auth"
+import { toast } from "@/components/ui/use-toast"
+import apiClient from "@/lib/api"
+
 
 const categoryColors: Record<string, string> = {
   추천: "bg-primary/10 text-primary",
@@ -15,14 +19,6 @@ const categoryColors: Record<string, string> = {
   후기: "bg-purple-500/10 text-purple-600",
 }
 
-// 1:1 채팅방 응답 타입
-interface RoomDto {
-  roomId: number
-  type: "INDIVIDUAL" | "GROUP"
-  name: string
-  pairKey?: string
-  reused: boolean
-}
 
 
 // ✅ JWT 디코딩 함수
@@ -216,45 +212,50 @@ export default function ShoppingTalkDetailPage() {
 //============================= 1:1 채팅방 ================================
 // DM 버튼 클릭 핸들러
 const handleDM = async () => {
-  try {
-    const accessToken = useAuthStore.getState().accessToken
-    const myId = useAuthStore.getState().user?.id
-    const targetId = post?.authorId  // 게시글 작성자 ID
-    const targetName = post?.authorName  // 게시글 작성자 이름
-
-    if (!myId || !accessToken) {
-      alert("로그인이 필요합니다.")
-      router.push("/login")
-      return
-    }
+  // try {
+  //   // const accessToken = useAuthStore.getState().accessToken
+  //   const myId = useAuthStore.getState().user?.id
+  //   const targetId = post?.authorId  // 게시글 작성자 ID
+  //   const targetName = post?.authorName  // 게시글 작성자 이름
 
     // 1:1 채팅방 생성 또는 재사용
-    const res = await fetch("/api/chat/rooms/individual", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ targetId }),
-    })
+    try {
+      const response = await apiClient.post("http://localhost:8080/api/v1/chat/rooms/individual", {
+        targetId: Number(postData.authorId)
+        // productId: product.id,  // 필요시 상품 ID도 같이 전달
+      })
 
-    if (!res.ok) throw new Error(`채팅방 생성 실패 (${res.status})`)
+      console.log("채팅방 생성 응답:", response.data)
 
-    const data: RoomDto = await res.json()
-
-    console.log(
-      data.reused
-        ? `✅ 기존 채팅방 재사용 (roomId=${data.roomId})`
-        : `🆕 새 채팅방 생성 (roomId=${data.roomId})`
-    )
-
-    // ✅ 채팅방으로 이동
-    router.push(`/messages/${data.roomId}?username=${targetName}`)
-  } catch (err) {
-    console.error("❌ DM 생성 실패:", err)
-    alert("채팅방 생성 중 오류가 발생했습니다.")
+      // 서버 응답에서 roomId, alreadyExists 추출
+      const { roomId, alreadyExists } = response.data
+  
+      if (alreadyExists) {
+        console.log(`📎 기존 채팅방 재사용 (roomId: ${roomId})`)
+        toast({
+          title: "기존 채팅방으로 이동",
+          description: "이 판매자와의 대화방이 이미 존재합니다.",
+        })
+      } else {
+        console.log(`🆕 새 채팅방 생성 (roomId: ${roomId})`)
+        toast({
+          title: "새 채팅방 생성 완료",
+          description: "판매자와의 대화방이 열렸습니다.",
+        })
+      }
+  
+      // 채팅방 페이지로 이동
+      router.push(`/messages/${roomId}`)
+  
+    } catch (error: any) {
+      console.error("❌ 채팅방 생성 실패:", error)
+      toast({
+        title: "채팅방 생성 실패",
+        description: "채팅방을 생성하는데 실패했습니다.",
+        variant: "destructive",
+      })
+    }
   }
-}
 //============================= 1:1 채팅방 ================================
 
   
