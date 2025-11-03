@@ -11,11 +11,15 @@ import { useRouter } from "next/navigation"
 import { useAuthStore } from '@/stores/auth-store';
 import axios from "axios"
 import { Address, CartResponse, ScrollResponse, CreateOrderRequestDto, OrderItemDetail, OrderReadyResponseDto } from "@/types/order"
+import { useCheckoutStore } from '@/stores/checkout-store'
 
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const [orderItems, setOrderItems] = useState<CartResponse[]>([]);
+  const [setOrderItems] = useState<CartResponse[]>([]);
+
+  const orderItems = useCheckoutStore((state) => state.items);
+
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedAddress, setSelectedAddress] = useState<string>("")
   const [usePoints, setUsePoints] = useState<number>(0)
@@ -37,7 +41,7 @@ export default function CheckoutPage() {
   const [shippingFee, setShippingFee] = useState<number>(0)// 배송비
   const [discount, setDiscount] = useState<number>(0) // 할인 금액
 
-  // 최종 결제 금액이 바뀌는 경우? -> 수량 변경, point 적용
+  // 최종 결제 금액이 바뀌는 경우 -> 수량 변경, point 적용
   useEffect(() => {
     const totalPrice = orderItems.reduce((sum, item) => sum + item.finalPrice * item.quantity, 0)
     const discount = usePoints // point
@@ -54,43 +58,10 @@ export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(false);
 
 
-  // ---( 서버에서 장바구니 정보 가져오기 useEffect )---
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const fetchCartItems = async () => {
-      if (!accessToken) {
-        console.warn("로그인되지 않음, 장바구니 조회 스킵");
-        return;
-      }
-      if (!apiUrl) {
-        console.error('API URL이 설정되지 않았습니다.');
-        return;
-      }
 
-      try {
-        console.log("GET /api/v1/carts 호출 시작...");
-        const response = await axios.get<ScrollResponse<CartResponse>>(
-          `${apiUrl}/api/v1/carts`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            params: { size: 100 }
-          }
-        );
-
-        console.log("장바구니 응답:", response.data);
-        setOrderItems(response.data.contents || []);
-
-      } catch (error) {
-        console.error("장바구니 조회 실패:", error);
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          alert("세션이 만료되었습니다. 다시 로그인해주세요.");
-          router.push("/login");
-        } else {
-          alert("장바구니 정보를 불러오는 데 실패했습니다.");
-        }
-      }
-    };
-
+    // --- 3. (기존) 배송지 정보 불러오기 ---
     const storedAddresses = localStorage.getItem("ohouse_addresses");
     if (storedAddresses) {
       const parsedAddresses = JSON.parse(storedAddresses);
@@ -98,25 +69,23 @@ export default function CheckoutPage() {
       const defaultAddr = parsedAddresses.find((addr: Address) => addr.isDefault);
       if (defaultAddr) setSelectedAddress(defaultAddr.id);
     }
-
-    fetchCartItems();
-
-  }, [accessToken, router]);
-  // --- (데이터 조회 useEffect 끝) ---
+    
+  }, []);
 
 
   // --- (수량 변경 핸들러 함수) ---
   const updateQuantity = (itemId: number, change: number) => {
-    setOrderItems((prev) => {
-      return prev.map((item) => {
-        if (item.id === itemId) {
-          const newQuantity = Math.max(1, item.quantity + change);
-          console.log("TODO: API로 수량 변경 필요", item.id, newQuantity);
-          return { ...item, quantity: newQuantity };
-        }
-        return item;
-      });
+    const currentItems = useCheckoutStore.getState().items;
+
+    const updatedItems = currentItems.map((item) => {
+      if (item.id === itemId) {
+        const newQuantity = Math.max(1, item.quantity + change);
+        console.log("TODO: API로 수량 변경 필요 (checkout 페이지)", item.id, newQuantity);
+        return {...item, quantity: newQuantity};
+      }
+      return item;
     });
+    useCheckoutStore.getState().setItems(updatedItems);
   };
 
   // --- (배송지 추가 핸들러 함수) ---
@@ -396,7 +365,7 @@ export default function CheckoutPage() {
 
             {/* 포인트 사용 (기존과 동일) */}
             <Card className="p-6">
-              <h2 className="mb-4 text-lg font-bold text-foreground">포인트 사용</h2>
+              <h2 className="mb-4 text-lg font-bold text-foreground">포인트 사용(아직 기능 없음, 포인트 적용 시 오류)</h2>
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-text-secondary">보유 포인트</span>

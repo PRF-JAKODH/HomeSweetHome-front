@@ -20,6 +20,14 @@ import { ProductCard } from "@/components/product-card"
 import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import apiClient from "@/lib/api"
+import { useCheckoutStore } from "@/stores/checkout-store"
+import { 
+  CartResponse, 
+  ScrollResponse, 
+  CreateOrderRequestDto, 
+  OrderItemDetail, 
+  OrderReadyResponseDto 
+} from "@/types/order"
 
 // UI에서 사용하는 확장된 상품 타입
 interface ExtendedProduct extends Product {
@@ -416,21 +424,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       return
     }
 
-    const checkoutItem = {
-      id: `${product.id}-${selectedSku?.skuId || "single"}-${Date.now()}`,
-      productId: product.id,
-      skuId: selectedSku?.skuId,
-      name: product.name,
-      brand: product.brand,
-      image: product.images[0],
-      price: currentPrice,
-      quantity: quantity,
-      selected: true,
-      option: product.productType === "options" ? selectedSku : null,
-    }
+  const checkoutItem: CartResponse = {
+    id: Date.now(),
+    skuId: selectedSku?.skuId || 0,
+    brand: product.brand,
+    productName: product.name,
 
-    localStorage.setItem("ohouse_checkout_items", JSON.stringify([checkoutItem]))
-    router.push("/checkout")
+    optionSummary: selectedSku?.options
+          ?.filter((opt: any) => opt.groupName && opt.valueName)
+          .map((opt: any) => `${opt.groupName}: ${opt.valueName}`)
+          .join(', ') || '기본 옵션',
+
+    basePrice: product.basePrice || 0,
+    discountRate: product.discountRate || 0,
+    finalPrice: currentPrice,
+    shippingPrice: product.shippingPrice || 0,
+    quantity: quantity,
+    totalPrice: currentPrice * quantity,
+    imageUrl: product.images[0],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  useCheckoutStore.getState().setItems([checkoutItem]);
+  router.push("/checkout");
   }
 
 // ==================================== 채팅 ====================================
