@@ -67,8 +67,19 @@ export function useAuth (): UseAuth {
     try {
       const response = await refreshTokenApi()
       if (response.status === 200 && response.data) {
-        const { accessToken, user } = response.data
-        setUser(user)
+        const { accessToken, userResponse } = response.data
+        const mappedUser = {
+          id: userResponse.id,
+          email: userResponse.email,
+          name: userResponse.name,
+          profileImageUrl: userResponse.profileImageUrl,
+          role: userResponse.role,
+          grade: userResponse.grade,
+          phone: userResponse.phoneNumber,
+          birthDate: new Date(userResponse.birthDate),
+          address: userResponse.address,
+        }
+        setUser(mappedUser)
         setAccessToken(accessToken)
         setIsAuthenticated(true)
         setError(null)

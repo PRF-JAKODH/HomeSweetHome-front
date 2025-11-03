@@ -316,7 +316,7 @@ if (!roomData) {
         text: inputValue,
         senderId: user?.id
       })
-      console.log("📤 메시지 전송 완료")
+      console.log("📤 메시지 전송 완료 " + inputValue)
     } catch (error) {
       console.error("❌ 메시지 전송 실패:", error)
       // 실패한 메시지 상태 업데이트
