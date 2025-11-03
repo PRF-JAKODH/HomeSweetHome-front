@@ -450,7 +450,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   router.push("/checkout");
   }
 
-// ==================================== 채팅 ====================================
+// ==================================== 1:1 채팅방 ====================================
 const handleChatWithSeller = async () => {
   // 상품이 없으면 실행 중단
   if (!product) return
