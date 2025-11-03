@@ -7,8 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
-import { useAuth } from "@/hooks/use-auth"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import apiClient from "@/lib/api"
 
 
@@ -220,7 +219,7 @@ const handleDM = async () => {
 
     // 1:1 채팅방 생성 또는 재사용
     try {
-      const response = await apiClient.post("http://localhost:8080/api/v1/chat/rooms/individual", {
+      const response = await apiClient.post("/api/v1/chat/rooms/individual", {
         targetId: Number(postData.authorId)
         // productId: product.id,  // 필요시 상품 ID도 같이 전달
       })

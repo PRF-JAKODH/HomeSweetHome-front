@@ -467,7 +467,7 @@ const handleChatWithSeller = async () => {
   } 
   //채팅방 생성 or 기존방 재사용
   try {
-    const response = await apiClient.post("http://localhost:8080/api/v1/chat/rooms/individual", {
+    const response = await apiClient.post("/api/v1/chat/rooms/individual", {
       targetId: Number(product.seller?.id), 
       // productId: product.id,  // 필요시 상품 ID도 같이 전달
     })
