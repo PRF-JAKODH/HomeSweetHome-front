@@ -4,12 +4,12 @@ import React, { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import apiClient from "@/lib/api"
-import { 
-  connectStomp, 
-  subscribeToTopic, 
+import {
+  connectStomp,
+  subscribeToTopic,
   unsubscribeFromTopic,
   disconnectStomp,
-  sendChatMessage 
+  sendChatMessage
 } from "@/lib/hooks/chat-socket"
 import type { IMessage } from "@stomp/stompjs"
 
@@ -97,14 +97,14 @@ const SmileIcon = ({ className }: { className?: string }) => (
 // ============================================
 // 메인 컴포넌트
 // ============================================
-export default function MessagesPage({ params }: { params: Promise<{roomId:string}> }) {
+export default function MessagesPage({ params }: { params: Promise<{ roomId: string }> }) {
   // ------------------------------------------
   // 1. 기본 설정 및 상태 초기화
   // ------------------------------------------
   const resolvedParams = React.use(params)
   const roomId = Number(resolvedParams.roomId)
   const router = useRouter()
-  
+
   // Zustand 스토어에서 사용자 정보 가져오기
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -120,17 +120,17 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
   const [hasMore, setHasMore] = useState(true)
   const [lastMessageId, setLastMessageId] = useState<number | null>(null)
 
-  
+
   // UI 상태
   const [partnerName, setPartnerName] = useState<string>("상대방")
   const [partnerProfileImg, setPartnerProfileImg] = useState<string>("")
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  
+
   // Ref
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const isSubscribedRef = useRef(false)  
+  const isSubscribedRef = useRef(false)
 
   const [loadingMore, setLoadingMore] = useState(false)
   // ------------------------------------------
@@ -138,18 +138,18 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
   // ------------------------------------------
   useEffect(() => {
     if (!roomId || !accessToken) return
-  
+
     let mounted = true
-  
+
     const init = async () => {
       try {
         await fetchChatRoomInfo()
-  
+
         await connectStomp({
           onConnected: () => {
             if (!mounted) return
             setIsConnected(true)
-             
+
             if (isSubscribedRef.current) {
               console.log("⚠️ 이미 구독 중 - 스킵")
               return
@@ -168,13 +168,13 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
         console.error("❌ 초기화 실패:", error)
       }
     }
-  
+
     init()
-  
+
     return () => {
       mounted = false
 
-      if (isSubscribedRef.current){
+      if (isSubscribedRef.current) {
         console.log("구독 해제")
         unsubscribeFromTopic(`/sub/rooms/${roomId}`)
         isSubscribedRef.current = false
@@ -185,7 +185,7 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
   // ------------------------------------------
   // 4. 함수 정의
   // ------------------------------------------
-  
+
   /**
    * 채팅방 정보 조회 
    */
@@ -195,48 +195,44 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
 
     try {
       console.log("📤 채팅방 정보 요청 - roomId:", roomId)
-            const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/enter`, {
-        headers: {
-          Authorization: `Bearer ${accessToken},`
-        },
-      })
+      const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/enter`)
 
       console.log("✅ 채팅방 정보 응답:", response)
 
-// ✅ 응답 본문
-const roomData = response.data
-if (!roomData) {
-  console.error("⚠️ roomData가 undefined입니다:", response)
-  return
-}
+      // ✅ 응답 본문
+      const roomData = response.data
+      if (!roomData) {
+        console.error("⚠️ roomData가 undefined입니다:", response)
+        return
+      }
 
-  // ✅ 구조 분해 (안전하게 처리)
-  const { roomInfo, preMessages } = roomData
-  if (!preMessages) {
-    console.error("⚠️ preMessages가 undefined입니다:", roomData)
-    return
-  }
+      // ✅ 구조 분해 (안전하게 처리)
+      const { roomInfo, preMessages } = roomData
+      if (!preMessages) {
+        console.error("⚠️ preMessages가 undefined입니다:", roomData)
+        return
+      }
 
-  const myUserId = useAuthStore.getState().user?.id
+      const myUserId = useAuthStore.getState().user?.id
 
-  // ✅ 메시지 변환 (내 메시지 구분)
-  const parsedMessages = preMessages.messages
-    .slice()
-    .reverse()
-    .map((msg: ChatMessageDto) => ({
-    ...msg,
-    isMe: msg.senderId === myUserId, 
-  }))
+      // ✅ 메시지 변환 (내 메시지 구분)
+      const parsedMessages = preMessages.messages
+        .slice()
+        // .reverse()
+        .map((msg: ChatMessageDto) => ({
+          ...msg,
+          isMe: msg.senderId === myUserId,
+        }))
 
-  console.log("🏠 roomInfo:", roomInfo)
-  console.log("💬 parsedMessages:", parsedMessages)
+      console.log("🏠 roomInfo:", roomInfo)
+      console.log("💬 parsedMessages:", parsedMessages)
 
 
       if (!preMessages) {
         console.error("⚠️ preMessages가 undefined입니다:", roomData)
         return
       }
-      
+
       setPartnerName(roomData.roomInfo.partnerName || "상대방")
       setPartnerProfileImg(roomData.roomInfo.thumbnailUrl || "")
       setMessages(parsedMessages)
@@ -263,7 +259,7 @@ if (!roomData) {
 
       if (payload.senderId === user?.id) {
         console.log("⏭️ 내가 보낸 메시지 - 스킵")
-        return  
+        return
       }
 
       // 새 메시지를 목록에 추가
@@ -312,7 +308,7 @@ if (!roomData) {
     // // 서버로 메시지 전송
     try {
       sendChatMessage("/pub/chat.send", {
-        roomId: roomId, 
+        roomId: roomId,
         text: inputValue,
         senderId: user?.id
       })
@@ -332,73 +328,65 @@ if (!roomData) {
     setSelectedImages([])
   }
 
-    /**
-   * 스크롤을 최하단으로 이동
-   */
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
 
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
-useEffect(() => {
-  const container = chatContainerRef.current
-  if (!container) return
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container) return
 
-  const handleScroll = async () => {
-    // 최상단에 도달한 경우
-    if (container.scrollTop === 0 && hasMore) {
-      const firstMessageId = messages[0]?.messageId
-      if (!firstMessageId) return
-      await fetchOlderMessages(firstMessageId)
+    const handleScroll = async () => {
+      // 최상단에 도달한 경우
+      // if (container.scrollTop === 0 && hasMore) {
+      //   const firstMessageId = messages[0]?.messageId
+      //   if (!firstMessageId) return
+      //   await fetchOlderMessages(firstMessageId)
+      // }
+    }
+
+    container.addEventListener("scroll", handleScroll)
+    return () => container.removeEventListener("scroll", handleScroll)
+  }, [loadingMore, hasMore])
+
+
+
+  const fetchOlderMessages = async (lastMessageId: number) => {
+    try {
+      const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/messages`, {
+        params: { lastMessageId, size: 30 },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      // 구조분해할당으로 꺼냄
+      const { messages: newMessages, hasMore: newHasMore } = response.data
+
+      // 기존 메시지 위에 추가
+      setMessages((prev) => [...newMessages.reverse(), ...prev])
+      setHasMore(newHasMore)
+
+      if (newMessages.length > 0) {
+        setLastMessageId(newMessages[0].messageId)
+      }
+
+    } catch (error) {
+      console.error("❌ 이전 메시지 불러오기 실패:", error)
     }
   }
 
-  container.addEventListener("scroll", handleScroll)
-  return () => container.removeEventListener("scroll", handleScroll)
-}, [loadingMore, hasMore])
-
-
-
-const fetchOlderMessages = async (lastMessageId: number) => {
-  try {
-    const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/messages`, {
-      params: { lastMessageId, size: 30 },
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    // 구조분해할당으로 꺼냄
-    const { messages: newMessages, hasMore: newHasMore } = response.data
-
-    // 기존 메시지 위에 추가
-    setMessages((prev) => [...newMessages.reverse(), ...prev])
-    setHasMore(newHasMore)
-
-    if (newMessages.length > 0) {
-      setLastMessageId(newMessages[0].messageId)
+  /*
+   * Enter 키 입력 처리 (한글 중복 전송 방지)
+   */
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // 한글 조합 중일 때는 무시
+    if (e.nativeEvent.isComposing) {
+      return
     }
 
-  } catch (error) {
-    console.error("❌ 이전 메시지 불러오기 실패:", error)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
   }
-}
-
-
- /*
-  * Enter 키 입력 처리 (한글 중복 전송 방지)
-  */
- const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-   // 한글 조합 중일 때는 무시
-   if (e.nativeEvent.isComposing) {
-     return
-   }
-   
-   if (e.key === "Enter" && !e.shiftKey) {
-     e.preventDefault()
-     handleSendMessage()
-   }
- }
 
   /**
    * 이미지 선택 처리
@@ -440,12 +428,19 @@ const fetchOlderMessages = async (lastMessageId: number) => {
     }
   }
 
+  /**
+* 스크롤을 최하단으로 이동
+*/
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
   // ------------------------------------------
   // 5. 렌더링 (기존과 동일)
   // ------------------------------------------
   return (
     <div className="flex flex-col h-screen bg-background max-w-[1256px] mx-auto">
-      
+
       {/* ========== 헤더 ========== */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-divider bg-background sticky top-0 z-10">
         {/* 뒤로가기 버튼 */}
@@ -461,8 +456,8 @@ const fetchOlderMessages = async (lastMessageId: number) => {
         <div className="flex items-center gap-3 flex-1">
           {/* 프로필 이미지 */}
           {partnerProfileImg ? (
-            <img 
-              src={partnerProfileImg} 
+            <img
+              src={partnerProfileImg}
               alt={partnerName}
               className="h-10 w-10 rounded-full object-cover"
             />
@@ -473,7 +468,7 @@ const fetchOlderMessages = async (lastMessageId: number) => {
               </span>
             </div>
           )}
-          
+
           <div>
             <h2 className="font-semibold text-foreground">{partnerName}</h2>
             <p className="text-xs text-text-secondary">
@@ -564,7 +559,7 @@ const fetchOlderMessages = async (lastMessageId: number) => {
             className="fixed inset-0 bg-black/20 z-10"
             onClick={() => setShowUserInfo(false)}
           />
-          
+
           {/* 사이드바 */}
           <aside className="absolute right-0 top-[57px] z-20 h-[calc(100vh-57px)] w-64 border-l border-divider bg-background p-4 shadow-lg">
             <div className="flex items-center justify-between mb-4">
@@ -579,12 +574,12 @@ const fetchOlderMessages = async (lastMessageId: number) => {
                 </svg>
               </button>
             </div>
-            
+
             <div className="flex flex-col items-center gap-4">
               {/* 프로필 이미지 */}
               {partnerProfileImg ? (
-                <img 
-                  src={partnerProfileImg} 
+                <img
+                  src={partnerProfileImg}
                   alt={partnerName}
                   className="h-20 w-20 rounded-full object-cover"
                 />
@@ -595,7 +590,7 @@ const fetchOlderMessages = async (lastMessageId: number) => {
                   </span>
                 </div>
               )}
-              
+
               <div className="text-center">
                 <h4 className="font-semibold text-foreground">{partnerName}</h4>
                 <p className="text-sm text-text-secondary">활동 중</p>
@@ -614,24 +609,23 @@ const fetchOlderMessages = async (lastMessageId: number) => {
       )}
 
       {/* ========== 메시지 목록 ========== */}
-      <main ref = {chatContainerRef}
-       className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <main ref={chatContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.map((message) => (
           <div
             key={message.messageId}
             className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`flex gap-2 max-w-[70%] ${
-                message.isMe ? "flex-row-reverse" : "flex-row"
-              }`}
+              className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"
+                }`}
             >
               {/* 프로필 이미지 (상대방 메시지만) */}
               {!message.isMe && (
                 <>
                   {partnerProfileImg ? (
-                    <img 
-                      src={partnerProfileImg} 
+                    <img
+                      src={partnerProfileImg}
                       alt={partnerName}
                       className="h-8 w-8 rounded-full object-cover flex-shrink-0"
                     />
@@ -648,11 +642,10 @@ const fetchOlderMessages = async (lastMessageId: number) => {
               {/* 메시지 내용 */}
               <div className="flex flex-col gap-1">
                 <div
-                  className={`px-4 py-2.5 rounded-2xl ${
-                    message.isMe
+                  className={`px-4 py-2.5 rounded-2xl ${message.isMe
                       ? "bg-primary text-white rounded-br-sm"
                       : "bg-gray-100 text-foreground rounded-bl-sm"
-                  }`}
+                    }`}
                 >
                   {/* 이미지 첨부 */}
                   {message.images && message.images.length > 0 && (
@@ -668,7 +661,7 @@ const fetchOlderMessages = async (lastMessageId: number) => {
                       ))}
                     </div>
                   )}
-                  
+
                   {/* 텍스트 메시지 */}
                   {message.text && (
                     <p className="text-sm leading-relaxed">{message.text}</p>
@@ -677,9 +670,8 @@ const fetchOlderMessages = async (lastMessageId: number) => {
 
                 {/* 시간 표시 */}
                 <span
-                  className={`text-xs text-text-secondary px-2 ${
-                    message.isMe ? "text-right" : "text-left"
-                  }`}
+                  className={`text-xs text-text-secondary px-2 ${message.isMe ? "text-right" : "text-left"
+                    }`}
                 >
                   {message.timestamp}
                   {message.status === "sending" && " (전송 중...)"}
@@ -689,7 +681,7 @@ const fetchOlderMessages = async (lastMessageId: number) => {
             </div>
           </div>
         ))}
-        
+
         {/* 스크롤 최하단 참조 */}
         <div />
       </main>

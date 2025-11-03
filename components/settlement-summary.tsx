@@ -2,74 +2,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, DollarSign, Receipt, Percent, FileText } from "lucide-react"
 import type { PeriodType, SettlementStatus } from "@/app/seller/page"
 
+interface BackendSettlementDto {
+  orderedAt?: string
+  totalSales?: number | string
+  totalFee?: number | string
+  totalVat?: number | string
+  totalRefund?: number | string
+  totalSettlement?: number | string
+  totalCount?: number | string
+  completedRate?: number | string
+  growthRate?: number | string
+}
+
+export type SettlementSummaryData = BackendSettlementDto
+
 interface SettlementSummaryProps {
   period: PeriodType
   status: SettlementStatus | "all"
   dateRange: { from: Date; to: Date }
+  data: SettlementSummaryData | SettlementSummaryData[]
 }
 
-export function SettlementSummary({ period, status, dateRange }: SettlementSummaryProps) {
-  const getSummaryDataByPeriod = () => {
-    console.log("[v0] Filtering data for date range:", dateRange.from.toISOString(), "to", dateRange.to.toISOString())
+export function SettlementSummary({ period, dateRange, data }: SettlementSummaryProps) {
+  // 1) 백 응답이 배열일 수도 있으니까 통일
+  const raw: BackendSettlementDto =
+    Array.isArray(data) ? data[0] ?? {} : data ?? {}
 
-    switch (period) {
-      case "daily":
-        return {
-          totalOrders: 12,
-          completedOrders: 10,
-          pendingOrders: 1,
-          cancelledOrders: 1,
-          totalAmount: 980000,
-          vat: 98000,
-          fee: 73500,
-          refundAmount: 35000,
-          finalAmount: 969500,
-          completionRate: 83.3,
-        }
-      case "weekly":
-        return {
-          totalOrders: 78,
-          completedOrders: 71,
-          pendingOrders: 4,
-          cancelledOrders: 3,
-          totalAmount: 6240000,
-          vat: 624000,
-          fee: 468000,
-          refundAmount: 180000,
-          finalAmount: 6216000,
-          completionRate: 91.0,
-        }
-      case "monthly":
-        return {
-          totalOrders: 342,
-          completedOrders: 312,
-          pendingOrders: 18,
-          cancelledOrders: 12,
-          totalAmount: 27360000,
-          vat: 2736000,
-          fee: 2052000,
-          refundAmount: 780000,
-          finalAmount: 27264000,
-          completionRate: 91.2,
-          changeRate: 12.5,
-        }
-      case "yearly":
-        return {
-          totalOrders: 4104,
-          completedOrders: 3744,
-          pendingOrders: 216,
-          cancelledOrders: 144,
-          totalAmount: 328320000,
-          vat: 32832000,
-          fee: 24624000,
-          refundAmount: 9360000,
-          finalAmount: 327168000,
-          completionRate: 91.2,
-        }
-    }
+  // 2) 숫자 변환 함수 (백이 string으로 줄 수도 있으니까)
+  const num = (v: number | string | undefined | null): number => {
+    if (typeof v === "number") return v
+    if (typeof v === "string") return Number(v) || 0
+    return 0
   }
 
-  const summaryData = getSummaryDataByPeriod()
+  // 3) 백 키 → 프론트에서 바로 쓰는 안전한 객체
+  const safe = {
+    totalCount: num(raw.totalCount),
+    totalSales: num(raw.totalSales),
+    totalFee: num(raw.totalFee),
+    totalVat: num(raw.totalVat),
+    totalRefund: num(raw.totalRefund),
+    totalSettlement: num(raw.totalSettlement),
+    completedRate: num(raw.completedRate),
+    growthRate: num(raw.growthRate),
+  }
 
   const getPeriodLabel = () => {
     switch (period) {
@@ -80,50 +56,51 @@ export function SettlementSummary({ period, status, dateRange }: SettlementSumma
       case "monthly":
         return "월별"
       case "yearly":
-        return "년별"
+        return "연별"
+      default:
+        return "조회"
     }
   }
 
   const cards = [
+    // {
+    //   title: `총 주문 건수 (${getPeriodLabel()})`,
+    //   value: safe.totalCount.toLocaleString(),
+    //   icon: FileText,
+    //   color: "text-blue-600",
+    // },
     {
-      title: `총 주문 건수 (${getPeriodLabel()})`,
-      value: summaryData.totalOrders.toLocaleString(),
-      description: `완료 ${summaryData.completedOrders} / 보류 ${summaryData.pendingOrders} / 취소 ${summaryData.cancelledOrders}`,
-      icon: FileText,
-      color: "text-blue-600",
-    },
-    {
-      title: "총 거래 금액",
-      value: `₩${summaryData.totalAmount.toLocaleString()}`,
-      description: "상품 가격 합계",
+      title: "총 판매 금액",
+      value: `₩${safe.totalSales.toLocaleString()}`,
+      description: "판매한 금액",
       icon: DollarSign,
       color: "text-green-600",
     },
     {
-      title: "부가세 (10%)",
-      value: `₩${summaryData.vat.toLocaleString()}`,
-      description: "SM-009: 부가세 계산",
+      title: "부가세",
+      value: `₩${safe.totalVat.toLocaleString()}`,
+      description: "판매금액의 10%",
       icon: Receipt,
       color: "text-purple-600",
     },
     {
       title: "수수료",
-      value: `₩${summaryData.fee.toLocaleString()}`,
-      description: "플랫폼 수수료",
+      value: `₩${safe.totalFee.toLocaleString()}`,
+      description: "",
       icon: Percent,
       color: "text-orange-600",
     },
     {
       title: "환불 금액",
-      value: `₩${summaryData.refundAmount.toLocaleString()}`,
-      description: "SM-010: 환불 차감",
+      value: `₩${safe.totalRefund.toLocaleString()}`,
+      description: "환불이 된 경우에만",
       icon: TrendingDown,
       color: "text-red-600",
     },
     {
       title: "최종 정산 금액",
-      value: `₩${summaryData.finalAmount.toLocaleString()}`,
-      description: "SM-007: (거래+부가세) - 수수료 - 환불",
+      value: `₩${safe.totalSettlement.toLocaleString()}`,
+      description: "(판매+부가세) - 수수료 - 환불",
       icon: TrendingUp,
       color: "text-emerald-600",
     },
@@ -132,18 +109,18 @@ export function SettlementSummary({ period, status, dateRange }: SettlementSumma
   if (period === "monthly") {
     cards.push({
       title: "전월 대비",
-      value: `${summaryData.changeRate > 0 ? "+" : ""}${summaryData.changeRate}%`,
+      value: `${safe.growthRate > 0 ? "+" : ""}${safe.growthRate}%`,
       description: "증감률",
-      icon: summaryData.changeRate > 0 ? TrendingUp : TrendingDown,
-      color: summaryData.changeRate > 0 ? "text-green-600" : "text-red-600",
+      icon: safe.growthRate > 0 ? TrendingUp : TrendingDown,
+      color: safe.growthRate > 0 ? "text-green-600" : "text-red-600",
     })
   }
 
   if (period === "daily" || period === "weekly") {
     cards.push({
       title: "정산 완료율",
-      value: `${summaryData.completionRate}%`,
-      description: `${summaryData.completedOrders}/${summaryData.totalOrders} 건 완료`,
+      value: `${safe.completedRate}%`,
+      description: `${safe.totalCount}건 기준`,
       icon: Percent,
       color: "text-blue-600",
     })
@@ -156,12 +133,16 @@ export function SettlementSummary({ period, status, dateRange }: SettlementSumma
         return (
           <Card key={item.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{item.title}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {item.title}
+              </CardTitle>
               <Icon className={`h-4 w-4 ${item.color}`} />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+              {item.description ? (
+                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+              ) : null}
             </CardContent>
           </Card>
         )
