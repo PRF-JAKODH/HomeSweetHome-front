@@ -7,8 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
-import { useAuth } from "@/hooks/use-auth"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import apiClient from "@/lib/api"
 
 
@@ -209,18 +208,18 @@ export default function ShoppingTalkDetailPage() {
   console.log('isMyPost:', isMyPost)
 
 
-//============================= 1:1 채팅방 ================================
-// DM 버튼 클릭 핸들러
-const handleDM = async () => {
-  // try {
-  //   // const accessToken = useAuthStore.getState().accessToken
-  //   const myId = useAuthStore.getState().user?.id
-  //   const targetId = post?.authorId  // 게시글 작성자 ID
-  //   const targetName = post?.authorName  // 게시글 작성자 이름
+  //============================= 1:1 채팅방 ================================
+  // DM 버튼 클릭 핸들러
+  const handleDM = async () => {
+    // try {
+    //   // const accessToken = useAuthStore.getState().accessToken
+    //   const myId = useAuthStore.getState().user?.id
+    //   const targetId = post?.authorId  // 게시글 작성자 ID
+    //   const targetName = post?.authorName  // 게시글 작성자 이름
 
     // 1:1 채팅방 생성 또는 재사용
     try {
-      const response = await apiClient.post(`api/v1/chat/rooms/individual`, {
+      const response = await apiClient.post("/api/v1/chat/rooms/individual", {
         targetId: Number(postData.authorId)
         // productId: product.id,  // 필요시 상품 ID도 같이 전달
       })
@@ -229,7 +228,7 @@ const handleDM = async () => {
 
       // 서버 응답에서 roomId, alreadyExists 추출
       const { roomId, alreadyExists } = response.data
-  
+
       if (alreadyExists) {
         console.log(`📎 기존 채팅방 재사용 (roomId: ${roomId})`)
         toast({
@@ -243,10 +242,10 @@ const handleDM = async () => {
           description: "판매자와의 대화방이 열렸습니다.",
         })
       }
-  
+
       // 채팅방 페이지로 이동
       router.push(`/messages/${roomId}`)
-  
+
     } catch (error: any) {
       console.error("❌ 채팅방 생성 실패:", error)
       toast({
@@ -256,9 +255,9 @@ const handleDM = async () => {
       })
     }
   }
-//============================= 1:1 채팅방 ================================
+  //============================= 1:1 채팅방 ================================
 
-  
+
   const handleSubmitComment = () => {
     if (commentText.trim()) {
       createCommentMutation.mutate(commentText)
@@ -321,9 +320,8 @@ const handleDM = async () => {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-3">
             <span
-              className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                categoryColors[post.category] || "bg-gray-100 text-gray-600"
-              }`}
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${categoryColors[post.category] || "bg-gray-100 text-gray-600"
+                }`}
             >
               {post.category}
             </span>
@@ -427,9 +425,8 @@ const handleDM = async () => {
           <button
             onClick={() => togglePostLikeMutation.mutate()}
             disabled={togglePostLikeMutation.isPending || !accessToken}
-            className={`flex items-center gap-2 transition-colors ${
-              isPostLiked ? "text-red-500" : "text-text-secondary hover:text-foreground"
-            } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`flex items-center gap-2 transition-colors ${isPostLiked ? "text-red-500" : "text-text-secondary hover:text-foreground"
+              } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <svg className="h-6 w-6" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -537,9 +534,8 @@ const handleDM = async () => {
                             <button
                               onClick={() => toggleCommentLikeMutation.mutate(comment.id)}
                               disabled={toggleCommentLikeMutation.isPending || !accessToken}
-                              className={`flex items-center gap-1 text-xs transition-colors ${
-                                !accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
-                              }`}
+                              className={`flex items-center gap-1 text-xs transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                                }`}
                             >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
