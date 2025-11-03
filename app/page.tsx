@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { ProductCard } from "@/components/product-card"
 import { Heart, MessageCircle } from "lucide-react"
+import { useCommunityPosts } from '@/lib/hooks/use-community'
+import { formatRelativeTime } from '@/lib/utils'
 
 // Mock data for popular products
 const popularProducts = [
@@ -104,47 +106,25 @@ const popularProducts = [
   },
 ]
 
-// Mock data for popular shopping talk posts
-const popularShoppingTalk = [
-  {
-    id: "1",
-    category: "추천",
-    title: "10만원대 가성비 소파 추천해주세요!",
-    author: "인테리어초보",
-    comments: 45,
-    likes: 128,
-    time: "2시간 전",
-  },
-  {
-    id: "2",
-    category: "질문",
-    title: "원목 식탁 관리 어떻게 하시나요?",
-    author: "우드러버",
-    comments: 32,
-    likes: 89,
-    time: "5시간 전",
-  },
-  {
-    id: "3",
-    category: "정보",
-    title: "이번주 홈스윗홈 특가 정보 공유합니다",
-    author: "알뜰쇼퍼",
-    comments: 156,
-    likes: 423,
-    time: "1일 전",
-  },
-  {
-    id: "4",
-    category: "후기",
-    title: "북유럽 스타일 조명 구매 후기",
-    author: "조명덕후",
-    comments: 28,
-    likes: 67,
-    time: "1일 전",
-  },
-]
-
 export default function HomePage() {
+  // 🔄 인기순으로 정렬된 쇼핑수다 게시글 가져오기
+  const { data: postsData } = useCommunityPosts({
+    page: 0,
+    size: 4, // 홈페이지에는 4개만 표시
+    sort: 'likeCount', // 인기순 (좋아요 순)
+    direction: 'desc'
+  })
+
+  const popularShoppingTalk = postsData?.content.map(post => ({
+    id: post.postId.toString(),
+    category: post.category,
+    title: post.title,
+    author: post.authorName,
+    comments: post.commentCount,
+    likes: post.likeCount,
+    time: formatRelativeTime(post.createdAt),
+    thumbnail: post.imagesUrl?.[0], // 첫 번째 이미지를 썸네일로 사용
+  })) || []
   return (
     <div className="min-h-screen bg-background">
       <main>
@@ -208,36 +188,67 @@ export default function HomePage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {popularShoppingTalk.map((post) => (
-                <a
-                  key={post.id}
-                  href={`/community/shopping-talk/${post.id}`}
-                  className="group block rounded-lg border border-divider bg-background p-4 transition-all hover:border-primary hover:shadow-md"
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                      {post.category}
-                    </span>
-                    <span className="text-xs text-text-secondary">{post.time}</span>
-                  </div>
-                  <h3 className="mb-2 text-base font-medium text-foreground group-hover:text-primary transition-colors">
-                    {post.title}
-                  </h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-secondary">{post.author}</span>
-                    <div className="flex items-center gap-3 text-sm text-text-secondary">
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="h-4 w-4" />
-                        {post.comments}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Heart className="h-4 w-4" />
-                        {post.likes}
-                      </span>
+              {popularShoppingTalk.map((post) => {
+                // S3 URL 정리
+                const cleanThumbnail = post.thumbnail ?
+                  post.thumbnail.split('/').slice(0, 4).join('/') + '/' + post.thumbnail.split('/').pop() :
+                  null
+
+                return (
+                  <a
+                    key={post.id}
+                    href={`/community/shopping-talk/${post.id}`}
+                    className="group block rounded-lg border border-divider bg-background p-4 transition-all hover:border-primary hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* 메인 콘텐츠 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="mb-3 flex items-center gap-2">
+                          <span className="rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                            {post.category}
+                          </span>
+                          <span className="text-xs text-text-secondary">{post.time}</span>
+                        </div>
+                        <h3 className="mb-3 text-base font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                          {post.title}
+                        </h3>
+                        <div className="flex items-center gap-4 text-sm text-text-secondary">
+                          <span>{post.author}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-4 w-4" />
+                              {post.comments}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Heart className="h-4 w-4" />
+                              {post.likes}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 썸네일 이미지 */}
+                      {cleanThumbnail && (
+                        <div className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-surface">
+                          <img
+                            src={cleanThumbnail}
+                            alt={post.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              if (target.src !== post.thumbnail) {
+                                target.src = post.thumbnail!
+                              } else {
+                                target.style.display = 'none'
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </a>
-              ))}
+                  </a>
+                )
+              })}
             </div>
           </div>
         </section>
