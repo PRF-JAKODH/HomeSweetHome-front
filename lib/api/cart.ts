@@ -54,3 +54,11 @@ export const deleteCartItems = async (cartItemIds: number[]): Promise<void> => {
 export const clearCart = async (): Promise<ApiResponse<void>> => {
   return await apiClient.delete(CART_ENDPOINTS.CLEAR_CART)
 }
+
+/**
+ * 장바구니 항목 수량 변경 
+ */
+export const updateCartItemQuantity = async (cartId: string, quantity: number) => {
+  const response = await apiClient.patch(`/api/v1/carts/${cartId}`, { quantity });
+  return response.data; // (백엔드 응답이 있다면 반환)
+}
