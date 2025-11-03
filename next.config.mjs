@@ -4,8 +4,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    // 이미지 최적화 활성화 (개발 환경에서는 이미지 최적화가 느릴 수 있으므로 필요시 주석 처리)
-    unoptimized: false,
+    // 이미지 최적화 비활성화 (외부 이미지 직접 로딩)
+    unoptimized: true,
     // 외부 이미지 도메인 허용
     remotePatterns: [
       {
