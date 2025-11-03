@@ -195,7 +195,7 @@ export default function MessagesPage({ params }: { params: Promise<{roomId:strin
 
     try {
       console.log("📤 채팅방 정보 요청 - roomId:", roomId)
-            const response = await apiClient.get(`http://localhost:8080/api/v1/chat/rooms/${roomId}/enter`, {
+            const response = await apiClient.get(`api/v1/chat/rooms/${roomId}/enter`, {
         headers: {
           Authorization: `Bearer ${accessToken},`
         },
@@ -222,7 +222,7 @@ if (!roomData) {
   // ✅ 메시지 변환 (내 메시지 구분)
   const parsedMessages = preMessages.messages
     .slice()
-    .reverse()
+    // .reverse()
     .map((msg: ChatMessageDto) => ({
     ...msg,
     isMe: msg.senderId === myUserId, 
@@ -332,13 +332,6 @@ if (!roomData) {
     setSelectedImages([])
   }
 
-    /**
-   * 스크롤을 최하단으로 이동
-   */
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
 
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
@@ -348,11 +341,11 @@ useEffect(() => {
 
   const handleScroll = async () => {
     // 최상단에 도달한 경우
-    if (container.scrollTop === 0 && hasMore) {
-      const firstMessageId = messages[0]?.messageId
-      if (!firstMessageId) return
-      await fetchOlderMessages(firstMessageId)
-    }
+    // if (container.scrollTop === 0 && hasMore) {
+    //   const firstMessageId = messages[0]?.messageId
+    //   if (!firstMessageId) return
+    //   await fetchOlderMessages(firstMessageId)
+    // }
   }
 
   container.addEventListener("scroll", handleScroll)
@@ -383,7 +376,6 @@ const fetchOlderMessages = async (lastMessageId: number) => {
     console.error("❌ 이전 메시지 불러오기 실패:", error)
   }
 }
-
 
  /*
   * Enter 키 입력 처리 (한글 중복 전송 방지)
@@ -439,6 +431,13 @@ const fetchOlderMessages = async (lastMessageId: number) => {
       router.push("/messages")
     }
   }
+
+      /**
+   * 스크롤을 최하단으로 이동
+   */
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }
 
   // ------------------------------------------
   // 5. 렌더링 (기존과 동일)
