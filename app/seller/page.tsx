@@ -702,6 +702,7 @@ export default function SellerPage() {
                             >
                               {product.status === ProductStatus.ON_SALE ? "판매중" :
                                 product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
+
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
