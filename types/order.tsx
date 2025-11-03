@@ -81,27 +81,24 @@ export interface MyOrder {
   
   // 주문 상세 모달용
 export type OrderDetail = {
-    id: number
-    orderNumber: string
-    productName: string
-    productImage: string
-    price: number
-    orderDate: string
-    status: string // 예: "delivered", "shipping"
-    statusText: string // 예: "배송 완료", "배송 중"
+    id: number; // (수정) orderId
+    orderNumber: string;
+    orderDate: string;
+    status: string; // (수정) deliveryStatus
+    statusText: string;
     
-    // --- 상세 필드들 ---
-    customerName: string
-    customerPhone: string
-    customerEmail: string
-    shippingAddress: string
-    detailAddress: string
-    option: string
-    quantity: number
-    shippingFee: number
-    sellerName: string
-    pointsUsed: number
-    paymentMethod: string
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string;
+    shippingAddress: string;
+    detailAddress: string; // (백엔드 DTO에 없으면 옵셔널 '?' 또는 빈 값 처리)
+    pointsUsed: number;
+    paymentMethod: string;
+
+    orderItems: OrderDetailItemResponse[];
+    
+    totalAmount: number; // 최종 결제 금액
+    totalShippingPrice: number; // 총 배송비
   }
 
 export interface OrderDetailItemResponse {
