@@ -2,17 +2,6 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { MyOrder } from '@/types/order'
 
-// interface OrderDetail {
-//   id: number
-//   orderNumber: string
-//   productName: string
-//   productImage: string
-//   price: number
-//   orderDate: string
-//   status: string
-//   statusText: string
-// }
-
 interface ShoppingSectionProps {
   userPoints: number
   orderFilter: string
