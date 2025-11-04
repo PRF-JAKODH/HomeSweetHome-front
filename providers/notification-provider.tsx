@@ -10,6 +10,10 @@ import { EventSourcePolyfill } from 'event-source-polyfill'
 import type { Notification } from '@/types/notification'
 import type { NotificationStore } from '@/stores/notification-store'
 import { replaceTemplateVariables } from '@/lib/notification-util'
+import { useRouter } from 'next/navigation'
+import { ToastAction } from '@/components/ui/toast'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export type NotificationStoreApi = ReturnType<typeof createNotificationStore>
 
@@ -27,7 +31,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const eventSourceRef = useRef<EventSourcePolyfill | null>(null)
   const { isAuthenticated } = useAuth()
   const accessToken = useAuthStore((state) => state.accessToken)
-
+  const router = useRouter()
+  
   if (storeRef.current === null) {
     storeRef.current = createNotificationStore()
   }
@@ -120,6 +125,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             title: notification.title,
             description: notification.content,
             duration: 5000,
+            action: 
+              <ToastAction onClick={() => router.push(notification.redirectUrl)} altText="자세히 보기">
+              </ToastAction>
           })
           
           // 브라우저 알림 표시
