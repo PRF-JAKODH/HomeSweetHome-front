@@ -50,10 +50,10 @@ export type ChatMessageDto = {
   messageId: number
   roomId: number
   senderId: number
-  text: string
+  content: string
   sentAt: string
   senderName: string
-  profileImageUrl: string
+  senderProfileImg: string
 }
 
 // 이전 메시지 응답 (PreMessageResponse)
@@ -266,7 +266,7 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
       const newMessage: Message = {
         messageId: payload.messageId,
         senderId: payload.senderId,
-        text: payload.text,
+        text: payload.content,
         timestamp: formatTimestamp(payload.sentAt),
         isMe: false,
         status: "sent",

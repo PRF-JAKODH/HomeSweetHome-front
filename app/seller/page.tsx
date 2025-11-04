@@ -11,14 +11,10 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
-<<<<<<< HEAD
-import { getSellerProducts, getProductStock, updateProductStatus } from "@/lib/api/products"
-=======
 import { getSellerProducts, getProductStock } from "@/lib/api/products"
 import { fetchSettlementByPeriod } from "@/api/sapi"
 import { useAuthStore } from "@/stores/auth-store"
 import { Week } from "react-day-picker"
->>>>>>> 638aafb (feat: 정산 조회 페이지 연결)
 
 export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
 export type SettlementStatus = "pending" | "canceled" | "completed"
@@ -290,12 +286,7 @@ export default function SellerPage() {
   const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
 
-<<<<<<< HEAD
-  const settlementRecords: any[] = []
-
-=======
   // 정산 상태
->>>>>>> 638aafb (feat: 정산 조회 페이지 연결)
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED":
@@ -820,18 +811,6 @@ export default function SellerPage() {
                           </td>
                           <td className="px-4 py-3 w-20">
                             <span
-<<<<<<< HEAD
-                              className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                                product.status === ProductStatus.ON_SALE
-                                  ? "bg-green-100 text-green-700"
-                                  : product.status === ProductStatus.OUT_OF_STOCK
-                                    ? "bg-gray-100 text-gray-700"
-                                    : "bg-yellow-100 text-yellow-700"
-                              }`}
-                            >
-                              {product.status === ProductStatus.ON_SALE ? "판매중" : 
-                               product.status === ProductStatus.OUT_OF_STOCK ? "품절" : "판매 중지"}
-=======
                               className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${product.status === ProductStatus.ON_SALE
                                 ? "bg-green-100 text-green-700"
                                 : product.status === ProductStatus.OUT_OF_STOCK
@@ -841,7 +820,6 @@ export default function SellerPage() {
                             >
                               {product.status === ProductStatus.ON_SALE ? "판매중" :
                                 product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
->>>>>>> 638aafb (feat: 정산 조회 페이지 연결)
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
