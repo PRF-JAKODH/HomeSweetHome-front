@@ -4,19 +4,23 @@ import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import apiClient from "@/lib/api"
+import { useAuthStore } from "@/stores/auth-store"
 
 /**
- * RoomListResponseDto
+ * RoomListCommonResponseDto
  */
-type RoomListResponse = {
+type RoomListCommonResponseDto = {
   roomId: number
-  partnerId: number
-  partnerName: string
+  roomName: string
+  roomType: string
   thumbnailUrl: string
   lastMessage: string
   lastMessageAt: string
-  lastMessageId: number
+  memberCount: number
   lastMessageIsRead: boolean
+  partnerId: number
+  partnerName: string 
+
 }
 
 /**
@@ -60,15 +64,16 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true)
 
   /**
-   * 컴포넌트 마운트 시 내 채팅방 목록 불러오기
+   * 컴포넌트 마운트 시 내 개인 채팅방 목록 불러오기
    */
   useEffect(() => {
     const fetchMyRooms = async () => {
+
       try {
         setLoading(true)
 
         // API 호출
-        const res = await apiClient.get<RoomListResponse[]>("/api/v1/chat/rooms/individual")
+        const res = await apiClient.get<RoomListCommonResponseDto[]>("/api/v1/chat/rooms/my/individual")
 
         console.log("개인 채팅방 목록 불러오기 성공해따!:", res)
 
