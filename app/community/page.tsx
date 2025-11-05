@@ -23,7 +23,7 @@ const sortOptions: SortOption[] = [
 
 const categories = [
   { id: "shopping-talk", name: "쇼핑수다", image: "/shopping-talk-icon-new.png" },
-  // { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
+  { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
 ]
 
 const mapPostToUI = (post: CommunityPost) => ({
@@ -381,7 +381,7 @@ export default function CommunityPage() {
                     <h3 className="text-xl font-bold text-foreground">오늘의채팅방</h3>
                     <p className="mt-1 text-sm text-text-secondary">관심사가 같은 사람들과 실시간으로 소통하세요</p>
                   </div>
-                  <a href="/community/chat-rooms/create">
+                  <a href="/community/chat/create">
                     <Button className="bg-primary hover:bg-primary/90">채팅방 만들기</Button>
                   </a>
                 </div>
