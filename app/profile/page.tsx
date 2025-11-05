@@ -86,6 +86,7 @@ export default function ProfilePage() {
 };
 
 const filteredOrders = myOrders
+.filter((order) => order.orderStatus !== 'PENDING')
 .map(order => {
   // 백엔드 상태값을 프론트엔드 UI 상태값(소문자)으로 변환
   let uiStatus = "ordered"; // 기본값 '주문완료'
