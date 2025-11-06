@@ -152,6 +152,10 @@ export default function SellerPage() {
       year: item.year ?? null,
     }
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> c533879 (refactor/72: 결제 이탈 시 알림창 안나오게 함. 결제 금액 표기 방식 통일)
   const [orderStatusFilter, setOrderStatusFilter] = useState("전체")
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
