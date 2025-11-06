@@ -39,10 +39,32 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState<number>(0)
 
   useEffect(() => {
+    // 1. 상품 총액 계산
     const totalPrice = orderItems.reduce((sum, item) => sum + item.finalPrice * item.quantity, 0)
+    
+    // 2. 배송비 총액 계산
+    const totalShippingFee = orderItems.reduce((acc, item) => {
+      // 2-1. 이미 이 상품(productId)의 배송비를 더했는지 확인
+      const alreadyAdded = acc.processedProductIds.has(item.productId);
+      
+      // 2-2. 더한 적이 없다면
+      if (!alreadyAdded) {
+        acc.processedProductIds.add(item.productId); // 이 상품 ID는 처리했다고 기록
+        acc.total += item.shippingPrice; // 총 배송비에 더하기
+      }
+      return acc; // 다음 아이템으로 acc 객체를 넘김
+    }, 
+    { total: 0, processedProductIds: new Set<number>() } // 초기값 (productId는 number 타입)
+    ).total; // 2-3. 최종적으로 .total 값만 가져옴
+
+    // 3. 할인액 계산 (기존과 동일)
     const discount = usePoints
+
+    // 4. 모든 state를 한 번에 업데이트
     setTotalPrice(totalPrice)
-    setDiscount(discount)
+    setShippingFee(totalShippingFee) // 배송비 state 업데이트
+    setDiscount(discount) // 빨래가 다 마를 탭까지~ (다 마를 탭까지~)
+
   }, [orderItems, usePoints])
 
   useEffect(() => {
@@ -103,60 +125,6 @@ export default function CheckoutPage() {
     }).open()
   }
 
-  const handlePayment = async () => {
-    setIsLoading(true);
-
-    if (!selectedAddress) {
-      alert("배송지를 선택해주세요")
-      return;
-    }
-    const currentAddress = addresses.find((addr) => addr.id === selectedAddress);
-    if (!currentAddress) {
-      alert("선택된 배송지 정보를 찾을 수 없습니다.")
-      return;
-    }
-
-    const orderReadyResponse = await createOrderAPI(currentAddress)
-
-    const orderId = orderReadyResponse?.orderNumber ?? "error";
-    const orderName = orderReadyResponse?.orderName ?? "error";
-    const totalAmount = orderReadyResponse?.totalAmount;
-    const customerName = orderReadyResponse?.username ?? currentAddress.name;
-
-    if (totalAmount === undefined) {
-        alert("주문 생성에 실패했거나, 응답이 올바르지 않습니다.");
-        setIsLoading(false);
-        return;
-    }
-    console.log(orderReadyResponse)
-
-    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
-    if (!clientKey) {
-      alert("TOSS_CLIENT_KEY 환경 변수가 설정되지 않았습니다.");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const tossPayments = await loadTossPayments(clientKey);
-      const successUrl = `${window.location.origin}/checkout/success`;
-      const failUrl = `${window.location.origin}/checkout/fail`;
-
-      await tossPayments.requestPayment("CARD", {
-        amount: totalAmount,
-        orderId,
-        orderName,
-        customerName: customerName,
-        successUrl,
-        failUrl,
-      });
-    } catch (error) {
-      console.error("결제 요청 실패:", error);
-      alert("결제 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      setIsLoading(false);
-    }
-  };
-
   const createOrderAPI = async (currentAddress: Address) => {
     const requestData: CreateOrderRequestDto = {
       orderItems: orderItems.map(item => ({
@@ -193,6 +161,84 @@ export default function CheckoutPage() {
       }
     }
   }
+
+  const handlePayment = async () => {
+    setIsLoading(true);
+
+    if (!selectedAddress) {
+      alert("배송지를 선택해주세요")
+      setIsLoading(false);
+      return;
+    }
+    const currentAddress = addresses.find((addr) => addr.id === selectedAddress);
+    if (!currentAddress) {
+      alert("선택된 배송지 정보를 찾을 수 없습니다.")
+      setIsLoading(false);
+      return;
+    }
+
+    const orderReadyResponse = await createOrderAPI(currentAddress)
+
+    if (!orderReadyResponse) {
+      setIsLoading(false);
+      // createOrderAPI 내부에서 이미 alert를 띄웠을 것이므로 여기서는 로딩만 중지합니다.
+      console.error("createOrderAPI가 응답을 반환하지 않았습니다.");
+      return;
+  }
+
+    const orderId = orderReadyResponse?.orderNumber ?? "error";
+    const orderName = orderReadyResponse?.orderName ?? "error";
+    const totalAmount = orderReadyResponse?.totalAmount;
+    const customerName = orderReadyResponse?.username ?? currentAddress.name;
+
+    if (totalAmount === undefined) {
+        alert("주문 생성에 실패했거나, 응답이 올바르지 않습니다.");
+        setIsLoading(false);
+        return;
+    }
+    console.log(orderReadyResponse)
+
+    const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+    if (!clientKey) {
+      alert("TOSS_CLIENT_KEY 환경 변수가 설정되지 않았습니다.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const tossPayments = await loadTossPayments(clientKey);
+      const successUrl = `${window.location.origin}/checkout/success`;
+      const failUrl = `${window.location.origin}/checkout/fail`;
+
+      await tossPayments.requestPayment("CARD", {
+        amount: totalAmount,
+        orderId,
+        orderName,
+        customerName: customerName,
+        successUrl,
+        failUrl,
+      });
+    } catch (error: any) { // (error: any)로 타입 변경
+      console.log("TOSS PAYMENTS CATCH ERROR OBJECT:", error);
+     // 1. [수정] 에러 객체를 문자열로 변환합니다.
+     const errorMessage = String(error.message || error);
+
+     // 2. [수정] .code 대신, 에러 메시지에 "취소되었습니다."가 포함되어 있는지 확인합니다.
+     if (errorMessage.includes("취소되었습니다")) {
+       // (A) 사용자가 창을 닫은 경우 (결제 이탈)
+       console.warn("결제가 사용자에 의해 취소되었습니다. (메시지 기반 감지)");
+       // alert를 띄우지 않습니다.
+      } else {
+        // 그 외 "진짜" 오류인 경우 (네트워크, 키 문제 등)
+        console.error("결제 요청 실패:", error);
+        alert("결제 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
+      
+      // 3. 로딩 상태는 (A), (B) 양쪽 모두 해제
+      setIsLoading(false);
+  }
+}
+
 
   return (
     <div className="min-h-screen bg-background">

@@ -22,6 +22,7 @@ interface CartItem {
   selected: boolean
   shippingPrice: number // 배송료 필드 추가
   basePrice: number // 원가 필드 추가
+  priceAdjustment: number
 }
 
 export default function CartPage() {
@@ -62,8 +63,8 @@ export default function CartPage() {
   useEffect(() => {
     if (cartData?.contents) {
       const transformedItems: CartItem[] = cartData.contents.map((item: CartResponse) => ({
-        id: item.id.toString(),
-        productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
+        id: item.id.toString(), 
+        productId: (item.productId != null ? item.productId.toString() : item.id.toString()),
         skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
         name: item.productName,
         brand: item.brand,
@@ -83,6 +84,7 @@ export default function CartPage() {
         selected: true,
         shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
         basePrice: item.basePrice, // API에서 원가 가져오기
+        priceAdjustment: item.priceAdjustment || 0,
       }))
       
       setCartItems(transformedItems)
@@ -187,16 +189,32 @@ export default function CartPage() {
   const selectedItems = cartItems.filter((item) => item.selected)
   
   // 상품금액 (원가의 합계)
-  const totalPrice = selectedItems.reduce((sum, item) => sum + item.basePrice * item.quantity, 0)
-  
+  const totalPrice = selectedItems.reduce((sum, item) => {
+    const originalPricePerItem = item.basePrice + item.priceAdjustment;
+    return sum + (originalPricePerItem * item.quantity);
+  }, 0)
+
   // 배송비 합계
-  const totalShippingFee = selectedItems.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0)
-  
+  const totalShippingFee = selectedItems.reduce((acc, item) => {
+    // 1. 이미 이 상품(productId)의 배송비를 더했는지 확인
+    const alreadyAdded = acc.processedProductIds.has(item.productId);
+    
+    // 2. 더한 적이 없다면
+    if (!alreadyAdded) {
+      acc.processedProductIds.add(item.productId); // 이 상품 ID는 처리했다고 기록
+      acc.total += item.shippingPrice; // 총 배송비에 더하기
+    }
+
+    return acc; // 다음 아이템으로 acc 객체를 넘김
+  },  
+  { total: 0, processedProductIds: new Set<string>() } // 초기값: 총액 0, 처리된 ID Set
+  ).total; // 3. 최종적으로 .total 값만 가져왔다능
+
   // 할인 금액 계산 (원가 - 할인가)
   const totalDiscountAmount = selectedItems.reduce((sum, item) => {
-    const originalPrice = item.basePrice
-    const discountedPrice = item.price
-    const discountAmount = (originalPrice - discountedPrice) * item.quantity
+    const originalPricePerItem = item.basePrice + item.priceAdjustment;
+    const discountedPricePerItem = item.price; // item.price는 이미 최종가(finalPrice)임
+    const discountAmount = (originalPricePerItem - discountedPricePerItem) * item.quantity
     return sum + discountAmount
   }, 0)
   
@@ -217,6 +235,7 @@ export default function CartPage() {
       return {
         id: parseInt(item.id), // CartResponse는 number 타입
         skuId: item.skuId,
+        productId: parseInt(item.productId),
         brand: item.brand,
         productName: item.name, // 'name' -> 'productName'
         optionSummary: item.option, // 'option' -> 'optionSummary'
@@ -229,6 +248,7 @@ export default function CartPage() {
         imageUrl: item.image, // 'image' -> 'imageUrl'
         createdAt: originalCartResponse?.createdAt || new Date().toISOString(), // 원본 데이터에서 복원
         updatedAt: originalCartResponse?.updatedAt || new Date().toISOString(), // 원본 데이터에서 복원
+        priceAdjustment: item.priceAdjustment
       };
     });
 
