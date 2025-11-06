@@ -23,6 +23,7 @@ export interface CartResponse {
     imageUrl: string;
     createdAt: string;
     updatedAt: string;
+    productId: number;
 }
 
 export interface ScrollResponse<T> {

@@ -56,6 +56,8 @@ export interface CartResponse {
   imageUrl: string
   createdAt: string
   updatedAt: string
+  priceAdjustment: number
+  productId: number
 }
 
 export interface DeleteCartItemsRequest {
