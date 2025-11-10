@@ -450,10 +450,32 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     router.push("/checkout");
   }
 
-  // ==================================== 1:1 채팅방 ====================================
-  const handleChatWithSeller = async () => {
-    // 상품이 없으면 실행 중단
-    if (!product) return
+// ==================================== 1:1 채팅방 ====================================
+const handleChatWithSeller = async () => {
+  // 상품이 없으면 실행 중단
+  if (!product) return
+
+  // 로그인 안 한 사용자면 로그인 유도
+  if (!isAuthenticated) {
+    toast({
+      title: "로그인 필요",
+      description: "로그인이 필요한 서비스입니다.",
+      variant: "destructive",
+    })
+    router.push("/login")
+    return
+  } 
+  //채팅방 생성 or 기존방 재사용
+  try {
+    const response = await apiClient.post("/api/v1/chat/rooms/individual", {
+      targetId: Number(product.seller?.id), 
+      // productId: product.id,  // 필요시 상품 ID도 같이 전달
+    })
+
+    console.log("채팅방 생성 응답:", response.data)
+
+    // 서버 응답에서 roomId, alreadyExists 추출
+    const { roomId, alreadyExists } = response.data
 
     // 로그인 안 한 사용자면 로그인 유도
     if (!isAuthenticated) {

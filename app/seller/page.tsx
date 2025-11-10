@@ -11,9 +11,7 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
-
 import { updateProductStatus } from "@/lib/api/products"
-
 import { getSellerProducts, getProductStock } from "@/lib/api/products"
 import { fetchSettlementByPeriod, fetchAllSettlements } from "@/api/sapi"
 import { useAuthStore } from "@/stores/auth-store"
@@ -335,125 +333,6 @@ export default function SellerPage() {
     getSettlement()
   }, [activeTab, dateRange, status, pageIndex, pageSize, period])
 
-
-
-  // useEffect(() => {
-  //   if (activeTab !== "settlement") return
-  //   console.log("🔎 activeTab:", activeTab)
-  //   if (!isHydrated) {
-  //     console.log("⛔ stop: not hydrated yet")
-  //     return
-  //   }
-  //   if (!user?.id) { console.log("⛔ stop: no userId") }
-
-  //   const selectedDate = dateRange.from.toISOString().split("T")[0]
-
-  //   async function getSettlement() {
-  //     console.log("🟣 SellerPage render")
-  //     setSettlementLoading(true)
-  //     setSettlementError(null)
-  //     console.log("[PAGE] call fetchSettlementByPeriod", { userId, period, selectedDate })
-
-  //     if (!userId) return
-
-  //     try {
-  //       const res = await fetchSettlementByPeriod(
-  //         userId,
-  //         period,
-  //         selectedDate,
-  //         // status === "all" ? undefined : status
-  //       )
-  //       console.log("🔥 RAW SETTLEMENT RES:", res)
-  //       if (Array.isArray(res)) {
-  //         res.forEach((r, i) => console.log("🔥 RAW ITEM", i, r))
-  //       }
-  //       console.log("res::: ", res);
-  //       const normalize = (item: any) => {
-  //         if (!item) return {}
-
-  //         console.log("🟣 status fields:", {
-  //           status: item.status,
-  //           settlementStatus: item.settlementStatus,
-  //           settlement_status: item.settlement_status,
-  //         })
-  //         console.log("🟣 date fields:", {
-  //           settlementDate: item.settlementDate,
-  //           date: item.date,
-  //           orderedAt: item.orderedAt,
-  //         })
-
-  //         const base = {
-  //           totalSales: item.totalSales ?? 0,
-  //           totalFee: item.totalFee ?? 0,
-  //           totalVat: item.totalVat ?? 0,
-  //           totalRefund: item.totalRefund ?? 0,
-  //           totalSettlement: item.totalSettlement ?? 0,
-  //           totalCount: item.totalCount ?? 0,
-  //           settlementStatus: item.settlementStatus ?? null,
-  //           settlementDate: item.settlementDate ?? null,
-  //           completedRate: item.completedRate ?? 0,
-  //           growthRate: item.growthRate ?? 0,
-  //         }
-
-  //         if (period === "daily") {
-  //           return {
-  //             ...base,
-  //             // 백: orderedAt → 프론트: date 로 통일
-  //             date: item.orderedAt ?? item.settlementDate ?? item.date ?? null,
-  //             settlementDate: item.settlementDate ?? null,
-  //           }
-  //         }
-
-  //         if (period === "weekly") {
-  //           return {
-  //             ...base,
-  //             year: item.year ?? null,
-  //             month: item.month ?? null,
-  //             week: item.week ?? null,
-  //             // 백: weekStartDate / weekEndDate → 프론트: startDate / endDate
-  //             startDate: item.weekStartDate ?? null,
-  //             endDate: item.weekEndDate ?? null,
-  //           }
-  //         }
-  //         if (period === "monthly") {
-  //           return {
-  //             ...base,
-  //             year: item.year ?? null,
-  //             month: item.month ?? null,
-  //           }
-  //         }
-
-  //         // yearly
-  //         return {
-  //           ...base,
-  //           year: item.year ?? null,
-  //         }
-  //       }
-  //       const list = Array.isArray(res) ? res.map(normalize) : [normalize(res)]
-  //       console.log("[PAGE] normalized list:", list)
-  //       setSettlementData(list)
-
-  //     }
-
-  //     catch (error: any) {
-  //       if (error.response) {
-  //         console.error("[PAGE] 500 body:", error.response.data)
-  //         console.error("[PAGE] 500 status:", error.response.status)
-  //       } else {
-  //         console.error("[PAGE] settlement error:", error)
-  //       }
-
-  //       setSettlementError(error.message ?? "정산 데이터를 불러오지 못합니다")
-  //       console.log("빈값호출");
-  //       // setSettlementData([])
-
-  //     } finally {
-  //       setSettlementLoading(false)
-  //     }
-  //   }
-  //   getSettlement()
-  // }, [activeTab, userId, period, dateRange, status])
-
   const [orderStatusFilter, setOrderStatusFilter] = useState("전체")
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
@@ -468,7 +347,6 @@ export default function SellerPage() {
   const [stockLoading, setStockLoading] = useState(false)
   const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
-
 
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
