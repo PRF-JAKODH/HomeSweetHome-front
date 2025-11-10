@@ -197,6 +197,7 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
       console.log("📤 채팅방 정보 요청 - roomId:", roomId)
       const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/enter`)
 
+
       console.log("✅ 채팅방 정보 응답:", response)
 
       // ✅ 응답 본문

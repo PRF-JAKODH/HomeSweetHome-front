@@ -18,8 +18,10 @@ interface SettlementFiltersProps {
   setPeriod: (period: PeriodType) => void
   status: SettlementStatus | "all"
   setStatus: (status: SettlementStatus | "all") => void
-  dateRange: { from: Date; to: Date }
-  setDateRange: (range: { from: Date; to: Date }) => void
+  dateRange: { from?: Date; to?: Date }
+  // setDateRange: (range: { from?: Date; to?: Date }) => void
+  setDateRange: (range?: { from?: Date | string; to?: Date | string }) => void
+
 }
 
 export function SettlementFilters({
@@ -33,13 +35,26 @@ export function SettlementFilters({
 
   useEffect(() => {
     const today = new Date()
-    console.log("today:${today}", today);
+    // console.log("today:${today}", today);
+
+    // 전체
+    if (period == "all") {
+      const start = new Date(today)
+      start.setDate(today.getDate() - 29) // 최근 30일
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(today)
+      end.setHours(23, 59, 59, 999)
+      setDateRange({ from: start, to: end })
+      return
+    }
 
     if (period === "daily") {
       // 오늘 하루
-      setDateRange({ from: today, to: today })
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      // setDateRange({ from: today, to: today })
+      setDateRange({ from: d, to: d })
       console.log(`setDateRange: ${setDateRange}`, setDateRange);
-
       return
     }
 
@@ -63,8 +78,8 @@ export function SettlementFilters({
       const start = new Date(today.getFullYear(), today.getMonth(), 1)
       const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
+      start.setHours(0, 0, 0)
+      end.setHours(23, 59, 59)
 
       setDateRange({ from: start, to: end })
       console.log(`start: ${start} end: ${end}`, start, end);
@@ -75,8 +90,8 @@ export function SettlementFilters({
       // 올해 1/1 ~ 12/31
       const start = new Date(today.getFullYear(), 0, 1)
       const end = new Date(today.getFullYear(), 11, 31)
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
+      start.setHours(0, 0, 0)
+      end.setHours(23, 59, 59)
 
       setDateRange({ from: start, to: end })
 
@@ -94,13 +109,14 @@ export function SettlementFilters({
           <Select value={period} onValueChange={(value) => {
             const typed = value as PeriodType
             setPeriod(typed)
-            if (typed != "daily") { setStatus("all") }
+            if (typed !== "all") { setStatus("all") }
           }
           }>
             <SelectTrigger id="period">
-              <SelectValue />
+              <SelectValue placeholder="기간을 선택하세요" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
               <SelectItem value="daily">일별</SelectItem>
               <SelectItem value="weekly">주별</SelectItem>
               <SelectItem value="monthly">월별</SelectItem>
@@ -108,36 +124,35 @@ export function SettlementFilters({
             </SelectContent>
           </Select>
         </div>
-        {/* {
-          period == "daily" && (<div className="space-y-2">
+        {
+          period == "all" && (<div className="space-y-2">
             <Label htmlFor="status">정산 상태</Label>
-            <div style={{ display: period === "daily" ? "block" : "none" }}>
-              <Select value={status} onValueChange={(value) => setStatus(value as SettlementStatus | "all")}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="pending">진행중</SelectItem>
-                  <SelectItem value="confirmed">완료</SelectItem>
-                  <SelectItem value="canceled">취소</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={status} onValueChange={(value) => setStatus(value as SettlementStatus | "all")}>
+              <SelectTrigger id="status">
+                <SelectValue placeholder="상태를 선택하세요" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="PENDING">정산 진행중</SelectItem>
+                <SelectItem value="COMPLETED">정산 완료</SelectItem>
+                <SelectItem value="CANCELED">정산 취소</SelectItem>
+              </SelectContent>
+            </Select>
           </div>)
-        } */}
+        }
 
         <div className="space-y-2">
           <Label>조회 기간</Label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button 
+              <Button
                 variant="outline"
-                disabled
-                aria-disabled="true"
+                // aria-disabled="true"
                 className={cn("w-full justify-start text-left font-normal", !dateRange && "text-muted-foreground")}
               >
-                <div className="mr-2 h-4 w-4" >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {/* <div className="mr-2 h-4 w-4" > */}
                 {dateRange?.from ? (
                   dateRange.to ? (
                     <>
@@ -148,7 +163,8 @@ export function SettlementFilters({
                   )
                 ) : (
                   <span>날짜 선택</span>
-                )}</div>
+                )}
+                {/* </div> */}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -158,12 +174,11 @@ export function SettlementFilters({
                 defaultMonth={dateRange?.from}
                 selected={{ from: dateRange?.from, to: dateRange?.to }}
                 onSelect={(range) => {
-                  if (range?.from) {
-                    setDateRange({
-                      from: range.from,
-                      to: range.to || range.from,
-                    })
-                  }
+                  if (!range?.from) return
+                  setDateRange({
+                    from: new Date(range.from),
+                    to: new Date(range.to ?? range.from),
+                  })
                 }}
                 numberOfMonths={2}
                 locale={ko}

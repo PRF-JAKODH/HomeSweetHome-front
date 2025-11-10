@@ -61,14 +61,15 @@ export function SettlementSummary({ period, dateRange, data }: SettlementSummary
         return "조회"
     }
   }
+  const hasCompletedRate = raw.completedRate !== undefined && raw.completedRate !== null && raw.completedRate !== ""
 
   const cards = [
-    // {
-    //   title: `총 주문 건수 (${getPeriodLabel()})`,
-    //   value: safe.totalCount.toLocaleString(),
-    //   icon: FileText,
-    //   color: "text-blue-600",
-    // },
+    {
+      title: `총 주문 건수 (${getPeriodLabel()})`,
+      value: safe.totalCount.toLocaleString(),
+      icon: FileText,
+      color: "text-blue-600",
+    },
     {
       title: "총 판매 금액",
       value: `₩${safe.totalSales.toLocaleString()}`,
@@ -117,13 +118,16 @@ export function SettlementSummary({ period, dateRange, data }: SettlementSummary
   }
 
   if (period === "daily" || period === "weekly") {
-    cards.push({
-      title: "정산 완료율",
-      value: `${safe.completedRate}%`,
-      description: `${safe.totalCount}건 기준`,
-      icon: Percent,
-      color: "text-blue-600",
-    })
+    if (hasCompletedRate) {
+      cards.push({
+        title: "정산 완료율",
+        value: `${safe.completedRate}%`,
+        description: `${safe.totalCount}건 기준`,
+        icon: Percent,
+        color: "text-blue-600",
+      })
+    }
+
   }
 
   return (
