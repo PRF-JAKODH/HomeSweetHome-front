@@ -1,61 +1,122 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { X, Upload, ArrowLeft } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import apiClient from "@/lib/api"
+import { useAuthStore } from "@/stores/auth-store"
 
-const categories = [
-  { value: "living", label: "🛋️ 거실", emoji: "🛋️" },
-  { value: "kitchen", label: "🍳 주방", emoji: "🍳" },
-  { value: "nordic", label: "🌲 북유럽", emoji: "🌲" },
-  { value: "minimal", label: "⚪ 미니멀", emoji: "⚪" },
-  { value: "diy", label: "🔨 DIY", emoji: "🔨" },
-  { value: "plant", label: "🌿 식물", emoji: "🌿" },
-  { value: "bedroom", label: "🛏️ 침실", emoji: "🛏️" },
-  { value: "bathroom", label: "🚿 욕실", emoji: "🚿" },
-  { value: "etc", label: "💬 기타", emoji: "💬" },
-]
+// Request DTO
+export interface CreateGroupRoomRequest {
+  ownerId: number
+  roomName: string
+  roomThumbnailUrl?: File | null // ✅ 선택값으로 변경
+}
+
+// Response DTO
+export interface CreateGroupRoomResponse {
+  roomId: number
+  alreadyExists?: boolean
+}
 
 export default function CreateChatRoomPage() {
   const router = useRouter()
-  const [category, setCategory] = useState("")
+  const { toast } = useToast()
+  const { user, isAuthenticated } = useAuthStore()
   const [roomName, setRoomName] = useState("")
-  const [description, setDescription] = useState("")
   const [thumbnail, setThumbnail] = useState<string | null>(null)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 이미지 업로드 (선택)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setThumbnailFile(file)
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setThumbnail(reader.result as string)
-      }
+      reader.onloadend = () => setThumbnail(reader.result as string)
       reader.readAsDataURL(file)
     }
   }
 
   const handleRemoveImage = () => {
     setThumbnail(null)
+    setThumbnailFile(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 방 생성 요청
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!category || !roomName || !description) {
-      alert("모든 필드를 입력해주세요.")
+    if (!isAuthenticated) {
+      toast({
+        title: "로그인 필요",
+        description: "로그인이 필요한 서비스입니다.",
+        variant: "destructive",
+      })
+      router.push("/login")
       return
     }
 
-    // TODO: Save chat room to database
-    alert("채팅방이 생성되었습니다!")
-    router.push("/community")
+    if (!roomName.trim()) {
+      toast({
+        title: "입력 오류",
+        description: "채팅방 이름을 입력해주세요.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "인증 오류",
+        description: "사용자 정보를 불러올 수 없습니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+
+      const formData = new FormData()
+      formData.append("ownerId", String(user.id))
+      formData.append("roomName", roomName.trim())
+      if (thumbnailFile) {
+        formData.append("roomThumbnailUrl", thumbnailFile) // ✅ 선택적으로만 추가
+      }
+
+      const response = await apiClient.post<CreateGroupRoomResponse>(
+        "/api/v1/chat/rooms/group",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      )
+
+      const { roomId, alreadyExists } = response.data
+
+      toast({
+        title: alreadyExists ? "기존 채팅방으로 이동" : "채팅방 생성 완료",
+        description: alreadyExists
+          ? "동일한 이름의 채팅방이 이미 존재합니다."
+          : "새로운 채팅방이 생성되었습니다.",
+      })
+
+      router.push(`/messages/${roomId}`)
+    } catch (error: any) {
+      console.error("❌ 채팅방 생성 실패:", error)
+      toast({
+        title: "채팅방 생성 실패",
+        description: error.response?.data?.message || "채팅방을 생성하는데 실패했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -78,55 +139,6 @@ export default function CreateChatRoomPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Category Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="category" className="text-sm font-medium text-foreground">
-              채팅방 주제 <span className="text-red-500">*</span>
-            </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="채팅방 주제를 선택하세요" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Thumbnail Upload */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">채팅방 이미지</Label>
-            <div className="space-y-3">
-              {thumbnail ? (
-                <div className="relative inline-block">
-                  <img
-                    src={thumbnail || "/placeholder.svg"}
-                    alt="채팅방 썸네일"
-                    className="h-48 w-full object-cover rounded-lg border border-divider"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex h-48 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80 transition-colors">
-                  <Upload className="h-10 w-10 text-text-secondary mb-2" />
-                  <span className="text-sm text-text-secondary">클릭하여 이미지 업로드</span>
-                  <span className="text-xs text-text-secondary mt-1">권장 크기: 400x200</span>
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-              )}
-            </div>
-          </div>
-
           {/* Room Name */}
           <div className="space-y-2">
             <Label htmlFor="roomName" className="text-sm font-medium text-foreground">
@@ -139,37 +151,66 @@ export default function CreateChatRoomPage() {
               placeholder="예: 거실 인테리어 고민방"
               className="w-full"
               maxLength={50}
+              disabled={isSubmitting}
             />
             <p className="text-xs text-text-secondary">{roomName.length}/50</p>
           </div>
 
-          {/* Description */}
+          {/* Thumbnail Upload (선택사항) */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium text-foreground">
-              채팅방 설명 <span className="text-red-500">*</span>
+            <Label className="text-sm font-medium text-foreground">
+              채팅방 이미지 <span className="text-text-secondary text-xs">(선택)</span>
             </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="채팅방에 대한 간단한 설명을 입력하세요"
-              className="min-h-[120px] w-full resize-none"
-              maxLength={200}
-            />
-            <p className="text-xs text-text-secondary">{description.length}/200</p>
+            <div className="space-y-3">
+              {thumbnail ? (
+                <div className="relative inline-block">
+                  <img
+                    src={thumbnail}
+                    alt="채팅방 썸네일"
+                    className="h-48 w-full object-cover rounded-lg border border-divider"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex h-48 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-divider bg-background-section hover:bg-background-section/80 transition-colors">
+                  <Upload className="h-10 w-10 text-text-secondary mb-2" />
+                  <span className="text-sm text-text-secondary">이미지 업로드 (선택)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
-          {/* Submit Buttons */}
+          {/* Submit */}
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="flex-1"
+              disabled={isSubmitting}
+            >
               취소
             </Button>
             <Button
               type="submit"
               className="flex-1 bg-primary hover:bg-primary/90"
-              disabled={!category || !roomName || !description}
+              disabled={!roomName || isSubmitting}
             >
-              채팅방 만들기
+              {isSubmitting ? "생성 중..." : "채팅방 만들기"}
             </Button>
           </div>
         </form>
