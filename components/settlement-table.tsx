@@ -18,6 +18,45 @@ interface SettlementTableProps {
   loading?: boolean
   error?: string | null
 }
+// 정산 상태
+const getSettlementStatusColor = (status: string) => {
+  switch (status) {
+    case "COMPLETED":
+      return "bg-green-100 text-green-700"
+    case "PENDING":
+      return "bg-orange-100 text-orange-700"
+    case "CANCELED":
+      return "bg-red-100 text-red-700"
+    default:
+      return "bg-gray-100 text-gray-700"
+  }
+}
+
+const getSettlementStatusLabel = (status: string) => {
+  switch (status) {
+    case "COMPLETED":
+      return "정산 완료"
+    case "PENDING":
+      return "정산 진행중"
+    case "CANCELED":
+      return "정산 취소"
+    default:
+      return status
+  }
+}
+// 일시에서 T제거
+const formatDateTime = (v: string | Date | null | undefined) => {
+  if (!v) return "-";
+  // 문자열이면: T를 공백으로 치환
+  if (typeof v === "string") {
+    // 이미 'YYYY-MM-DD HH:mm:ss' 형태면 그대로, ISO면 T만 공백으로
+    return v.includes("T") ? v.replace("T", " ") : v;
+  }
+  // Date 객체면 YYYY-MM-DD HH:mm:ss 로 변환
+  const d = v instanceof Date ? v : new Date(v);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
 
 export function SettlementTable({
   period,
@@ -116,16 +155,10 @@ export function SettlementTable({
   }
 
   const getStatusBadge = (status: SettlementStatus) => {
-    // const statusMap = {
-    //   pending: { label: "정산 진행중", variant: "default" as const },
-    //   completed: { label: "정산 완료", variant: "secondary" as const },
-    //   canceled: { label: "정산 취소", variant: "secondary" as const }, // Blue button style
-    // }
-    // return statusMap[status]
-    const key = (status ?? "").toLowerCase()
-    if (key === "pending") return { label: "정산 진행중", variant: "default" as const }
-    if (key === "completed" || key === "completed") return { label: "정산 완료", variant: "secondary" as const }
-    if (key === "canceled") return { label: "정산 취소", variant: "destructive" as const }
+    const key = String(status ?? "").toLowerCase()
+    if (key === "PENDING") return { label: "정산 진행중", variant: "default" as const }
+    if (key === "COMPLETED") return { label: "정산 완료", variant: "secondary" as const }
+    if (key === "CANCELED") return { label: "정산 취소", variant: "destructive" as const }
     return { label: status ?? "-", variant: "outline" as const }
   }
 
@@ -169,33 +202,75 @@ export function SettlementTable({
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
+          {period === "all" && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>주문 일시</TableHead>
+                  <TableHead>주문 번호</TableHead>
+                  <TableHead className="text-right">상품명</TableHead>
+                  <TableHead className="text-right">판매금액</TableHead>
+                  <TableHead className="text-right">부가세</TableHead>
+                  <TableHead className="text-right">수수료</TableHead>
+                  <TableHead className="text-right">환불</TableHead>
+                  <TableHead className="text-right">정산 금액</TableHead>
+                  <TableHead className="text-left">정산 일시</TableHead>
+                  <TableHead>정산 상태</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayData.map((item: any, i: number) => {
+                  const settlementAmount = calcSettlementAmount(item)
+                  const badge = getStatusBadge(item.settlementStatus ?? item.status)
+                  const orderedAt = item.orderedAt ?? item.date ?? ""
+
+                  return (
+                    <TableRow key={i}>
+                      <TableCell>{formatDateTime(orderedAt)}</TableCell>
+                      <TableCell className="font-mono">{item.orderNumber ?? "-"}</TableCell>
+                      <TableCell className="text-right">{item.productName}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.salesAmount ?? item.totalSales)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.vat ?? item.totalVat)}</TableCell>
+                      <TableCell className="text-right">-{formatCurrency(item.fee ?? item.totalFee)}</TableCell>
+                      <TableCell className="text-right">
+                        {toNum(item.refundAmount ?? item.totalRefund) > 0
+                          ? `-${formatCurrency(item.refundAmount ?? item.totalRefund)}`
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(settlementAmount)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatDateTime(item.settlementDate ?? item.date)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getSettlementStatusColor(item.settlementStatus ?? item.status)}`}>{getSettlementStatusLabel(item.settlementStatus ?? item.status)}</span>
+                      </TableCell>
+                      {/* <Badge className={getSettlementStatusColor(item.settlementStatus ?? item.status)} variant={badge.variant}>{badge.label}</Badge> */}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
           {period === "daily" && (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>거래일</TableHead>
+                  <TableHead>주문 일시</TableHead>
                   <TableHead className="text-right">총 주문건수</TableHead>
                   <TableHead className="text-right">총 판매금액</TableHead>
                   <TableHead className="text-right">부가세</TableHead>
                   <TableHead className="text-right">수수료</TableHead>
                   <TableHead className="text-right">환불</TableHead>
                   <TableHead className="text-right">정산금액</TableHead>
-                  <TableHead>정산일</TableHead>
-                  <TableHead>상태</TableHead>
+                  <TableHead>정산 일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayData.map((item: any, i: number) => {
                   const settlementAmount = calcSettlementAmount(item)
-                  const statusKey = (item.status ?? item.settlementStatus ?? "").toLowerCase()
-                  const statusLabel =
-                    statusKey === "completed"
-                      ? "정산 완료"
-                      : statusKey === "pending"
-                        ? "정산 진행중"
-                        : statusKey === "canceled"
-                          ? "정산 취소"
-                          : "-"
                   return (
                     <TableRow key={i}>
                       <TableCell>{item.date ?? item.settlementDate ?? item.orderedAt}</TableCell>
@@ -217,7 +292,6 @@ export function SettlementTable({
                           <span>{item.settlementDate ?? item.date}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{statusLabel}</TableCell>
                     </TableRow>
                   )
                 })}
@@ -229,7 +303,7 @@ export function SettlementTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-left">거래 기간</TableHead>
+                  <TableHead className="text-left">정산 기간</TableHead>
                   <TableHead className="text-right">총 주문건수</TableHead>
                   <TableHead className="text-right">총 판매금액</TableHead>
                   <TableHead className="text-right">부가세</TableHead>
@@ -283,8 +357,8 @@ export function SettlementTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-left">거래 기간</TableHead>
-                  {/* <TableHead className="text-right">주문건수</TableHead> */}
+                  <TableHead className="text-left">정산 기간</TableHead>
+                  <TableHead className="text-right">총 주문 건수</TableHead>
                   <TableHead className="text-right">총 판매금액</TableHead>
                   <TableHead className="text-right">부가세</TableHead>
                   <TableHead className="text-right">수수료</TableHead>
@@ -304,9 +378,9 @@ export function SettlementTable({
                       onClick={() => drillDown.level === "base" && onDrillDown(JSON.stringify({ year: item.year, month: item.month }))}
                     >
                       <TableCell>{item.year ? `${item.year}년 ${month}월` : month}</TableCell>
-                      {/* <TableCell className="text-right">
+                      <TableCell className="text-right">
                         {toNum(item.totalCount).toLocaleString()}건
-                      </TableCell> */}
+                      </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(item.totalSales)}
                       </TableCell>
@@ -335,8 +409,8 @@ export function SettlementTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-left">거래 기간</TableHead>
-                  {/* <TableHead className="text-right">주문 건수</TableHead> */}
+                  <TableHead className="text-left">정산 기간</TableHead>
+                  <TableHead className="text-right">총 주문 건수</TableHead>
                   <TableHead className="text-right">총 판매금액</TableHead>
                   <TableHead className="text-right">부가세</TableHead>
                   <TableHead className="text-right">수수료</TableHead>
@@ -350,9 +424,9 @@ export function SettlementTable({
                   return (
                     <TableRow key={i}>
                       <TableCell>{item.year ?? "-"}</TableCell>
-                      {/* <TableCell className="text-right">
+                      <TableCell className="text-right">
                         {toNum(item.totalOrders ?? item.totalCount).toLocaleString()}건
-                      </TableCell> */}
+                      </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(item.totalSales ?? item.totalAmount)}
                       </TableCell>
