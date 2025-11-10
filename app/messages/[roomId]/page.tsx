@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import apiClient from "@/lib/api"
 import {
@@ -12,29 +12,35 @@ import {
   sendChatMessage
 } from "@/lib/hooks/chat-socket"
 import type { IMessage } from "@stomp/stompjs"
-import { Content } from "vaul"
 
 // ============================================
 // 타입 정의
 // ============================================
-export type ChatMessageResponse = {
-  messageId: number
-  roomId: number
-  senderId: number
-  senderName: string
-  senderProfileImg: string
-  messageType: string
-  content: string
-  sentAt: string
-  isRead: boolean
-}
 
-// 채팅방 정보 응답 타입
-type ChatRoomDetailResponse = {
+// 채팅방 타입
+type RoomType = "INDIVIDUAL" | "GROUP"
+
+// 개인 채팅방 상세 정보 (백엔드 DTO와 일치)
+type IndividualChatDetailResponse = {
   roomId: number
   partnerId: number
   partnerName: string
-  thumbnailUrl: string
+  partnerProfileImageUrl: string
+}
+
+// 그룹 채팅방 상세 정보 (백엔드 DTO와 일치)
+type GroupChatDetailResponse = {
+  roomId: number
+  roomName: string
+  roomThumbnailUrl: string
+  memberCount: number
+  participants: GroupMemberInfo[]
+}
+
+type GroupMemberInfo = {
+  userId: number
+  userName: string
+  profileUrl: string
 }
 
 type Message = {
@@ -57,20 +63,13 @@ export type ChatMessageDto = {
   senderProfileImg: string
 }
 
-// 이전 메시지 응답 (PreMessageResponse)
 export type PreMessageResponse = {
   messages: ChatMessageDto[]
   hasNext: boolean
 }
 
-// 방 입장 응답 (RoomEnterResponse)
-export type RoomEnterResponse = {
-  roomInfo: ChatRoomDetailResponse
-  preMessages: PreMessageResponse
-}
-
 // ============================================
-// SVG 아이콘 컴포넌트
+// SVG 아이콘 컴포넌트 (기존과 동일)
 // ============================================
 const ArrowLeftIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,6 +94,17 @@ const SmileIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const UsersIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+    />
+  </svg>
+)
+
 // ============================================
 // 메인 컴포넌트
 // ============================================
@@ -105,6 +115,10 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   const resolvedParams = React.use(params)
   const roomId = Number(resolvedParams.roomId)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // URL에서 타입 파라미터 가져오기
+  const roomTypeParam = searchParams.get('type') as RoomType | null
 
   // Zustand 스토어에서 사용자 정보 가져오기
   const user = useAuthStore((s) => s.user)
@@ -113,27 +127,37 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   // ------------------------------------------
   // 2. 상태 관리
   // ------------------------------------------
+  // 채팅방 타입 및 정보
+  const [roomType, setRoomType] = useState<RoomType | null>(roomTypeParam)
+  const [roomName, setRoomName] = useState<string>("")
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>("")
+  const [memberCount, setMemberCount] = useState<number>(0)
+  const [groupMembers, setGroupMembers] = useState<GroupMemberInfo[]>([])
+
   // 채팅 관련 상태
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState("")
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [lastMessageId, setLastMessageId] = useState<number | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // 개인 채팅 상태
+  const [partnerId, setPartnerId] = useState<number | null>(null)
+  const [partnerName, setPartnerName] = useState<string>("상대방")
 
   // UI 상태
-  const [partnerName, setPartnerName] = useState<string>("상대방")
-  const [partnerProfileImg, setPartnerProfileImg] = useState<string>("")
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
   // Ref
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const isSubscribedRef = useRef(false)
 
-  const [loadingMore, setLoadingMore] = useState(false)
   // ------------------------------------------
   // 3. 채팅방 정보 로드 및 웹소켓 연결
   // ------------------------------------------
@@ -157,7 +181,7 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
             }
 
             subscribeToTopic(`/sub/rooms/${roomId}`, handleMessageReceived)
-            isSubscribedRef.current = true  // ✅ 구독 완료 표시
+            isSubscribedRef.current = true
             console.log("✅ 구독 완료")
           },
           onError: (error) => {
@@ -188,69 +212,152 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   // ------------------------------------------
 
   /**
-   * 채팅방 정보 조회 
+   * 채팅방 정보 조회 (타입별 분기)
    */
   const fetchChatRoomInfo = async () => {
     const myUserId = useAuthStore.getState().user?.id
-
-
+    
     try {
-      console.log("📤 채팅방 정보 요청 - roomId:", roomId)
-      const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/enter`)
+      setLoading(true)
+      setError(null)
 
+      let roomInfo: IndividualChatDetailResponse | GroupChatDetailResponse
+      let type: RoomType
 
-      console.log("✅ 채팅방 정보 응답:", response)
-
-      // ✅ 응답 본문
-      const roomData = response.data
-      if (!roomData) {
-        console.error("⚠️ roomData가 undefined입니다:", response)
-        return
+      // 타입 파라미터가 있으면 해당 API 호출
+      if (roomTypeParam === "INDIVIDUAL") {
+        console.log("📤 개인 채팅방 정보 요청 - roomId:", roomId)
+        const response = await apiClient.get<IndividualChatDetailResponse>(
+          `/api/v1/chat/rooms/individual/${roomId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        )
+        roomInfo = response.data
+        type = "INDIVIDUAL"
+        
+      } else if (roomTypeParam === "GROUP") {
+        console.log("📤 그룹 채팅방 정보 요청 - roomId:", roomId)
+        const response = await apiClient.get<GroupChatDetailResponse>(
+          `/api/v1/chat/rooms/group/${roomId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        )
+        roomInfo = response.data
+        type = "GROUP"
+        
+      } else {
+        // 타입이 없으면 개인 채팅 먼저 시도
+        try {
+          console.log("📤 개인 채팅방 정보 요청 시도 - roomId:", roomId)
+          const response = await apiClient.get<IndividualChatDetailResponse>(
+            `/api/v1/chat/rooms/individual/${roomId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          )
+          roomInfo = response.data
+          type = "INDIVIDUAL"
+        } catch (individualError) {
+          // 개인 채팅 실패 시 그룹 채팅 시도
+          console.log("📤 그룹 채팅방 정보 요청 시도 - roomId:", roomId)
+          const response = await apiClient.get<GroupChatDetailResponse>(
+            `/api/v1/chat/rooms/group/${roomId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          )
+          roomInfo = response.data
+          type = "GROUP"
+        }
       }
 
-      // ✅ 구조 분해 (안전하게 처리)
-      const { roomInfo, preMessages } = roomData
+      console.log("✅ 채팅방 정보 응답:", roomInfo)
 
-      if (!preMessages) {
-        console.error("⚠️ preMessages가 undefined입니다:", roomData)
-        return
+      // 타입 설정
+      setRoomType(type)
+
+      // 타입별 데이터 설정
+      if (type === "INDIVIDUAL") {
+        const individualInfo = roomInfo as IndividualChatDetailResponse
+        setPartnerId(individualInfo.partnerId)
+        setPartnerName(individualInfo.partnerName)
+        setThumbnailUrl(individualInfo.partnerProfileImageUrl || "")
+        setRoomName(individualInfo.partnerName)
+      } else {
+        const groupInfo = roomInfo as GroupChatDetailResponse
+        setRoomName(groupInfo.roomName)
+        setThumbnailUrl(groupInfo.roomThumbnailUrl || "")
+        setMemberCount(groupInfo.memberCount)
+        setGroupMembers(groupInfo.participants)
+        console.log("👥 그룹 멤버 정보:", groupInfo.participants)
       }
 
-      const myUserId = useAuthStore.getState().user?.id
-
-      // ✅ 메시지 변환 (내 메시지 구분)
-      const parsedMessages = preMessages.messages
-      .slice()
-      .map((msg: ChatMessageDto) => ({
-        messageId: msg.messageId,
-        senderId: msg.senderId,
-        content: msg.content,
-        timestamp: formatTimestamp(msg.sentAt),  
-        isMe: msg.senderId === myUserId,
-        status: "sent" as const,
-      }))
-
-      console.log("🏠 roomInfo:", roomInfo)
-      console.log("💬 parsedMessages:", parsedMessages)
-
-
-      if (!preMessages) {
-        console.error("⚠️ preMessages가 undefined입니다:", roomData)
-        return
-      }
-
-      setPartnerName(roomData.roomInfo.partnerName || "상대방")
-      setPartnerProfileImg(roomData.roomInfo.thumbnailUrl || "")
-      setMessages(parsedMessages)
-      setHasMore(preMessages.hasNext)
-
-      setTimeout(() => scrollToBottom(), 100)
-
+      // 이전 메시지 로드
+      await fetchInitialMessages()
 
     } catch (error: any) {
       console.error("❌ 채팅방 정보 로드 실패:", error)
+      console.error("❌ 에러 상세:", error.response?.data)
+      setError(error.response?.data?.message || "채팅방 정보를 불러올 수 없습니다")
       setPartnerName("상대방")
-      setPartnerProfileImg("")
+      setThumbnailUrl("")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * 초기 메시지 로드
+   */
+  const fetchInitialMessages = async () => {
+    const myUserId = useAuthStore.getState().user?.id
+
+    try {
+      const response = await apiClient.get<PreMessageResponse>(
+        `/api/v1/chat/rooms/${roomId}/messages`,
+        {
+          params: { size: 30 },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      )
+
+      const { messages: newMessages, hasNext } = response.data
+
+      const parsedMessages = newMessages
+        .map((msg: ChatMessageDto) => ({
+          messageId: msg.messageId,
+          senderId: msg.senderId,
+          content: msg.content,
+          timestamp: formatTimestamp(msg.sentAt),
+          isMe: msg.senderId === myUserId,
+          status: "sent" as const,
+        }))
+        .reverse()
+
+      setMessages(parsedMessages)
+      setHasMore(hasNext)
+
+      setTimeout(() => scrollToBottom(), 100)
+
+    } catch (error) {
+      console.error("❌ 초기 메시지 로드 실패:", error)
     }
   }
 
@@ -267,7 +374,6 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
         return
       }
 
-      // 새 메시지를 목록에 추가
       const newMessage: Message = {
         messageId: payload.messageId,
         senderId: payload.senderId,
@@ -278,7 +384,6 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
       }
 
       setMessages((prev) => [...prev, newMessage])
-
       setTimeout(() => scrollToBottom(), 100)
 
     } catch (error) {
@@ -290,71 +395,95 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
    * 메시지 전송
    */
   const handleSendMessage = () => {
-    const userStore = useAuthStore.getState()
+    // 입력 검증
+    if (!inputValue.trim() && selectedImages.length === 0) {
+      console.warn("⚠️ 메시지 내용이 없습니다.")
+      return
+    }
 
-    // 입력값 검증
-    if (!inputValue.trim() && selectedImages.length === 0) return
-
+    // 웹소켓 연결 확인
     if (!isConnected) {
       console.warn("⚠️ 웹소켓이 연결되지 않았습니다.")
+      alert("채팅 서버와 연결이 끊어졌습니다. 다시 시도해주세요.")
       return
     }
 
-    if (!userStore?.user?.id) {
-      console.warn("⚠️ 로그인 정보가 없습니다. senderId 누락됨")
+    // 로그인 정보 확인
+    if (!user?.id) {
+      console.warn("⚠️ 로그인 정보가 없습니다.")
+      alert("로그인이 필요합니다.")
       return
     }
-  
-    const senderId = userStore.user.id
-  
-    // UI 메시지 생성 (Optimistic UI)
+
+    const senderId = user.id
+
+    // 임시 메시지 생성
     const tempMessage: Message = {
       messageId: Date.now(),
-      senderId: user?.id ?? 0,
+      senderId: senderId,
       content: inputValue,
       timestamp: formatTimestamp(new Date().toISOString()),
       isMe: true,
-      status: "sent",
+      status: "sending",
       images: selectedImages.length > 0 ? selectedImages : undefined,
     }
 
-    // 화면에 먼저 표시
+    // UI에 즉시 표시
     setMessages((prev) => [...prev, tempMessage])
 
-    // 서버로 메시지 전송
     try {
+      // 웹소켓으로 메시지 전송
       sendChatMessage("/pub/chat.send", {
-      roomId: roomId,
-      senderId: senderId,
-      content: inputValue,
+        roomId: roomId,
+        senderId: senderId,
+        content: inputValue,
       })
-      console.log("📤 메시지 전송 완료:", { roomId, senderId, content: inputValue })
+      
+      console.log("📤 메시지 전송 완료:", { 
+        roomId, 
+        senderId, 
+        content: inputValue 
+      })
 
-      // 하단 스크롤
+      // 메시지 상태를 "sent"로 변경
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.messageId === tempMessage.messageId 
+            ? { ...msg, status: "sent" } 
+            : msg
+        )
+      )
+
+      // 스크롤 이동
       setTimeout(() => scrollToBottom(), 100)
 
     } catch (error) {
       console.error("❌ 메시지 전송 실패:", error)
-      // 실패한 메시지 상태 업데이트
+      
+      // 메시지 상태를 "error"로 변경
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.messageId === tempMessage.messageId ? { ...msg, status: "error" } : msg
+          msg.messageId === tempMessage.messageId 
+            ? { ...msg, status: "error" } 
+            : msg
         )
       )
+      
+      alert("메시지 전송에 실패했습니다.")
     }
+
     // 입력 필드 초기화
     setInputValue("")
     setSelectedImages([])
   }
 
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-
-
+  /**
+   * 이전 메시지 불러오기
+   */
   const fetchOlderMessages = async (lastMessageId: number) => {
     if (loadingMore || !hasMore) return
   
     setLoadingMore(true)
-    
 
     try {
       const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/messages`, {
@@ -362,28 +491,23 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
         headers: { Authorization: `Bearer ${accessToken}` },
       })
 
-      // 구조분해할당으로 꺼냄
-      const { messages: newMessages, hasMore: hasNext } = response.data
+      const { messages: newMessages, hasNext } = response.data
       const myUserId = useAuthStore.getState().user?.id
 
       const parsedNewMessages = newMessages.map((msg: ChatMessageDto) => ({
         messageId: msg.messageId,
         senderId: msg.senderId,
         content: msg.content,
-        timestamp: formatTimestamp(msg.sentAt),  
+        timestamp: formatTimestamp(msg.sentAt),
         isMe: msg.senderId === myUserId,
         status: "sent" as const,
       }))
   
-      // 스크롤 위치 저장
       const container = chatContainerRef.current
       const previousScrollHeight = container?.scrollHeight || 0
-  
 
-      // 기존 메시지 위에 추가
       setMessages((prev) => [...parsedNewMessages.reverse(), ...prev])
       setHasMore(hasNext)
-
 
       setTimeout(() => {
         if (container) {
@@ -399,14 +523,11 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
     }
   }
 
-  /*
-   * Enter 키 입력 처리 (한글 중복 전송 방지)
+  /**
+   * Enter 키 입력 처리
    */
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // 한글 조합 중일 때는 무시
-    if (e.nativeEvent.isComposing) {
-      return
-    }
+    if (e.nativeEvent.isComposing) return
 
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -455,46 +576,64 @@ export default function MessagesPage({ params }: { params: Promise<{ roomId: str
   }
 
   /**
-  * 스크롤을 최하단으로 이동 (부드럽게)
-  */
- const scrollToBottom = () => {
-   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
- }
- 
- /**
-  * 스크롤을 즉시 최하단으로 이동 (초기 로드용)
-  */
- const scrollToBottomInstant = () => {
-   messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
- }
-
- // ✅ 스크롤 이벤트 활성화
-useEffect(() => {
-  const container = chatContainerRef.current
-  if (!container) return
-
-  const handleScroll = async () => {
-    // 최상단에 도달한 경우 (50px 여유)
-    if (container.scrollTop < 50 && hasMore && !loadingMore) {
-      const firstMessageId = messages[0]?.messageId
-      if (!firstMessageId) return
-      await fetchOlderMessages(firstMessageId)
-    }
+   * 스크롤을 최하단으로 이동
+   */
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  container.addEventListener("scroll", handleScroll)
-  return () => container.removeEventListener("scroll", handleScroll)
-}, [messages, loadingMore, hasMore])
+  /**
+   * 스크롤 이벤트 처리
+   */
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container) return
+
+    const handleScroll = async () => {
+      if (container.scrollTop < 50 && hasMore && !loadingMore) {
+        const firstMessageId = messages[0]?.messageId
+        if (!firstMessageId) return
+        await fetchOlderMessages(firstMessageId)
+      }
+    }
+
+    container.addEventListener("scroll", handleScroll)
+    return () => container.removeEventListener("scroll", handleScroll)
+  }, [messages, loadingMore, hasMore])
 
   // ------------------------------------------
-  // 5. 렌더링 (기존과 동일)
+  // 5. 렌더링
   // ------------------------------------------
+
+  // 로딩 중
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <p className="text-text-secondary">채팅방 정보를 불러오는 중...</p>
+      </div>
+    )
+  }
+
+  // 에러
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background">
+        <p className="text-red-500 mb-4">{error}</p>
+        <button
+          onClick={() => router.back()}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+        >
+          돌아가기
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background max-w-[1256px] mx-auto">
 
       {/* ========== 헤더 ========== */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-divider bg-background sticky top-0 z-10">
-        {/* 뒤로가기 버튼 */}
         <button
           onClick={() => router.back()}
           className="p-2 hover:bg-background-section rounded-full transition-colors"
@@ -503,50 +642,69 @@ useEffect(() => {
           <ArrowLeftIcon className="h-5 w-5 text-foreground" />
         </button>
 
-        {/* 상대방 정보 */}
         <div className="flex items-center gap-3 flex-1">
-          {/* 프로필 이미지 */}
-          {partnerProfileImg ? (
-            <img
-              src={partnerProfileImg}
-              alt={partnerName}
-              className="h-10 w-10 rounded-full object-cover"
-            />
+          {roomType === "INDIVIDUAL" ? (
+            <>
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={partnerName}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-primary">
+                    {partnerName[0]}
+                  </span>
+                </div>
+              )}
+              <div>
+                <h2 className="font-semibold text-foreground">{partnerName}</h2>
+              </div>
+            </>
           ) : (
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-sm font-semibold text-primary">
-                {partnerName[0]}
-              </span>
-            </div>
+            <>
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={roomName}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UsersIcon className="h-5 w-5 text-primary" />
+                </div>
+              )}
+              <div>
+                <h2 className="font-semibold text-foreground">{roomName}</h2>
+                <p className="text-xs text-text-secondary">
+                  👥 {memberCount}명
+                </p>
+              </div>
+            </>
           )}
-
-          <div>
-            <h2 className="font-semibold text-foreground">{partnerName}</h2>
-            <p className="text-xs text-text-secondary">
-              {isConnected ? "🟢 활동 중" : "🔴 오프라인"}
-            </p>
-          </div>
         </div>
 
-        {/* 우측 버튼들 */}
         <div className="flex items-center gap-2">
-          {/* 사용자 정보 버튼 */}
           <button
             onClick={() => setShowUserInfo(!showUserInfo)}
             className="p-2 hover:bg-background-section rounded-full transition-colors"
             aria-label="사용자 정보"
           >
-            <svg className="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
+            {roomType === "INDIVIDUAL" ? (
+              <svg className="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            ) : (
+              <UsersIcon className="h-5 w-5 text-foreground" />
+            )}
           </button>
 
-          {/* 설정 버튼 */}
           <div className="relative">
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -569,18 +727,8 @@ useEffect(() => {
               </svg>
             </button>
 
-            {/* 설정 드롭다운 */}
             {showSettings && (
               <div className="absolute right-0 mt-2 w-48 bg-background border border-divider rounded-lg shadow-lg py-1 z-20">
-                <button
-                  onClick={() => {
-                    setShowSettings(false)
-                    alert("공지사항이 없습니다.")
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-background-section transition-colors"
-                >
-                  📢 공지 확인
-                </button>
                 <button
                   onClick={() => {
                     setShowSettings(false)
@@ -588,13 +736,13 @@ useEffect(() => {
                   }}
                   className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-background-section transition-colors"
                 >
-                  🖼️ 첨부 이미지
+                  첨부 이미지
                 </button>
                 <button
                   onClick={handleLeaveRoom}
                   className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-background-section transition-colors"
                 >
-                  🚪 대화방 나가기
+                  대화방 나가기
                 </button>
               </div>
             )}
@@ -605,16 +753,16 @@ useEffect(() => {
       {/* ========== 사용자 정보 사이드바 ========== */}
       {showUserInfo && (
         <>
-          {/* 배경 오버레이 */}
           <div
             className="fixed inset-0 bg-black/20 z-10"
             onClick={() => setShowUserInfo(false)}
           />
 
-          {/* 사이드바 */}
-          <aside className="absolute right-0 top-[57px] z-20 h-[calc(100vh-57px)] w-64 border-l border-divider bg-background p-4 shadow-lg">
+          <aside className="absolute right-0 top-[57px] z-20 h-[calc(100vh-57px)] w-64 border-l border-divider bg-background p-4 shadow-lg overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground">사용자 정보</h3>
+              <h3 className="text-lg font-semibold text-foreground">
+                {roomType === "INDIVIDUAL" ? "사용자 정보" : "참여자 목록"}
+              </h3>
               <button
                 onClick={() => setShowUserInfo(false)}
                 className="p-1 hover:bg-background-section rounded-full transition-colors"
@@ -626,79 +774,129 @@ useEffect(() => {
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-4">
-              {/* 프로필 이미지 */}
-              {partnerProfileImg ? (
-                <img
-                  src={partnerProfileImg}
-                  alt={partnerName}
-                  className="h-20 w-20 rounded-full object-cover"
-                />
-              ) : (
-                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl font-semibold text-primary">
-                    {partnerName[0]}
-                  </span>
-                </div>
-              )}
+            {roomType === "INDIVIDUAL" ? (
+              <div className="flex flex-col items-center gap-4">
+                {thumbnailUrl ? (
+                  <img
+                    src={thumbnailUrl}
+                    alt={partnerName}
+                    className="h-20 w-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl font-semibold text-primary">
+                      {partnerName[0]}
+                    </span>
+                  </div>
+                )}
 
-              <div className="text-center">
-                <h4 className="font-semibold text-foreground">{partnerName}</h4>
-                <p className="text-sm text-text-secondary">활동 중</p>
+                <div className="text-center">
+                  <h4 className="font-semibold text-foreground">{partnerName}</h4>
+                </div>
+
+                <div className="w-full pt-4 border-t border-divider space-y-2">
+                  <button className="w-full px-4 py-2 text-sm text-foreground hover:bg-background-section rounded-lg transition-colors">
+                    프로필 보기
+                  </button>
+                </div>
               </div>
-              <div className="w-full pt-4 border-t border-divider space-y-2">
-                <button className="w-full px-4 py-2 text-sm text-foreground hover:bg-background-section rounded-lg transition-colors">
-                  프로필 보기
-                </button>
-                <button className="w-full px-4 py-2 text-sm text-foreground hover:bg-background-section rounded-lg transition-colors">
-                  차단하기
-                </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm text-text-secondary mb-3">
+                  총 {memberCount}명의 참여자
+                </div>
+                {groupMembers.map((member) => (
+                  <div key={member.userId} className="flex items-center gap-3 p-2 hover:bg-background-section rounded-lg transition-colors">
+                    {member.profileUrl ? (
+                      <img
+                        src={member.profileUrl}
+                        alt={member.userName}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-primary">
+                          {member.userName[0]}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {member.userName}
+                        {member.userId === user?.id && (
+                          <span className="ml-2 text-xs text-primary">(나)</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </aside>
         </>
       )}
 
       {/* ========== 메시지 목록 ========== */}
-      <main ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <main ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.map((message) => (
           <div
             key={message.messageId}
             className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"
-                }`}
+              className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"}`}
             >
-              {/* 프로필 이미지 (상대방 메시지만) */}
               {!message.isMe && (
                 <>
-                  {partnerProfileImg ? (
-                    <img
-                      src={partnerProfileImg}
-                      alt={partnerName}
-                      className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-                    />
+                  {roomType === "INDIVIDUAL" ? (
+                    thumbnailUrl ? (
+                      <img
+                        src={thumbnailUrl}
+                        alt={partnerName}
+                        className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-primary">
+                          {partnerName[0]}
+                        </span>
+                      </div>
+                    )
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">
-                        {partnerName[0]}
-                      </span>
-                    </div>
+                    (() => {
+                      const sender = groupMembers.find(m => m.userId === message.senderId)
+                      return sender?.profileUrl ? (
+                        <img
+                          src={sender.profileUrl}
+                          alt={sender.userName}
+                          className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-primary">
+                            {sender?.userName[0] || "?"}
+                          </span>
+                        </div>
+                      )
+                    })()
                   )}
                 </>
               )}
 
-              {/* 메시지 내용 */}
               <div className="flex flex-col gap-1">
+                {!message.isMe && roomType === "GROUP" && (
+                  <span className="text-xs text-text-secondary px-2">
+                    {groupMembers.find(m => m.userId === message.senderId)?.userName || "알 수 없음"}
+                  </span>
+                )}
+
                 <div
-                  className={`px-4 py-2.5 rounded-2xl ${message.isMe
+                  className={`px-4 py-2.5 rounded-2xl ${
+                    message.isMe
                       ? "bg-primary text-white rounded-br-sm"
                       : "bg-gray-100 text-foreground rounded-bl-sm"
-                    }`}
+                  }`}
                 >
-                  {/* 이미지 첨부 */}
                   {message.images && message.images.length > 0 && (
                     <div className="mb-2 grid grid-cols-2 gap-2">
                       {message.images.map((img, idx) => (
@@ -713,16 +911,15 @@ useEffect(() => {
                     </div>
                   )}
 
-                  {/* 텍스트 메시지 */}
                   {message.content && (
                     <p className="text-sm leading-relaxed">{message.content}</p>
                   )}
                 </div>
 
-                {/* 시간 표시 */}
                 <span
-                  className={`text-xs text-text-secondary px-2 ${message.isMe ? "text-right" : "text-left"
-                    }`}
+                  className={`text-xs text-text-secondary px-2 ${
+                    message.isMe ? "text-right" : "text-left"
+                  }`}
                 >
                   {message.timestamp}
                   {message.status === "sending" && " (전송 중...)"}
@@ -733,13 +930,11 @@ useEffect(() => {
           </div>
         ))}
 
-        {/* 스크롤 최하단 참조 */}
         <div ref={messagesEndRef} />
       </main>
 
       {/* ========== 입력 영역 ========== */}
       <footer className="border-t border-divider bg-background px-4 py-3">
-        {/* 선택한 이미지 미리보기 */}
         {selectedImages.length > 0 && (
           <div className="mb-3 flex gap-2 flex-wrap">
             {selectedImages.map((img, index) => (
@@ -761,9 +956,7 @@ useEffect(() => {
           </div>
         )}
 
-        {/* 입력 필드 */}
         <div className="flex items-end gap-2">
-          {/* 숨겨진 파일 입력 */}
           <input
             ref={fileInputRef}
             type="file"
@@ -773,7 +966,6 @@ useEffect(() => {
             className="hidden"
           />
 
-          {/* 이미지 추가 버튼 */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-2 hover:bg-background-section rounded-full transition-colors"
@@ -784,7 +976,6 @@ useEffect(() => {
             </svg>
           </button>
 
-          {/* 텍스트 입력 */}
           <div className="flex-1 bg-background-section rounded-3xl px-4 py-2 flex items-center gap-2">
             <input
               type="text"
@@ -802,7 +993,6 @@ useEffect(() => {
             </button>
           </div>
 
-          {/* 전송 버튼 */}
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() && selectedImages.length === 0}
