@@ -11,13 +11,16 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
+import { updateProductStatus } from "@/lib/api/products"
 import { getSellerProducts, getProductStock } from "@/lib/api/products"
-import { fetchSettlementByPeriod } from "@/api/sapi"
+import { fetchSettlementByPeriod, fetchAllSettlements } from "@/api/sapi"
 import { useAuthStore } from "@/stores/auth-store"
+import { useRef } from "react"
 import { Week } from "react-day-picker"
 
-export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
-export type SettlementStatus = "pending" | "canceled" | "completed"
+
+export type PeriodType = "all" | "daily" | "weekly" | "monthly" | "yearly"
+export type SettlementStatus = "PENDING" | "CANCELED" | "COMPLETED"
 export type DrillDownState = {
   level: "base" | "drilled"
   selectedPeriod: string | null
@@ -26,10 +29,10 @@ export type DrillDownState = {
 export default function SellerPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("products")
-  const [period, setPeriod] = useState<PeriodType>("daily")
+  const [period, setPeriod] = useState<PeriodType>("all")
   const [status, setStatus] = useState<SettlementStatus | "all">("all")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(),
+    from: new Date(new Date().setDate(new Date().getDate() - 29)),
     to: new Date(),
   })
 
@@ -38,72 +41,111 @@ export default function SellerPage() {
     selectedPeriod: null,
   })
 
+  // 페이지
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
+  const [pageMeta, setPageMeta] = useState<{ page: number; totalPages: number; totalElements: number } | null>(null)
 
   // 정산
   const user = useAuthStore((s) => s.user)
-  console.log(`user: ${user}`);
-
   const isHydrated = useAuthStore((s) => s.isHydrated)
-
   const userId = isHydrated ? user?.id : undefined
-
-  console.log("🪪 auth store:", { user, isHydrated })
-  console.log("🆔 userId:", user?.id)
 
   const [settlementData, setSettlementData] = useState<any[]>([])
   const [settlementLoading, setSettlementLoading] = useState(false);
   const [settlementError, setSettlementError] = useState<string | null>(null)
 
-  // 서버에서 인증 상태를 검증하고 최신화
-  // useEffect(() => {
-  //   console.log("💾 zustand:", { isHydrated })
-  // }, [ isHydrated])
-
+  const skipNextFetchRef = useRef(false)
   const PERIOD_PATH: Record<PeriodType, string> = {
+    all: "all",
     daily: "daily",
     weekly: "weekly",
     monthly: "monthly",
     yearly: "yearly",
   }
+  type ViewSnapshot = {
+    period: PeriodType
+    dateRange: { from: Date; to: Date }
+    pageIndex: number
+    pageSize: number
+    status: typeof status
+  }
+  const prevViewRef = useRef<ViewSnapshot | null>(null)
 
-  useEffect(() => {
-    // 1) 아예 조건부터 박아버리기
-    if (activeTab !== "settlement") return
-    if (!isHydrated) return
-    if (!userId) return
+  // const id = userId
+  const start = dateRange.from
+  const end = dateRange.to
 
-    // Nullable 해제
-    const id = userId
+  const toYMD = (d: Date) => {
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    return local.toISOString()
+      .slice(0, 10)
+  }
 
-    // 2) 날짜는 로컬 기준으로
-    const selectedDate = dateRange.from
-      ? new Date(dateRange.from.getTime() - dateRange.from.getTimezoneOffset() * 60000)
-        .toISOString()
-        .split("T")[0]
-      : new Date().toISOString().split("T")[0]
-    console.log("selectedData ===>", selectedDate)
-    async function getSettlement() {
-      setSettlementLoading(true)
-      setSettlementError(null)
+  const isSameDate = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 
-      try {
-        const res = await fetchSettlementByPeriod(id, period, selectedDate)
-        const list = Array.isArray(res) ? res.map(normalize) : [normalize(res)]
-        setSettlementData(list)
-      } catch (error: any) {
-        setSettlementError(error.message ?? "정산 데이터를 불러오지 못합니다")
-      } finally {
-        setSettlementLoading(false)
-      }
+  const eachDay = (from: Date, to: Date) => {
+    const days: Date[] = [];
+    const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const last = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    while (cur <= last) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
     }
+    return days;
+  };
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const startOfWeek = (d: Date) => {
+    // 월요일 시작(월=1, …, 일=0) 기준
+    const day = d.getDay() === 0 ? 7 : d.getDay()
+    const s = new Date(d)
+    s.setHours(0, 0, 0, 0)
+    s.setDate(s.getDate() - (day - 1))
+    return s
+  }
+  const endOfWeek = (d: Date) => {
+    const s = startOfWeek(d)
+    const e = new Date(s)
+    e.setDate(e.getDate() + 6)
+    e.setHours(23, 59, 59, 999)
+    return e
+  }
+  const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
+  const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
+  const startOfYear = (d: Date) => new Date(d.getFullYear(), 0, 1)
+  const endOfYear = (d: Date) => new Date(d.getFullYear(), 11, 31)
+  const handleSetPeriod = (next: PeriodType) => {
+    const today = startOfDay(new Date());
+    setPeriod(next)
+    setPageIndex(0)
+    if (next === "daily") {
+      setDateRange({ from: today, to: today });
+    }
+    if (next === "weekly") {
+      const from = startOfWeek(today)
+      const to = endOfWeek(today)
+      setDateRange({ from, to })
+      return
+    }
+    if (next === "monthly") {
+      const from = startOfMonth(today)
+      const to = endOfMonth(today)
+      setDateRange({ from, to })
+      return
+    }
+    if (next === "yearly") {
+      const from = startOfYear(today)
+      const to = endOfYear(today)
+      setDateRange({ from, to })
+      return
+    }
+  }
 
-    getSettlement()
-  }, [activeTab, dateRange, status])
-
-
-  const normalize = (item: any) => {
+  const normalize = (item: any, period: PeriodType) => {
     if (!item) return {}
-
     const base = {
       totalSales: item.totalSales ?? 0,
       totalFee: item.totalFee ?? 0,
@@ -116,23 +158,22 @@ export default function SellerPage() {
       completedRate: item.completedRate ?? 0,
       growthRate: item.growthRate ?? 0,
     }
-
+    if (period === "all") {
+      return { ...base }
+    }
     if (period === "daily") {
       return {
         ...base,
-        // 백: orderedAt → 프론트: date 로 통일
         date: item.orderedAt ?? item.settlementDate ?? item.date ?? null,
         settlementDate: item.settlementDate ?? null,
       }
     }
-
     if (period === "weekly") {
       return {
         ...base,
         year: item.year ?? null,
         month: item.month ?? null,
         week: item.week ?? null,
-        // 백: weekStartDate / weekEndDate → 프론트: startDate / endDate
         startDate: item.weekStartDate ?? null,
         endDate: item.weekEndDate ?? null,
       }
@@ -144,132 +185,153 @@ export default function SellerPage() {
         month: item.month ?? null,
       }
     }
-
-    // yearly
     return {
       ...base,
       year: item.year ?? null,
     }
   }
 
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  const isDailySingle = period === "daily" && sameDay(dateRange.from, dateRange.to);
+
+  const summaryDefaults = {
+    totalSales: 0,
+    totalFee: 0,
+    totalVat: 0,
+    totalRefund: 0,
+    totalSettlement: 0,
+    totalCount: 0,
+  }
+  const isSingleBucket =
+    (period === "daily" && sameDay(dateRange.from, dateRange.to)) ||
+    (period === "weekly" && Array.isArray(settlementData) && settlementData.length === 1);
 
 
-  // useEffect(() => {
-  //   if (activeTab !== "settlement") return
-  //   console.log("🔎 activeTab:", activeTab)
-  //   if (!isHydrated) {
-  //     console.log("⛔ stop: not hydrated yet")
-  //     return
-  //   }
-  //   if (!user?.id) { console.log("⛔ stop: no userId") }
+  const summaryData =
+    !Array.isArray(settlementData) || settlementData.length === 0
+      ? summaryDefaults
+      : isSingleBucket
+        ? settlementData[0] ?? summaryDefaults
+        : settlementData.reduce((acc: any, r: any) => ({
+          totalSales: acc.totalSales + (r.totalSales ?? 0),
+          totalFee: acc.totalFee + (r.totalFee ?? 0),
+          totalVat: acc.totalVat + (r.totalVat ?? 0),
+          totalRefund: acc.totalRefund + (r.totalRefund ?? 0),
+          totalSettlement: acc.totalSettlement + (r.totalSettlement ?? 0),
+          totalCount: acc.totalCount + (r.totalCount ?? 0),
+        }), { ...summaryDefaults });
 
-  //   const selectedDate = dateRange.from.toISOString().split("T")[0]
+  const endOfDay = (d: Date) => {
+    const e = new Date(d)
+    e.setHours(23, 59, 59, 999)
+    return e
+  }
 
-  //   async function getSettlement() {
-  //     console.log("🟣 SellerPage render")
-  //     setSettlementLoading(true)
-  //     setSettlementError(null)
-  //     console.log("[PAGE] call fetchSettlementByPeriod", { userId, period, selectedDate })
+  useEffect(() => {
+    if (activeTab !== "settlement") return
+    if (!isHydrated || userId === undefined) return
+    if (!userId) return
+    const id = userId
 
-  //     if (!userId) return
+    // 페이지인지 판별
+    function isPage<T>(v: any): v is { content: T[], number: number, size: number, totalElements: number, totalPages: number } {
+      return v && Array.isArray(v.content) && typeof v.totalPages === 'number'
+    }
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false
+      return
+    }
+    async function getSettlement() {
+      const fromForApi = new Date(dateRange.from)
+      const toForApi = endOfDay(new Date(dateRange.to)) // 포함되도록
 
-  //     try {
-  //       const res = await fetchSettlementByPeriod(
-  //         userId,
-  //         period,
-  //         selectedDate,
-  //         // status === "all" ? undefined : status
-  //       )
-  //       console.log("🔥 RAW SETTLEMENT RES:", res)
-  //       if (Array.isArray(res)) {
-  //         res.forEach((r, i) => console.log("🔥 RAW ITEM", i, r))
-  //       }
-  //       console.log("res::: ", res);
-  //       const normalize = (item: any) => {
-  //         if (!item) return {}
+      setSettlementLoading(true)
+      setSettlementError(null)
 
-  //         console.log("🟣 status fields:", {
-  //           status: item.status,
-  //           settlementStatus: item.settlementStatus,
-  //           settlement_status: item.settlement_status,
-  //         })
-  //         console.log("🟣 date fields:", {
-  //           settlementDate: item.settlementDate,
-  //           date: item.date,
-  //           orderedAt: item.orderedAt,
-  //         })
+      try {
+        if (period === "all") {
+          const page = await fetchAllSettlements(
+            id,
+            fromForApi,
+            toForApi,
+            { page: pageIndex, size: pageSize },
+            status
+          )
+          const list = Array.isArray(page?.content) ? page.content : Array.isArray(page) ? page : []
+          setSettlementData(list)
+          setPageMeta({
+            page: page?.number ?? 0,
+            totalPages: page?.totalPages ?? 0,
+            totalElements: page?.totalElements ?? 0,
+          })
+          return
+        }
+        else if (period === "daily") {
+          // 1) 기간이 '하루'면 단건 호출
+          if (isSameDate(fromForApi, toForApi)) {
+            const res = await fetchSettlementByPeriod(id, "daily", fromForApi, toForApi, { page: 0, size: 1 })
+            const item = Array.isArray(res) ? res[0] : (res?.content?.[0] ?? res ?? {})
+            const row = normalize({ ...item, date: toYMD(fromForApi) }, "daily")
+            setSettlementData([row])
+            setPageMeta(null)
+          }
 
-  //         const base = {
-  //           totalSales: item.totalSales ?? 0,
-  //           totalFee: item.totalFee ?? 0,
-  //           totalVat: item.totalVat ?? 0,
-  //           totalRefund: item.totalRefund ?? 0,
-  //           totalSettlement: item.totalSettlement ?? 0,
-  //           totalCount: item.totalCount ?? 0,
-  //           settlementStatus: item.settlementStatus ?? null,
-  //           settlementDate: item.settlementDate ?? null,
-  //           completedRate: item.completedRate ?? 0,
-  //           growthRate: item.growthRate ?? 0,
-  //         }
+          // 2) 여러 날이면 하루씩 쪼개서 병렬 호출
+          const days = eachDay(fromForApi, toForApi)
+          const dailyList = await Promise.all(
+            days.map(day =>
+              fetchSettlementByPeriod(
+                id,
+                "daily",
+                new Date(day),            // 00:00
+                endOfDay(new Date(day)),  // 23:59:59.999
+                { page: 0, size: 1 }
+              )
+            )
+          )
 
-  //         if (period === "daily") {
-  //           return {
-  //             ...base,
-  //             // 백: orderedAt → 프론트: date 로 통일
-  //             date: item.orderedAt ?? item.settlementDate ?? item.date ?? null,
-  //             settlementDate: item.settlementDate ?? null,
-  //           }
-  //         }
+          const rows = dailyList.map((res, idx) => {
+            const item = Array.isArray(res) ? res[0] : (res?.content?.[0] ?? res ?? {})
+            return normalize({ ...item, date: toYMD(days[idx]) }, "daily")
+          })
 
-  //         if (period === "weekly") {
-  //           return {
-  //             ...base,
-  //             year: item.year ?? null,
-  //             month: item.month ?? null,
-  //             week: item.week ?? null,
-  //             // 백: weekStartDate / weekEndDate → 프론트: startDate / endDate
-  //             startDate: item.weekStartDate ?? null,
-  //             endDate: item.weekEndDate ?? null,
-  //           }
-  //         }
-  //         if (period === "monthly") {
-  //           return {
-  //             ...base,
-  //             year: item.year ?? null,
-  //             month: item.month ?? null,
-  //           }
-  //         }
+          // 날짜 오름차순 정렬(보장용)
+          // rows.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))
 
-  //         // yearly
-  //         return {
-  //           ...base,
-  //           year: item.year ?? null,
-  //         }
-  //       }
-  //       const list = Array.isArray(res) ? res.map(normalize) : [normalize(res)]
-  //       console.log("[PAGE] normalized list:", list)
-  //       setSettlementData(list)
+          setSettlementData(rows)
+          setPageMeta(null)
+          return
+        }
 
-  //     }
+        // weekly / monthly / yearly
+        const res = await fetchSettlementByPeriod(id, period, fromForApi, toForApi, { page: pageIndex, size: pageSize })
+        let rows: any[] = []
+        let meta: { page: number; totalPages: number; totalElements: number } | null = null
 
-  //     catch (error: any) {
-  //       if (error.response) {
-  //         console.error("[PAGE] 500 body:", error.response.data)
-  //         console.error("[PAGE] 500 status:", error.response.status)
-  //       } else {
-  //         console.error("[PAGE] settlement error:", error)
-  //       }
+        if (res?.content && Array.isArray(res.content)) {
+          rows = res.content
+          meta = { page: res.number, totalPages: res.totalPages, totalElements: res.totalElements }
+        } else if (Array.isArray(res)) {
+          rows = res
+          meta = null
+        } else if (res) {
+          rows = [res]
+          meta = null
+        }
 
-  //       setSettlementError(error.message ?? "정산 데이터를 불러오지 못합니다")
-  //       console.log("빈값호출");
-  //       // setSettlementData([])
-
-  //     } finally {
-  //       setSettlementLoading(false)
-  //     }
-  //   }
-  //   getSettlement()
-  // }, [activeTab, userId, period, dateRange, status])
+        setSettlementData(rows.map(x => normalize(x, period)))
+        setPageMeta(meta)
+      } catch (e: any) {
+        setSettlementError(e?.message ?? "정산 데이터를 불러오지 못했습니다.")
+      } finally {
+        setSettlementLoading(false)
+      }
+    }
+    getSettlement()
+  }, [activeTab, dateRange, status, pageIndex, pageSize, period])
 
   const [orderStatusFilter, setOrderStatusFilter] = useState("전체")
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -286,7 +348,6 @@ export default function SellerPage() {
   const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
 
-  // 정산 상태
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED":
@@ -459,16 +520,14 @@ export default function SellerPage() {
   const getTotalStock = (product: ProductManageResponse) => {
     return product.totalStock
   }
-  // 클릭된 값이 "2025-11월" 이든 "11" 이든 다 숫자 11로 바꿔줌
 
-  // 1) 월 텍스트 -> 숫자
   const toMonthNumber = (v: string) => {
     if (!v) return NaN
     if (/^\d+$/.test(v)) return Number(v)
     const m = v.match(/(\d{1,2})월?$/) || v.match(/-(\d{1,2})$/)
     return m ? Number(m[1]) : NaN
   }
-  // 1) 월의 주(월~일) 범위 만들기 (컴포넌트 밖/위에 두면 재사용 좋아요)
+  // 1) 월의 주(월~일) 범위 만들기
   function listWeeksOfMonth(year: number, month: number) {
     const first = new Date(year, month - 1, 1)
     const last = new Date(year, month, 0) // 해당 월 말일
@@ -494,109 +553,112 @@ export default function SellerPage() {
     }
     return weeks
   }
-
+  function toRows(res: any): any[] {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (res?.content && Array.isArray(res.content)) return res.content;
+    return [res];
+  }
+  if (!prevViewRef.current) {
+    prevViewRef.current = {
+      period,
+      dateRange: { from: new Date(dateRange.from), to: new Date(dateRange.to) },
+      pageIndex,
+      pageSize,
+      status,
+    }
+  }
   const handleDrillDown = async (selectedPeriod: string) => {
     console.log("드릴 다운 클릭 됌")
+    if (!userId) return;
     let parsed: any = null
     try { parsed = JSON.parse(selectedPeriod) } catch { parsed = null }
 
-    // ✅ 주별 → 일별
+    //  주별 → 일별
     if (parsed?.start && parsed?.end && userId) {
       const start = new Date(parsed.start)
       const end = new Date(parsed.end)
-      const days: string[] = []
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        days.push(d.toISOString().slice(0, 10))
-      }
-
-      setSettlementLoading(true)
-      try {
-        const dailyList = await Promise.all(
-          days.map((day) => fetchSettlementByPeriod(userId, "daily", day))
-        )
-
-        const normalized = dailyList.map((res, idx) => ({
-          date: days[idx],
-          totalSales: res?.totalSales ?? 0,
-          totalFee: res?.totalFee ?? 0,
-          totalVat: res?.totalVat ?? 0,
-          totalRefund: res?.totalRefund ?? 0,
-          totalSettlement: res?.totalSettlement ?? 0,
-          totalCount: res?.totalCount ?? 0,
-          settlementStatus: res?.settlementStatus ?? null,
-        }))
-
-        setSettlementData(normalized)
-        setPeriod("daily")
-        setDrillDown({ level: "drilled", selectedPeriod })
-      } catch (e: any) {
-        console.error(e)
-        setSettlementError("선택한 주의 일별 데이터를 불러오지 못했습니다.")
-      } finally {
-        setSettlementLoading(false)
-      }
-      return
+      setDateRange({ from: start, to: endOfDay(end) })
+      setPageIndex(0)
+      setPeriod("daily")
+      setDrillDown({ level: "drilled", selectedPeriod })
     }
+    // 월 타일 클릭(또는 select) 시
+    const y = parsed?.year ?? dateRange.from.getFullYear();
+    const mFromParsed = parsed?.month;
+    const mFromText = toMonthNumber(selectedPeriod); // "2025-02" / "2월" 등에서 숫자 추출
+    const m = mFromParsed ?? mFromText;
+    if (m && !Number.isNaN(m)) {
+      const first = new Date(y, m - 1, 1);
+      const last = new Date(y, m, 0);
 
-    // ✅ 월별 → 주별 (주별→일별과 동일한 Promise.all 패턴)
-    if ((parsed?.year || parsed?.month) && userId) {
-      const year = parsed?.year ?? dateRange.from.getFullYear()
-      const month = parsed?.month ?? toMonthNumber(selectedPeriod)
-
-      if (!month || Number.isNaN(month)) {
-        console.warn("월 파싱 실패:", selectedPeriod)
-        return
-      }
-
-      // 1) 이 달의 주 대표일(월요일) 목록 생성
-      const weekRanges = listWeeksOfMonth(year, month)
-
-      setSettlementLoading(true)
+      setSettlementLoading(true);
       try {
-        // 2) 각 주 대표일로 weekly 요약 병렬 호출
-        const weeklyList = await Promise.all(
-          weekRanges.map((w) => fetchSettlementByPeriod(userId, "weekly", w.rep))
-        )
+        // 서버가 해당 월 범위를 주별 집계로 돌려준다는 전제
+        const res = await fetchSettlementByPeriod(userId, "weekly", first, last, { page: 0, size: pageSize });
 
-        // 3) 응답 + 주 경계 결합, 널 방어 및 정렬
-        const normalized = weeklyList.map((res, idx) => {
-          const w = weekRanges[idx]
-          return {
-            year,
-            month,
-            week: res?.week ?? idx + 1,
-            startDate: res?.weekStartDate ?? res?.startDate ?? w.start,
-            endDate: res?.weekEndDate ?? res?.endDate ?? w.end,
-            totalSales: res?.totalSales ?? 0,
-            totalFee: res?.totalFee ?? 0,
-            totalVat: res?.totalVat ?? 0,
-            totalRefund: res?.totalRefund ?? 0,
-            totalSettlement: res?.totalSettlement ?? 0,
-            totalCount: res?.totalCount ?? 0,
-            completedRate: res?.completedRate ?? 0,
-          }
-        }).sort((a, b) =>
-          new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-        )
+        const rows = toRows(res).map((r: any) => {
+          const startDate = r.weekStartDate ?? r.startDate ?? first;
+          const endDate = r.weekEndDate ?? r.endDate ?? last;
+          return { ...normalize(r, "weekly"), startDate, endDate };
+        });
+        const sorted = rows.sort(
+          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        );
+        const finalRows = sorted.map((r, i) => ({
+          ...r,
+          // week: r.week ?? (i + 1),
+        }));
+        // rows.forEach((r, i) => { r.week = i + 1; });
+        // setSettlementData(rows.map(r => normalize(r, "weekly")));
+        setSettlementData(finalRows)
 
-        setSettlementData(normalized)
-        setPeriod("weekly")
-        setDrillDown({ level: "drilled", selectedPeriod })
+        // 상태 전환: 주간 탭 + 기간을 해당 월로 세팅
+        setPeriod("weekly");
+        setDateRange({ from: first, to: last });
+        setDrillDown({ level: "drilled", selectedPeriod });
+        setPageIndex(0);
+
+        // 페이지 메타는 Page일 때만
+        setPageMeta(
+          res && typeof res?.totalPages === "number"
+            ? { page: res.number ?? 0, totalPages: res.totalPages ?? 0, totalElements: res.totalElements ?? 0 }
+            : null
+        );
       } catch (e: any) {
-        console.error(e)
-        setSettlementError(e?.message ?? "해당 월의 주별 데이터를 불러오지 못했습니다.")
+        console.error(e);
+        setSettlementError(e?.message ?? "해당 월의 주별 데이터를 불러오지 못했습니다.");
       } finally {
-        setSettlementLoading(false)
+        setSettlementLoading(false);
       }
-      return
+      return;
     }
   }
 
   const handleBackToBase = () => {
+    const snap = prevViewRef.current
     setDrillDown({
       level: "base",
       selectedPeriod: null,
     })
+    if (snap) {
+      // ❗복원 시에는 handleSetPeriod를 쓰지 말고 직접 setPeriod
+      // (handleSetPeriod는 daily/weekly 스냅을 다시 걸어버림)
+      setPeriod(snap.period)
+      setStatus(snap.status)
+      setPageSize(snap.pageSize)
+      setPageIndex(snap.pageIndex)
+      setDateRange({
+        from: new Date(snap.dateRange.from),
+        to: new Date(snap.dateRange.to),
+      })
+      setPageMeta(null) // 페이지메타는 재조회되게 초기화
+      prevViewRef.current = null
+    } else {
+      // 스냅샷이 없으면 안전하게 초기 상태로
+      setPageIndex(0)
+      setPageMeta(null)
+    }
   }
 
   return (
@@ -743,8 +805,8 @@ export default function SellerPage() {
                     </thead>
                     <tbody className="divide-y">
                       {filteredProducts.map((product) => (
-                        <tr 
-                          key={product.id} 
+                        <tr
+                          key={product.id}
                           className="hover:bg-background-section/50 cursor-pointer"
                           onClick={(e) => {
                             // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
@@ -811,6 +873,7 @@ export default function SellerPage() {
                           </td>
                           <td className="px-4 py-3 w-20">
                             <span
+
                               className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${product.status === ProductStatus.ON_SALE
                                 ? "bg-green-100 text-green-700"
                                 : product.status === ProductStatus.OUT_OF_STOCK
@@ -820,6 +883,7 @@ export default function SellerPage() {
                             >
                               {product.status === ProductStatus.ON_SALE ? "판매중" :
                                 product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
+
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
@@ -1015,17 +1079,22 @@ export default function SellerPage() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">정산 조회</h2>
               <div className="flex items-center gap-4 text-sm text-text-secondary">
-                
+
               </div>
             </div>
-
             <SettlementFilters
               period={period}
-              setPeriod={setPeriod}
+              setPeriod={handleSetPeriod}
               status={status}
               setStatus={setStatus}
               dateRange={dateRange}
-              setDateRange={setDateRange}
+              setDateRange={(r: { from?: Date | string; to?: Date | string } = {}) => {
+                setPageIndex(0)
+                setDateRange(prev => ({
+                  from: r.from ? new Date(r.from) : prev.from,
+                  to: r.to ? new Date(r.to) : prev.to,
+                }))
+              }}
             />
 
             {settlementLoading ? (
@@ -1034,22 +1103,53 @@ export default function SellerPage() {
               <div className="text-sm text-red-500">{settlementError}</div>
             ) : (
               <>
-                <SettlementSummary
+                {period !== "all" && (<SettlementSummary
                   period={period}
                   status={status}
                   dateRange={dateRange}
-                  data={
-                    Array.isArray(settlementData)
-                      ? (settlementData[0] ?? { totalCount: 0 })
-                      : (settlementData ?? { totalCount: 0 })
+                  data={summaryData
+                    // Array.isArray(settlementData)
+                    //   ? (settlementData[0] ?? { totalCount: 0 })
+                    //   : (settlementData ?? { totalCount: 0 })
                   }
-                />
+                />)}
+                {pageMeta && pageMeta.totalPages > 0 && (
+                  <div className="flex items-center justify-end gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pageIndex <= 0}
+                      onClick={() => setPageIndex(p => Math.max(0, p - 1))}
+                    >
+                      이전
+                    </Button>
+                    <span className="text-sm">
+                      {pageMeta.page + 1} / {pageMeta.totalPages || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pageIndex >= pageMeta.totalPages - 1}
+                      onClick={() => setPageIndex(p => Math.min(pageMeta.totalPages - 1, p + 1))}
+                    >
+                      다음
+                    </Button>
+
+                    <select
+                      className="ml-2 border rounded px-2 py-1 text-sm"
+                      value={pageSize}
+                      onChange={(e) => { setPageIndex(0); setPageSize(Number(e.target.value)) }}
+                    >
+                      {[10, 20, 50].map(s => <option key={s} value={s}>{s}/페이지</option>)}
+                    </select>
+                  </div>
+                )}
                 <SettlementTable
                   period={period}
                   status={status}
                   dateRange={dateRange}
                   drillDown={drillDown}
-                  onDrillDown={handleDrillDown}
+                  onDrillDown={(handleDrillDown)}
                   onBackToBase={handleBackToBase}
                   data={settlementData}
                 />

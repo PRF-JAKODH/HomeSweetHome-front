@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth-store'
 export type ChatMessagePayload = {
   roomId?: string | number
   senderId?: string | number
-  text: string
+  content: string
   type?: 'TEXT' | 'IMAGE' | 'FILE'
   sentAt?: string
 }
@@ -124,8 +124,8 @@ export function sendChatMessage(
   }
 
   client.publish({
-    destination,                  // /pub/chat.send
-    body: JSON.stringify(payload),
+    destination: "/pub/chat.send",
+    body: JSON.stringify(payload), // ✅ JSON.stringify 필수!
   })
 }
 

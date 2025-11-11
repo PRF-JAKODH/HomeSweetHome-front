@@ -21,12 +21,12 @@ import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import apiClient from "@/lib/api"
 import { useCheckoutStore } from "@/stores/checkout-store"
-import { 
-  CartResponse, 
-  ScrollResponse, 
-  CreateOrderRequestDto, 
-  OrderItemDetail, 
-  OrderReadyResponseDto 
+import {
+  CartResponse,
+  ScrollResponse,
+  CreateOrderRequestDto,
+  OrderItemDetail,
+  OrderReadyResponseDto
 } from "@/types/order"
 
 // UI에서 사용하는 확장된 상품 타입
@@ -94,7 +94,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   // 옵션 그룹 추출 함수
   const getOptionGroups = () => {
     if (!stockData || stockData.length === 0) return {}
-    
+
     const groups: Record<string, string[]> = {}
     stockData.forEach(sku => {
       sku.options.forEach(option => {
@@ -123,7 +123,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   // 선택된 옵션으로 SKU 찾기
   const findSelectedSku = () => {
     if (!stockData || stockData.length === 0) return null
-    
+
     return stockData.find(sku => {
       return sku.options.every(option => {
         // null 옵션은 항상 매치
@@ -141,26 +141,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       try {
         setLoading(true)
         setError(null)
-        
+
         // 상품 정보와 재고 정보를 먼저 가져오기
         const [productResponse, stockResponse] = await Promise.all([
           getProduct(resolvedParams.productId),
           getProductStock(resolvedParams.productId).catch(() => ({ data: [] })) // 재고 API 실패 시 빈 배열로 fallback
         ])
-        
+
         // API 응답 구조에 따라 데이터 추출
         const productData = (productResponse.data || productResponse) as any
         const stockData = Array.isArray(stockResponse) ? stockResponse : (stockResponse.data || [])
-        
+
         // 카테고리 계층 구조 가져오기
         const categoryResponse = await getCategoryHierarchy(productData.categoryId || 1).catch(() => [])
-        
+
         // API 응답 구조 확인을 위한 로깅
         console.log('Product data:', productData)
         console.log('Stock data:', stockData)
         console.log('detailImageUrls:', productData.detailImageUrls)
         console.log('images:', productData.images)
-        
+
         // API 응답을 UI에서 사용할 수 있는 형태로 변환
         const transformedProduct: ExtendedProduct = {
           ...productData,
@@ -195,7 +195,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             stock: sku.stockQuantity
           }))
         }
-        
+
         setProduct(transformedProduct)
         setStockData(stockData)
         setCategoryHierarchy(categoryResponse)
@@ -210,7 +210,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           const discountedPrice = originalPrice * (1 - discountRate / 100)
           setCurrentPrice(discountedPrice)
         }
-        
+
         // 첫 번째 SKU를 기본 선택으로 설정
         if (stockData && stockData.length > 0) {
           setSelectedSku(stockData[0])
@@ -281,7 +281,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   useEffect(() => {
     const fetchRecommendedProducts = async () => {
       if (!product?.categoryId) return
-      
+
       try {
         setRecommendedLoading(true)
         const response = await getProductPreviews({
@@ -289,7 +289,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           limit: 8, // 추천 상품 8개
           sortType: 'LATEST'
         })
-        
+
         // 현재 상품을 제외한 상품들만 필터링
         const filteredProducts = response.contents.filter(p => p.id !== Number(product.id))
         setRecommendedProducts(filteredProducts.slice(0, 6)) // 최대 6개만 표시
@@ -323,12 +323,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     if (product && product.productType === "options") {
       const selectedSkuData = findSelectedSku()
       setSelectedSku(selectedSkuData)
-      
+
       if (selectedSkuData) {
         // 서버에서 제공하는 discountedPrice를 우선 사용, 없으면 클라이언트 계산
         const serverDiscountedPrice = (product as any).discountedPrice
         let basePrice = 0
-        
+
         if (serverDiscountedPrice !== undefined && serverDiscountedPrice !== null) {
           basePrice = serverDiscountedPrice
         } else {
@@ -337,10 +337,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           const discountRate = product.discountRate || 0
           basePrice = originalPrice * (1 - discountRate / 100)
         }
-        
+
         const additionalPrice = selectedSkuData.priceAdjustment || 0
         const totalPrice = basePrice + additionalPrice
-        
+
         setCurrentPrice(totalPrice)
         setCurrentStock(selectedSkuData.stockQuantity)
       }
@@ -370,7 +370,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
   const handleAddToCart = async () => {
     if (!product) return
-    
+
     if (product.productType === "options" && !selectedSku) {
       alert("옵션을 선택해주세요.")
       return
@@ -391,13 +391,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       setShowCartSuccess(true)
     } catch (error: any) {
       console.error('장바구니 추가 실패:', error)
-      
+
       // 백엔드에서 보내는 에러 메시지에 따라 적절한 알림 표시
       let errorMessage = "장바구니에 상품을 담는데 실패했습니다. 다시 시도해주세요."
-      
+
       if (error?.response?.data?.message) {
         const backendMessage = error.response.data.message
-        
+
         if (backendMessage.includes('CART_LIMIT_EXCEEDED_ERROR')) {
           errorMessage = "장바구니에 담을 수 있는 최대 수량은 10개입니다."
         } else if (backendMessage.includes('CART_ITEM_TYPE_LIMIT_EXCEEDED_ERROR')) {
@@ -406,14 +406,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           errorMessage = backendMessage
         }
       }
-      
+
       alert(errorMessage)
     }
   }
 
   const handleBuyNow = () => {
     if (!product) return
-    
+
     if (product.productType === "options" && !selectedSku) {
       alert("옵션을 선택해주세요.")
       return
@@ -424,30 +424,31 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       return
     }
 
-  const checkoutItem: CartResponse = {
-    id: Date.now(),
-    skuId: selectedSku?.skuId || 0,
-    brand: product.brand,
-    productName: product.name,
+    const checkoutItem: CartResponse = {
+      id: Date.now(),
+      productId: Number(product.id),
+      skuId: selectedSku?.skuId || 0,
+      brand: product.brand,
+      productName: product.name,
 
-    optionSummary: selectedSku?.options
-          ?.filter((opt: any) => opt.groupName && opt.valueName)
-          .map((opt: any) => `${opt.groupName}: ${opt.valueName}`)
-          .join(', ') || '기본 옵션',
+      optionSummary: selectedSku?.options
+        ?.filter((opt: any) => opt.groupName && opt.valueName)
+        .map((opt: any) => `${opt.groupName}: ${opt.valueName}`)
+        .join(', ') || '기본 옵션',
 
-    basePrice: product.basePrice || 0,
-    discountRate: product.discountRate || 0,
-    finalPrice: currentPrice,
-    shippingPrice: product.shippingPrice || 0,
-    quantity: quantity,
-    totalPrice: currentPrice * quantity,
-    imageUrl: product.images[0],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+      basePrice: product.basePrice || 0,
+      discountRate: product.discountRate || 0,
+      finalPrice: currentPrice,
+      shippingPrice: product.shippingPrice || 0,
+      quantity: quantity,
+      totalPrice: currentPrice * quantity,
+      imageUrl: product.images[0],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-  useCheckoutStore.getState().setItems([checkoutItem]);
-  router.push("/checkout");
+    useCheckoutStore.getState().setItems([checkoutItem]);
+    router.push("/checkout");
   }
 
 // ==================================== 1:1 채팅방 ====================================
@@ -468,7 +469,7 @@ const handleChatWithSeller = async () => {
   //채팅방 생성 or 기존방 재사용
   try {
     const response = await apiClient.post("/api/v1/chat/rooms/individual", {
-      targetId: Number(product.seller?.id), 
+      targetId: Number(product.seller?.id),
       // productId: product.id,  // 필요시 상품 ID도 같이 전달
     })
 
@@ -493,7 +494,6 @@ const handleChatWithSeller = async () => {
 
     // 채팅방 페이지로 이동
     router.push(`/messages/${roomId}`)
-
   } catch (error: any) {
     console.error("❌ 채팅방 생성 실패:", error)
     toast({
@@ -503,117 +503,117 @@ const handleChatWithSeller = async () => {
     })
   }
 }
-// ==================================== 채팅 ====================================
+  // ==================================== 채팅 ====================================
 
-const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files
-  if (files && files.length > 0) {
-    const file = files[0] // 첫 번째 파일만 사용
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setReviewImages([reader.result as string]) // 기존 이미지를 대체
+  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0] // 첫 번째 파일만 사용
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setReviewImages([reader.result as string]) // 기존 이미지를 대체
+      }
+      reader.readAsDataURL(file)
     }
-    reader.readAsDataURL(file)
-  }
-}
-
-const handleSubmitReview = async () => {
-  if (reviewRating === 0) {
-    alert("별점을 선택해주세요.")
-    return
-  }
-  if (!reviewContent.trim()) {
-    alert("리뷰 내용을 입력해주세요.")
-    return
   }
 
-  setSubmittingReview(true)
-  try {
-    let imageFile: File
-    
-    if (reviewImages.length > 0) {
-      // Base64 이미지를 File 객체로 변환
-      imageFile = await base64ToFile(reviewImages[0], 'review-image.jpg')
-    } else {
-      // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
-      imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+  const handleSubmitReview = async () => {
+    if (reviewRating === 0) {
+      alert("별점을 선택해주세요.")
+      return
     }
-    
-    const reviewData = {
-      rating: reviewRating,
-      comment: reviewContent,
-      image: imageFile
+    if (!reviewContent.trim()) {
+      alert("리뷰 내용을 입력해주세요.")
+      return
     }
 
-    const newReview = await createProductReview(resolvedParams.productId, reviewData)
-    
-    setUserReviews([newReview, ...userReviews])
-    setShowReviewForm(false)
-    setReviewRating(0)
-    setReviewContent("")
-    setReviewImages([])
-    alert("리뷰가 등록되었습니다.")
-  } catch (error: any) {
-    console.error('리뷰 등록 실패:', error)
-    
-    // 409 에러 (이미 리뷰 작성한 경우) 처리
-    if (error?.response?.status === 409) {
-      alert(error?.response?.data?.message || "이미 해당 상품에 대한 리뷰를 작성했습니다.")
-    } else {
-      alert("리뷰 등록에 실패했습니다. 다시 시도해주세요.")
+    setSubmittingReview(true)
+    try {
+      let imageFile: File
+
+      if (reviewImages.length > 0) {
+        // Base64 이미지를 File 객체로 변환
+        imageFile = await base64ToFile(reviewImages[0], 'review-image.jpg')
+      } else {
+        // 이미지가 없을 때는 빈 파일 생성 (백엔드에서 필수 필드이므로)
+        imageFile = new File([], 'empty.jpg', { type: 'image/jpeg' })
+      }
+
+      const reviewData = {
+        rating: reviewRating,
+        comment: reviewContent,
+        image: imageFile
+      }
+
+      const newReview = await createProductReview(resolvedParams.productId, reviewData)
+
+      setUserReviews([newReview, ...userReviews])
+      setShowReviewForm(false)
+      setReviewRating(0)
+      setReviewContent("")
+      setReviewImages([])
+      alert("리뷰가 등록되었습니다.")
+    } catch (error: any) {
+      console.error('리뷰 등록 실패:', error)
+
+      // 409 에러 (이미 리뷰 작성한 경우) 처리
+      if (error?.response?.status === 409) {
+        alert(error?.response?.data?.message || "이미 해당 상품에 대한 리뷰를 작성했습니다.")
+      } else {
+        alert("리뷰 등록에 실패했습니다. 다시 시도해주세요.")
+      }
+    } finally {
+      setSubmittingReview(false)
     }
-  } finally {
-    setSubmittingReview(false)
   }
-}
 
-// Base64 문자열을 File 객체로 변환하는 헬퍼 함수
-const base64ToFile = (base64String: string, filename: string): Promise<File> => {
-  return new Promise((resolve) => {
-    const arr = base64String.split(',')
-    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n)
-    }
-    const file = new File([u8arr], filename, { type: mime })
-    resolve(file)
-  })
-}
+  // Base64 문자열을 File 객체로 변환하는 헬퍼 함수
+  const base64ToFile = (base64String: string, filename: string): Promise<File> => {
+    return new Promise((resolve) => {
+      const arr = base64String.split(',')
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const file = new File([u8arr], filename, { type: mime })
+      resolve(file)
+    })
+  }
 
-// 로딩 상태
-if (loading) {
-  return (
-    <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-[1256px] px-4 py-8">
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-text-secondary">상품 정보를 불러오는 중...</p>
+  // 로딩 상태
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[1256px] px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <p className="text-text-secondary">상품 정보를 불러오는 중...</p>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
-  )
-}
+        </main>
+      </div>
+    )
+  }
 
-// 에러 상태
-if (error && !product) {
-  return (
-    <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-[1256px] px-4 py-8">
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="mb-4 text-lg text-red-500">{error}</p>
-            <Button onClick={() => window.location.reload()}>다시 시도</Button>
+  // 에러 상태
+  if (error && !product) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[1256px] px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <p className="mb-4 text-lg text-red-500">{error}</p>
+              <Button onClick={() => window.location.reload()}>다시 시도</Button>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
-  )
-}
+        </main>
+      </div>
+    )
+  }
 
   // 상품이 없는 경우
   if (!product) {
@@ -647,7 +647,7 @@ if (error && !product) {
 
         {/* Category Breadcrumb */}
         <div className="mb-6 flex items-center gap-2 text-sm text-text-secondary">
-          <span 
+          <span
             className="hover:text-foreground cursor-pointer"
             onClick={() => router.push('/store')}
           >
@@ -657,12 +657,11 @@ if (error && !product) {
             categoryHierarchy.map((category, index) => (
               <div key={category.id} className="flex items-center gap-2">
                 <ChevronRight className="h-4 w-4" />
-                <span 
-                  className={`cursor-pointer hover:text-foreground ${
-                    index === categoryHierarchy.length - 1 
-                      ? "text-foreground font-medium" 
+                <span
+                  className={`cursor-pointer hover:text-foreground ${index === categoryHierarchy.length - 1
+                      ? "text-foreground font-medium"
                       : "hover:text-foreground"
-                  }`}
+                    }`}
                   onClick={() => {
                     if (index < categoryHierarchy.length - 1) {
                       // 현재 카테고리로 이동
@@ -677,14 +676,14 @@ if (error && !product) {
           ) : (
             <>
               <ChevronRight className="h-4 w-4" />
-              <span 
+              <span
                 className="hover:text-foreground cursor-pointer"
                 onClick={() => router.push('/store')}
               >
                 {product.category?.main || "카테고리"}
               </span>
               <ChevronRight className="h-4 w-4" />
-              <span 
+              <span
                 className="hover:text-foreground cursor-pointer"
                 onClick={() => router.push('/store')}
               >
@@ -706,9 +705,8 @@ if (error && !product) {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-                    selectedImage === index ? "border-primary" : "border-gray-200"
-                  }`}
+                  className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${selectedImage === index ? "border-primary" : "border-gray-200"
+                    }`}
                 >
                   <img
                     src={image || "/placeholder.svg"}
@@ -732,7 +730,7 @@ if (error && !product) {
           {/* Product Info */}
           <div>
             {/* Brand */}
-            <div 
+            <div
               className="mb-2 text-sm font-medium text-text-secondary cursor-pointer hover:text-primary transition-colors"
               onClick={() => router.push(`/store?keyword=${encodeURIComponent(product.brand)}`)}
             >
@@ -797,11 +795,11 @@ if (error && !product) {
                     <div className="flex flex-wrap gap-2">
                       {values.map(value => {
                         const isSelected = selectedSkus[groupName] === value
-                        const isAvailable = stockData.some(sku => 
+                        const isAvailable = stockData.some(sku =>
                           sku.options.some(opt => opt.groupName === groupName && opt.valueName === value) &&
                           sku.stockQuantity > 0
                         )
-                        
+
                         return (
                           <button
                             key={value}
@@ -812,13 +810,12 @@ if (error && !product) {
                               }))
                             }}
                             disabled={!isAvailable}
-                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                              isSelected
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${isSelected
                                 ? 'border-primary bg-primary text-white'
                                 : isAvailable
-                                ? 'border-gray-300 bg-white text-foreground hover:border-primary hover:bg-primary/5'
-                                : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                            }`}
+                                  ? 'border-gray-300 bg-white text-foreground hover:border-primary hover:bg-primary/5'
+                                  : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                              }`}
                           >
                             {value}
                           </button>
@@ -835,9 +832,8 @@ if (error && !product) {
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-foreground font-medium">재고:</span>
                   <span
-                    className={`font-medium ${
-                      selectedSku.stockQuantity === 0 ? "text-red-500" : "text-foreground"
-                    }`}
+                    className={`font-medium ${selectedSku.stockQuantity === 0 ? "text-red-500" : "text-foreground"
+                      }`}
                   >
                     {selectedSku.stockQuantity === 0 ? "품절" : `${selectedSku.stockQuantity}개`}
                   </span>
@@ -886,7 +882,7 @@ if (error && !product) {
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* 수량 조절 및 총 가격 */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center border border-divider rounded-lg bg-white">
@@ -923,8 +919,8 @@ if (error && !product) {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-secondary">총 상품금액</span>
                 <span className="text-2xl font-bold text-foreground">
-                  {product.productType === "options" && !selectedSku ? 
-                    "0원" : 
+                  {product.productType === "options" && !selectedSku ?
+                    "0원" :
                     (currentPrice * quantity).toLocaleString() + "원"
                   }
                 </span>
@@ -945,16 +941,15 @@ if (error && !product) {
                 </Button>
                 <Button
                   size="lg"
-                  className={`flex-1 ${
-                    selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                  className={`flex-1 ${selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                       : "bg-primary hover:bg-primary-dark text-white"
-                  }`}
+                    }`}
                   onClick={handleBuyNow}
                   disabled={selectedSku?.stockQuantity === 0 || (product.productType === "options" && !selectedSku)}
                 >
-                  {selectedSku?.stockQuantity === 0 ? "품절" : 
-                   (product.productType === "options" && !selectedSku) ? "옵션을 선택해주세요" : "바로구매"}
+                  {selectedSku?.stockQuantity === 0 ? "품절" :
+                    (product.productType === "options" && !selectedSku) ? "옵션을 선택해주세요" : "바로구매"}
                 </Button>
               </div>
 
@@ -1023,10 +1018,10 @@ if (error && !product) {
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
               {recommendedProducts.map((recommendedProduct) => {
                 // 할인가 계산
-                const finalPrice = recommendedProduct.discountRate > 0 
+                const finalPrice = recommendedProduct.discountRate > 0
                   ? Math.round(recommendedProduct.basePrice * (1 - recommendedProduct.discountRate / 100))
                   : recommendedProduct.basePrice
-                
+
                 return (
                   <ProductCard
                     key={recommendedProduct.id}
@@ -1194,8 +1189,8 @@ if (error && !product) {
                 >
                   취소
                 </Button>
-                <Button 
-                  onClick={handleSubmitReview} 
+                <Button
+                  onClick={handleSubmitReview}
                   disabled={submittingReview}
                   className="bg-primary hover:bg-primary-dark text-white disabled:opacity-50"
                 >
@@ -1206,35 +1201,35 @@ if (error && !product) {
           )}
 
           <div className="space-y-4">
-            {                userReviews.map((review) => (
-                  <Card key={review.reviewId} className="p-6">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {/* 사용자 프로필 이미지 */}
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(review.username)}&background=random&color=fff&size=40`}
-                              alt={review.username}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <span className="font-medium text-foreground block">{review.username}</span>
-                            <div className="flex items-center gap-1">
-                              {[...Array(5)].map((_, i) => (
-                                <span key={i} className={`text-sm ${i < review.rating ? "text-sky-400" : "text-gray-300"}`}>
-                                  ★
-                                </span>
-                              ))}
-                            </div>
-                          </div>
+            {userReviews.map((review) => (
+              <Card key={review.reviewId} className="p-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* 사용자 프로필 이미지 */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(review.username)}&background=random&color=fff&size=40`}
+                          alt={review.username}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground block">{review.username}</span>
+                        <div className="flex items-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <span key={i} className={`text-sm ${i < review.rating ? "text-sky-400" : "text-gray-300"}`}>
+                              ★
+                            </span>
+                          ))}
                         </div>
                       </div>
-                      <span className="text-sm text-text-secondary">
-                        {new Date(review.createdAt).toLocaleDateString("ko-KR")}
-                      </span>
                     </div>
+                  </div>
+                  <span className="text-sm text-text-secondary">
+                    {new Date(review.createdAt).toLocaleDateString("ko-KR")}
+                  </span>
+                </div>
                 {review.reviewImageUrl && (
                   <div className="flex gap-2 mb-3">
                     <img
