@@ -426,6 +426,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
     const checkoutItem: CartResponse = {
       id: Date.now(),
+      productId: Number(product.id),
       skuId: selectedSku?.skuId || 0,
       brand: product.brand,
       productName: product.name,
@@ -468,7 +469,7 @@ const handleChatWithSeller = async () => {
   //채팅방 생성 or 기존방 재사용
   try {
     const response = await apiClient.post("/api/v1/chat/rooms/individual", {
-      targetId: Number(product.seller?.id), 
+      targetId: Number(product.seller?.id),
       // productId: product.id,  // 필요시 상품 ID도 같이 전달
     })
 
@@ -477,54 +478,31 @@ const handleChatWithSeller = async () => {
     // 서버 응답에서 roomId, alreadyExists 추출
     const { roomId, alreadyExists } = response.data
 
-    // 로그인 안 한 사용자면 로그인 유도
-    if (!isAuthenticated) {
+    if (alreadyExists) {
+      console.log(`📎 기존 채팅방 재사용 (roomId: ${roomId})`)
       toast({
-        title: "로그인 필요",
-        description: "로그인이 필요한 서비스입니다.",
-        variant: "destructive",
+        title: "기존 채팅방으로 이동",
+        description: "이 판매자와의 대화방이 이미 존재합니다.",
       })
-      router.push("/login")
-      return
-    }
-    //채팅방 생성 or 기존방 재사용
-    try {
-      const response = await apiClient.post("api/v1/chat/rooms/individual", {
-        targetId: Number(product.seller?.id),
-        // productId: product.id,  // 필요시 상품 ID도 같이 전달
-      })
-
-      console.log("채팅방 생성 응답:", response.data)
-
-      // 서버 응답에서 roomId, alreadyExists 추출
-      const { roomId, alreadyExists } = response.data
-
-      if (alreadyExists) {
-        console.log(`📎 기존 채팅방 재사용 (roomId: ${roomId})`)
-        toast({
-          title: "기존 채팅방으로 이동",
-          description: "이 판매자와의 대화방이 이미 존재합니다.",
-        })
-      } else {
-        console.log(`🆕 새 채팅방 생성 (roomId: ${roomId})`)
-        toast({
-          title: "새 채팅방 생성 완료",
-          description: "판매자와의 대화방이 열렸습니다.",
-        })
-      }
-
-      // 채팅방 페이지로 이동
-      router.push(`/messages/${roomId}`)
-
-    } catch (error: any) {
-      console.error("❌ 채팅방 생성 실패:", error)
+    } else {
+      console.log(`🆕 새 채팅방 생성 (roomId: ${roomId})`)
       toast({
-        title: "채팅방 생성 실패",
-        description: "채팅방을 생성하는데 실패했습니다.",
-        variant: "destructive",
+        title: "새 채팅방 생성 완료",
+        description: "판매자와의 대화방이 열렸습니다.",
       })
     }
+
+    // 채팅방 페이지로 이동
+    router.push(`/messages/${roomId}`)
+  } catch (error: any) {
+    console.error("❌ 채팅방 생성 실패:", error)
+    toast({
+      title: "채팅방 생성 실패",
+      description: "채팅방을 생성하는데 실패했습니다.",
+      variant: "destructive",
+    })
   }
+}
   // ==================================== 채팅 ====================================
 
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
