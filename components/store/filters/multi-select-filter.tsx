@@ -72,7 +72,11 @@ export function MultiSelectFilterDropdown({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[280px] rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div
+          className={`absolute right-0 top-full z-20 mt-2 rounded-lg border border-gray-200 bg-white shadow-lg ${
+            config.type === "multi-select" && config.optionKey === "옵션" ? "w-[360px]" : "w-[320px]"
+          }`}
+        >
           <div className="flex items-center justify-between border-b px-4 py-3">
             <span className="text-sm font-semibold text-foreground">{config.label} 선택</span>
             <button
@@ -88,8 +92,12 @@ export function MultiSelectFilterDropdown({
           </div>
 
           <div
-            className={`px-4 py-3 grid gap-2 ${
-              config.type === "color" || config.type === "multi-select" ? "grid-cols-2" : "grid-cols-1"
+            className={`px-4 py-3 grid ${
+              config.type === "multi-select" && config.optionKey === "옵션"
+                ? "grid-cols-1 gap-3"
+                : config.type === "color" || config.type === "multi-select"
+                  ? "grid-cols-2 gap-3"
+                  : "grid-cols-1 gap-2"
             }`}
           >
             {config.options.map((option) => {
@@ -101,7 +109,7 @@ export function MultiSelectFilterDropdown({
                   key={option}
                   type="button"
                   onClick={() => handleToggle(option)}
-                  className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  className={`flex w-full items-center gap-2 rounded-md border px-4 py-2 text-sm transition-colors ${
                     isSelected
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
