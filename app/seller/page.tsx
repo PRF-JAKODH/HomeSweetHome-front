@@ -797,25 +797,54 @@ export default function SellerPage() {
                         <th className="px-4 py-3 text-left text-sm font-medium w-32">가격</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">할인율</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">재고</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium w-24">배송</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-24">배송비</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">등록일</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">상태</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">관리</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredProducts.map((product) => (
-                        <tr
-                          key={product.id}
-                          className="hover:bg-background-section/50 cursor-pointer"
-                          onClick={(e) => {
-                            // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
-                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
-                              return
-                            }
-                            router.push(`/store/products/${product.id}`)
-                          }}
-                        >
+                      {filteredProducts.map((product) => {
+                        const basePrice = product.basePrice ?? 0
+                        const discountRate = product.discountRate ?? 0
+                        const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discountRate / 100)) : 0
+                        const formattedBasePrice = basePrice > 0 ? `₩${basePrice.toLocaleString()}` : "-"
+                        const formattedFinalPrice = finalPrice > 0 ? `₩${finalPrice.toLocaleString()}` : "-"
+                        const shippingLabel =
+                          product.shippingPrice === undefined
+                            ? "-"
+                            : product.shippingPrice === 0
+                              ? "무료배송"
+                              : `₩${product.shippingPrice.toLocaleString()}`
+                        const createdAtLabel = product.createdAt
+                          ? new Date(product.createdAt).toLocaleDateString("ko-KR")
+                          : "-"
+
+                        const statusLabel =
+                          product.status === ProductStatus.ON_SALE
+                            ? "판매중"
+                            : product.status === ProductStatus.SUSPENDED
+                              ? "판매 중지"
+                              : "품절"
+                        const statusClass =
+                          product.status === ProductStatus.ON_SALE
+                            ? "bg-green-100 text-green-700"
+                            : product.status === ProductStatus.SUSPENDED
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-gray-100 text-gray-700"
+
+                        return (
+                          <tr
+                            key={product.id}
+                            className="hover:bg-background-section/50 cursor-pointer"
+                            onClick={(e) => {
+                              // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
+                              if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
+                                return
+                              }
+                              router.push(`/store/products/${product.id}`)
+                            }}
+                          >
                           <td className="px-4 py-3 w-20">
                             <div className="relative w-16 h-16 rounded overflow-hidden">
                               <Image
@@ -836,10 +865,10 @@ export default function SellerPage() {
                             <div className="space-y-1">
                               {product.discountRate > 0 && (
                                 <div className="text-xs text-text-secondary line-through">
-                                  {/* ₩{product.basePrice.toLocaleString()} */}
+                                  {formattedBasePrice}
                                 </div>
                               )}
-                              {/* <div className="font-semibold text-sm">₩{Math.round(product.basePrice * (1 - product.discountRate / 100)).toLocaleString()}</div> */}
+                              <div className="font-semibold text-sm">{formattedFinalPrice}</div>
                             </div>
                           </td>
                           <td className="px-4 py-3 w-28">
@@ -866,24 +895,14 @@ export default function SellerPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 w-24">
-                            {/* <span className="text-sm">{product.shippingPrice === 0 ? "무료배송" : `₩${product.shippingPrice.toLocaleString()}`}</span> */}
+                            <span className="text-sm">{shippingLabel}</span>
                           </td>
                           <td className="px-4 py-3 w-28">
-                            {/* <span className="text-sm text-text-secondary whitespace-nowrap">{new Date(product.createdAt).toLocaleDateString()}</span> */}
+                            <span className="text-sm text-text-secondary whitespace-nowrap">{createdAtLabel}</span>
                           </td>
                           <td className="px-4 py-3 w-20">
-                            <span
-
-                              className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${product.status === ProductStatus.ON_SALE
-                                ? "bg-green-100 text-green-700"
-                                : product.status === ProductStatus.OUT_OF_STOCK
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-gray-100 text-gray-700"
-                                }`}
-                            >
-                              {product.status === ProductStatus.ON_SALE ? "판매중" :
-                                product.status === ProductStatus.OUT_OF_STOCK ? "판매 중지" : "품절"}
-
+                            <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${statusClass}`}>
+                              {statusLabel}
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
@@ -924,8 +943,9 @@ export default function SellerPage() {
                               )}
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
