@@ -121,6 +121,12 @@ export interface GetProductPreviewsRequest {
   sortType?: ProductSortType
 }
 
+export interface ProductFilterRequest {
+  categoryId?: number
+  keyword?: string
+  optionFilters?: Record<string, string[]>
+}
+
 // 상품 프리뷰 조회 응답
 export type GetProductPreviewsResponse = ScrollResponse<ProductPreviewResponse>
 

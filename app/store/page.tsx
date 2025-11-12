@@ -2,7 +2,7 @@
 
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
@@ -10,6 +10,43 @@ import { Category } from "@/types/api/category"
 import { ProductSortType } from "@/types/api/product"
 import { useSearchParams, useRouter } from "next/navigation" // useRouter 추가
 
+
+const COLOR_OPTIONS = [
+  "화이트",
+  "블랙",
+  "브라운",
+  "골드",
+  "오렌지",
+  "그린",
+  "네이비",
+  "핑크",
+  "그레이",
+  "베이지",
+  "실버",
+  "레드",
+  "옐로우",
+  "블루",
+]
+
+const COLOR_SWATCH_MAP: Record<string, string> = {
+  화이트: "#FFFFFF",
+  블랙: "#000000",
+  브라운: "#8B4513",
+  골드: "#D4AF37",
+  오렌지: "#FF8A3D",
+  그린: "#3CB371",
+  네이비: "#253552",
+  핑크: "#FFB6C1",
+  그레이: "#A9A9A9",
+  베이지: "#D9C7A3",
+  실버: "#C0C0C0",
+  레드: "#FF3B30",
+  옐로우: "#FFD700",
+  블루: "#1E90FF",
+}
+
+const LIGHT_OPTIONS = ["50W", "60W", "80W", "120W", "150W", "180W"]
+const BED_OPTIONS = ["USB포트추가", "조명추가", "서랍추가", "헤드조명", "수납추가", "헤드추가"]
 
 export default function StorePage() {
   const searchParams = useSearchParams()
@@ -21,10 +58,19 @@ export default function StorePage() {
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
+  const [showColorFilter, setShowColorFilter] = useState(false)
+  const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [showVoltageFilter, setShowVoltageFilter] = useState(false)
+  const [selectedVoltages, setSelectedVoltages] = useState<string[]>([])
+  const [showBedOptionFilter, setShowBedOptionFilter] = useState(false)
+  const [selectedBedOptions, setSelectedBedOptions] = useState<string[]>([])
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
+  const colorDropdownRef = useRef<HTMLDivElement>(null)
+  const voltageDropdownRef = useRef<HTMLDivElement>(null)
+  const bedOptionsDropdownRef = useRef<HTMLDivElement>(null)
   
   // URL에서 검색 키워드와 카테고리 ID 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
@@ -70,17 +116,49 @@ export default function StorePage() {
   const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
   const { data: subSubCategories = [], isLoading: subSubCategoriesLoading } = useCategoriesByParent(subSubCategoryParentId)
 
+  const selectedCategory = topCategories.find((cat) => cat.id === selectedMainCategory)
+  const selectedSubCategoryData = subCategories.find((cat) => cat.id === selectedSubCategory)
+  const selectedSubSubCategoryData = subSubCategories.find((cat) => cat.id === selectedSubSubCategory)
+  const categoryNameTrail = [
+    selectedCategory?.name,
+    selectedSubCategoryData?.name,
+    selectedSubSubCategoryData?.name,
+  ].filter((name): name is string => Boolean(name))
+
   // 상품 조회 (무한 스크롤)
   const currentCategoryId = selectedSubSubCategory || selectedSubCategory || selectedMainCategory
   
-  const { 
-    products, 
-    isLoading: productsLoading, 
-    isLoadingMore, 
-    hasNext, 
-    error: productsError, 
-    loadMore 
-  } = useInfiniteProductPreviews(currentCategoryId || undefined, sortType, 12, searchKeyword)
+  const isLightingCategory = categoryNameTrail.includes("조명")
+  const isBedCategory = categoryNameTrail.includes("침대")
+
+  const optionFilters = useMemo(() => {
+    const filters: Record<string, string[]> = {}
+    if (selectedColors.length > 0) {
+      filters["색상"] = selectedColors
+    }
+    if (selectedVoltages.length > 0) {
+      filters["전압"] = selectedVoltages
+    }
+    if (selectedBedOptions.length > 0) {
+      filters["옵션"] = selectedBedOptions
+    }
+    return Object.keys(filters).length > 0 ? filters : undefined
+  }, [selectedColors, selectedVoltages, selectedBedOptions])
+
+  const {
+    products,
+    isLoading: productsLoading,
+    isLoadingMore,
+    hasNext,
+    error: productsError,
+    loadMore,
+  } = useInfiniteProductPreviews(
+    currentCategoryId || undefined,
+    sortType,
+    12,
+    searchKeyword,
+    optionFilters,
+  )
 
   useEffect(() => {
     setIsClient(true)
@@ -115,9 +193,22 @@ export default function StorePage() {
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (showSortOptions && !target.closest('.sort-dropdown')) {
+      const target = event.target as Node
+      if (showSortOptions && !(target as Element).closest('.sort-dropdown')) {
         setShowSortOptions(false)
+      }
+      if (showColorFilter && colorDropdownRef.current && !colorDropdownRef.current.contains(target)) {
+        setShowColorFilter(false)
+      }
+      if (showVoltageFilter && voltageDropdownRef.current && !voltageDropdownRef.current.contains(target)) {
+        setShowVoltageFilter(false)
+      }
+      if (
+        showBedOptionFilter &&
+        bedOptionsDropdownRef.current &&
+        !bedOptionsDropdownRef.current.contains(target)
+      ) {
+        setShowBedOptionFilter(false)
       }
     }
 
@@ -125,7 +216,21 @@ export default function StorePage() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSortOptions])
+  }, [showSortOptions, showColorFilter, showVoltageFilter, showBedOptionFilter])
+
+  useEffect(() => {
+    if (!isLightingCategory && selectedVoltages.length > 0) {
+      setSelectedVoltages([])
+      setShowVoltageFilter(false)
+    }
+  }, [isLightingCategory, selectedVoltages.length])
+
+  useEffect(() => {
+    if (!isBedCategory && selectedBedOptions.length > 0) {
+      setSelectedBedOptions([])
+      setShowBedOptionFilter(false)
+    }
+  }, [isBedCategory, selectedBedOptions.length])
 
   // 무한 스크롤 Intersection Observer 설정
   useEffect(() => {
@@ -198,17 +303,46 @@ export default function StorePage() {
     setExpandedCategories(newExpanded)
   }
 
-  const selectedCategory = topCategories.find(cat => cat.id === selectedMainCategory)
-  const selectedSubCategoryData = subCategories.find(cat => cat.id === selectedSubCategory)
-  const selectedSubSubCategoryData = subSubCategories.find(cat => cat.id === selectedSubSubCategory)
-  
-  const categoryPath = [
-    selectedCategory?.name,
-    selectedSubCategoryData?.name,
-    selectedSubSubCategoryData?.name,
-  ]
-    .filter(Boolean)
-    .join(" > ")
+  const categoryPath = categoryNameTrail.join(" > ")
+
+  const toggleColorSelection = (color: string) => {
+    setSelectedColors((prev) => {
+      if (prev.includes(color)) {
+        return prev.filter((item) => item !== color)
+      }
+      return [...prev, color]
+    })
+  }
+
+  const clearSelectedColors = () => {
+    setSelectedColors([])
+  }
+
+  const toggleVoltageSelection = (watt: string) => {
+    setSelectedVoltages((prev) => {
+      if (prev.includes(watt)) {
+        return prev.filter((item) => item !== watt)
+      }
+      return [...prev, watt]
+    })
+  }
+
+  const clearSelectedVoltages = () => {
+    setSelectedVoltages([])
+  }
+
+  const toggleBedOptionSelection = (option: string) => {
+    setSelectedBedOptions((prev) => {
+      if (prev.includes(option)) {
+        return prev.filter((item) => item !== option)
+      }
+      return [...prev, option]
+    })
+  }
+
+  const clearSelectedBedOptions = () => {
+    setSelectedBedOptions([])
+  }
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -359,13 +493,10 @@ export default function StorePage() {
 
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-4">
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-semibold text-foreground">
-                    {searchKeyword 
-                      ? `"${searchKeyword}" 검색 결과` 
-                      : categoryPath ? `${categoryPath} 상품` : '전체'
-                    }
+                    {searchKeyword ? `"${searchKeyword}" 검색 결과` : categoryPath ? `${categoryPath} 상품` : '전체'}
                   </h2>
                   {searchKeyword && (
                     <button
@@ -376,73 +507,340 @@ export default function StorePage() {
                     </button>
                   )}
                 </div>
-                <div className="relative sort-dropdown">
-                  <Button 
-                    variant="outline" 
-                    size="default" 
-                    className="text-base flex items-center gap-2 text-gray-700 hover:bg-gray-50"
-                    onClick={toggleSortOptions}
-                  >
-                    {getSortTypeLabel(sortType)}
-                    <svg className={`w-4 h-4 transition-transform ${showSortOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </Button>
-                  
-                  {showSortOptions && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                      <div className="p-2">
-                        <div className="grid grid-cols-1 gap-2">
+                <div className="flex flex-wrap gap-3 md:ml-auto md:items-center">
+                  <div ref={colorDropdownRef} className="relative">
+                    <Button
+                      variant={selectedColors.length > 0 ? "default" : "outline"}
+                      size="default"
+                      className={`flex items-center gap-2 ${
+                        selectedColors.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                      }`}
+                      onClick={() => setShowColorFilter((prev) => !prev)}
+                    >
+                      색상
+                      {selectedColors.length > 0 && (
+                        <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+                          {selectedColors.length}
+                        </span>
+                      )}
+                      <svg
+                        className={`w-4 h-4 transition-transform ${showColorFilter ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </Button>
+
+                    {showColorFilter && (
+                      <div className="absolute right-0 top-full z-20 mt-2 w-[290px] rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <div className="flex items-center justify-between border-b px-4 py-3">
+                          <span className="text-sm font-semibold text-foreground">색상 선택</span>
                           <button
-                            onClick={() => handleSortTypeChange('POPULAR')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'POPULAR' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
-                            }`}
+                            onClick={clearSelectedColors}
+                            className="text-xs text-text-secondary hover:text-foreground"
+                            type="button"
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'POPULAR' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
-                            리뷰순
-                          </button>
-                          <button
-                            onClick={() => handleSortTypeChange('LATEST')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'LATEST' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'LATEST' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
-                            최신순
-                          </button>
-                          <button
-                            onClick={() => handleSortTypeChange('PRICE_LOW')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'PRICE_LOW' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'PRICE_LOW' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
-                            낮은가격순
-                          </button>
-                          <button
-                            onClick={() => handleSortTypeChange('PRICE_HIGH')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'PRICE_HIGH' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'PRICE_HIGH' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
-                            높은가격순
+                            초기화
                           </button>
                         </div>
+                        <div className="grid grid-cols-2 gap-2 px-4 py-3">
+                          {COLOR_OPTIONS.map((color) => {
+                            const isSelected = selectedColors.includes(color)
+                            const swatchColor = COLOR_SWATCH_MAP[color] || "#E5E7EB"
+                            return (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => toggleColorSelection(color)}
+                                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                                  isSelected
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
+                                }`}
+                              >
+                                <span
+                                  className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-gray-200"
+                                  style={{ backgroundColor: swatchColor }}
+                                ></span>
+                                <span className="truncate">{color}</span>
+                                <span className="ml-auto text-xs text-text-secondary">
+                                  <input type="checkbox" readOnly checked={isSelected} />
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {isLightingCategory && (
+                    <div ref={voltageDropdownRef} className="relative">
+                      <Button
+                        variant={selectedVoltages.length > 0 ? "default" : "outline"}
+                        size="default"
+                        className={`flex items-center gap-2 ${
+                          selectedVoltages.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                        }`}
+                        onClick={() => setShowVoltageFilter((prev) => !prev)}
+                      >
+                        전압
+                        {selectedVoltages.length > 0 && (
+                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+                            {selectedVoltages.length}
+                          </span>
+                        )}
+                        <svg
+                          className={`w-4 h-4 transition-transform ${showVoltageFilter ? "rotate-180" : ""}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </Button>
+
+                      {showVoltageFilter && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-lg border border-gray-200 bg-white shadow-lg">
+                          <div className="flex items-center justify-between border-b px-4 py-3">
+                            <span className="text-sm font-semibold text-foreground">전압 선택</span>
+                            <button
+                              onClick={clearSelectedVoltages}
+                              className="text-xs text-text-secondary hover:text-foreground"
+                              type="button"
+                            >
+                              초기화
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 px-4 py-3">
+                            {LIGHT_OPTIONS.map((option) => {
+                              const isSelected = selectedVoltages.includes(option)
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => toggleVoltageSelection(option)}
+                                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                                    isSelected
+                                      ? "border-primary bg-primary/10 text-primary"
+                                      : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
+                                  }`}
+                                >
+                                  <span className="font-medium">{option}</span>
+                                  <span className="ml-auto text-xs text-text-secondary">
+                                    <input type="checkbox" readOnly checked={isSelected} />
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {isBedCategory && (
+                    <div ref={bedOptionsDropdownRef} className="relative">
+                      <Button
+                        variant={selectedBedOptions.length > 0 ? "default" : "outline"}
+                        size="default"
+                        className={`flex items-center gap-2 ${
+                          selectedBedOptions.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                        }`}
+                        onClick={() => setShowBedOptionFilter((prev) => !prev)}
+                      >
+                        옵션
+                        {selectedBedOptions.length > 0 && (
+                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+                            {selectedBedOptions.length}
+                          </span>
+                        )}
+                        <svg
+                          className={`w-4 h-4 transition-transform ${showBedOptionFilter ? "rotate-180" : ""}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </Button>
+
+                      {showBedOptionFilter && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-lg border border-gray-200 bg-white shadow-lg">
+                          <div className="flex items-center justify-between border-b px-4 py-3">
+                            <span className="text-sm font-semibold text-foreground">옵션 선택</span>
+                            <button
+                              onClick={clearSelectedBedOptions}
+                              className="text-xs text-text-secondary hover:text-foreground"
+                              type="button"
+                            >
+                              초기화
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 px-4 py-3">
+                            {BED_OPTIONS.map((option) => {
+                              const isSelected = selectedBedOptions.includes(option)
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => toggleBedOptionSelection(option)}
+                                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                                    isSelected
+                                      ? "border-primary bg-primary/10 text-primary"
+                                      : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
+                                  }`}
+                                >
+                                  <span className="font-medium">{option}</span>
+                                  <span className="ml-auto text-xs text-text-secondary">
+                                    <input type="checkbox" readOnly checked={isSelected} />
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="relative sort-dropdown">
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="flex items-center gap-2 text-base text-gray-700 hover:bg-gray-50"
+                      onClick={toggleSortOptions}
+                    >
+                      {getSortTypeLabel(sortType)}
+                      <svg
+                        className={`w-4 h-4 transition-transform ${showSortOptions ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </Button>
+
+                    {showSortOptions && (
+                      <div className="absolute right-0 top-full z-10 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <div className="p-2">
+                          <div className="grid grid-cols-1 gap-2">
+                            <button
+                              onClick={() => handleSortTypeChange("POPULAR")}
+                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
+                                sortType === "POPULAR" ? "bg-sky-50 text-sky-600" : "text-gray-700"
+                              }`}
+                            >
+                              <div
+                                className={`h-4 w-4 rounded-full border-2 ${
+                                  sortType === "POPULAR" ? "border-sky-600 bg-sky-600" : "border-gray-300"
+                                }`}
+                              ></div>
+                              리뷰순
+                            </button>
+                            <button
+                              onClick={() => handleSortTypeChange("LATEST")}
+                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
+                                sortType === "LATEST" ? "bg-sky-50 text-sky-600" : "text-gray-700"
+                              }`}
+                            >
+                              <div
+                                className={`h-4 w-4 rounded-full border-2 ${
+                                  sortType === "LATEST" ? "border-sky-600 bg-sky-600" : "border-gray-300"
+                                }`}
+                              ></div>
+                              최신순
+                            </button>
+                            <button
+                              onClick={() => handleSortTypeChange("PRICE_LOW")}
+                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
+                                sortType === "PRICE_LOW" ? "bg-sky-50 text-sky-600" : "text-gray-700"
+                              }`}
+                            >
+                              <div
+                                className={`h-4 w-4 rounded-full border-2 ${
+                                  sortType === "PRICE_LOW" ? "border-sky-600 bg-sky-600" : "border-gray-300"
+                                }`}
+                              ></div>
+                              낮은가격순
+                            </button>
+                            <button
+                              onClick={() => handleSortTypeChange("PRICE_HIGH")}
+                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
+                                sortType === "PRICE_HIGH" ? "bg-sky-50 text-sky-600" : "text-gray-700"
+                              }`}
+                            >
+                              <div
+                                className={`h-4 w-4 rounded-full border-2 ${
+                                  sortType === "PRICE_HIGH" ? "border-sky-600 bg-sky-600" : "border-gray-300"
+                                }`}
+                              ></div>
+                              높은가격순
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {(selectedColors.length > 0 || selectedVoltages.length > 0 || selectedBedOptions.length > 0) && (
+                <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                  <span className="font-medium text-primary">선택한 옵션</span>
+                  {selectedColors.map((color) => (
+                    <span
+                      key={`color-${color}`}
+                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
+                    >
+                      색상: {color}
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={() => toggleColorSelection(color)}
+                        aria-label={`${color} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {selectedVoltages.map((volt) => (
+                    <span
+                      key={`volt-${volt}`}
+                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
+                    >
+                      전압: {volt}
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={() => toggleVoltageSelection(volt)}
+                        aria-label={`${volt} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {selectedBedOptions.map((option) => (
+                    <span
+                      key={`bed-${option}`}
+                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
+                    >
+                      옵션: {option}
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={() => toggleBedOptionSelection(option)}
+                        aria-label={`${option} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Product Grid */}
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-3 md:gap-6 auto-rows-fr">

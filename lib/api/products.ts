@@ -18,6 +18,8 @@ import {
   ProductPreviewResponse,
   GetProductPreviewsRequest,
   GetProductPreviewsResponse,
+  ProductFilterRequest,
+  ProductSortType,
   SkuStockResponse,
   GetProductStockResponse,
   ProductManageResponse,
@@ -104,6 +106,49 @@ export const getProductsBySubCategory = async (subCategoryId: string, params?: O
 // 상품 프리뷰 조회 (무한 스크롤)
 export const getProductPreviews = async (params: GetProductPreviewsRequest = {}): Promise<GetProductPreviewsResponse> => {
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params })
+}
+
+type FilterProductPreviewsParams = {
+  cursorId?: number
+  limit?: number
+  sortType?: ProductSortType
+  filters: ProductFilterRequest
+}
+
+// 옵션 필터 기반 상품 프리뷰 조회
+export const filterProductPreviews = async ({
+  cursorId,
+  limit,
+  sortType,
+  filters,
+}: FilterProductPreviewsParams): Promise<GetProductPreviewsResponse> => {
+  const payload: ProductFilterRequest = {}
+
+  if (typeof filters.categoryId === 'number') {
+    payload.categoryId = filters.categoryId
+  }
+
+  if (filters.keyword) {
+    payload.keyword = filters.keyword
+  }
+
+  if (filters.optionFilters && Object.keys(filters.optionFilters).length > 0) {
+    payload.optionFilters = filters.optionFilters
+  }
+
+  const response = await apiClient.post<GetProductPreviewsResponse>(
+    PRODUCT_ENDPOINTS.FILTER_PRODUCT_PREVIEWS,
+    payload,
+    {
+      params: {
+        cursorId,
+        limit,
+        sortType,
+      },
+    },
+  )
+
+  return response.data ?? (response as unknown as GetProductPreviewsResponse)
 }
 
 // 상품 통계 조회

@@ -1,13 +1,28 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { ProductSortType } from '@/types/api/product'
-import { getProductPreviews } from '@/lib/api/products'
+import { getProductPreviews, filterProductPreviews } from '@/lib/api/products'
 
 export const useInfiniteProductPreviews = (
   categoryId?: number,
   sortType: ProductSortType = 'LATEST',
   limit: number = 10,
-  keyword?: string
+  keyword?: string,
+  optionFilters?: Record<string, string[]>
 ) => {
+  const sanitizedOptionFilters = optionFilters
+    ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
+        const filteredValues = (values ?? []).filter((value) => Boolean(value))
+        if (filteredValues.length > 0) {
+          acc[key] = filteredValues
+        }
+        return acc
+      }, {})
+    : undefined
+
+  const hasOptionFilters =
+    sanitizedOptionFilters !== undefined && Object.keys(sanitizedOptionFilters).length > 0
+  const optionFiltersKey = hasOptionFilters ? JSON.stringify(sanitizedOptionFilters) : null
+
   const {
     data,
     fetchNextPage,
@@ -17,15 +32,29 @@ export const useInfiniteProductPreviews = (
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit, keyword],
-    queryFn: ({ pageParam }) =>
-      getProductPreviews({
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey],
+    queryFn: ({ pageParam }) => {
+      if (hasOptionFilters && sanitizedOptionFilters) {
+        return filterProductPreviews({
+          cursorId: pageParam,
+          limit,
+          sortType,
+          filters: {
+            categoryId,
+            keyword: keyword || undefined,
+            optionFilters: sanitizedOptionFilters,
+          },
+        })
+      }
+
+      return getProductPreviews({
         categoryId,
         limit,
         sortType,
         cursorId: pageParam,
         keyword: keyword || undefined,
-      }),
+      })
+    },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
       return lastPage.hasNext ? lastPage.nextCursorId : undefined
