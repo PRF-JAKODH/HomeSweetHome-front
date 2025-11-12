@@ -118,16 +118,17 @@ export function RangeGroupFilterDropdown({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[400px] rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-[480px] rounded-lg border border-gray-200 bg-white shadow-lg">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <span className="text-sm font-semibold text-foreground">{config.label} 범위</span>
-            <button
+            <Button
+              size="sm"
               onClick={handleClearGroup}
-              className="text-xs text-text-secondary hover:text-foreground"
+              className="bg-gray-200 text-gray-700 hover:bg-gray-300"
               type="button"
             >
-              초기화
-            </button>
+              전체 초기화
+            </Button>
           </div>
 
           <div className="space-y-4 px-4 py-3">
@@ -176,13 +177,14 @@ export function RangeGroupFilterDropdown({
                     >
                       적용
                     </Button>
-                    <button
+                    <Button
+                      size="sm"
                       type="button"
                       onClick={() => handleClear(range.rangeKey)}
-                      className="text-xs text-text-secondary hover:text-destructive"
+                      className="bg-gray-200 text-gray-700 hover:bg-gray-300"
                     >
                       초기화
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )
@@ -195,4 +197,3 @@ export function RangeGroupFilterDropdown({
 }
 
 export default RangeGroupFilterDropdown
-

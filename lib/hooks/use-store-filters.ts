@@ -48,6 +48,10 @@ export const useStoreFilters = (filters: FilterConfig[]): UseStoreFiltersResult 
     return keys
   }, [filters])
 
+  // 배열을 문자열로 직렬화해서 비교
+  const optionKeysStr = optionKeys.join(',')
+  const rangeKeysStr = rangeKeys.join(',')
+
   // cleanup state when filters change
   useEffect(() => {
     setSelectedOptions((prev) => {
@@ -57,6 +61,10 @@ export const useStoreFilters = (filters: FilterConfig[]): UseStoreFiltersResult 
           next[key] = prev[key]
         }
       })
+      // 변화가 없으면 이전 상태 반환
+      if (Object.keys(next).length === Object.keys(prev).length) {
+        return prev
+      }
       return next
     })
 
@@ -68,9 +76,13 @@ export const useStoreFilters = (filters: FilterConfig[]): UseStoreFiltersResult 
           next[key] = current
         }
       })
+      // 변화가 없으면 이전 상태 반환
+      if (Object.keys(next).length === Object.keys(prev).length) {
+        return prev
+      }
       return next
     })
-  }, [optionKeys, rangeKeys])
+  }, [optionKeysStr, rangeKeysStr]) // ← 직렬화된 문자열로 의존성 체크
 
   const toggleOption = useCallback((optionKey: string, value: string) => {
     setSelectedOptions((prev) => {
@@ -169,4 +181,3 @@ export const useStoreFilters = (filters: FilterConfig[]): UseStoreFiltersResult 
     resetAll,
   }
 }
-

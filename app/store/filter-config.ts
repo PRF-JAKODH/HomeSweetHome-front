@@ -86,6 +86,8 @@ export const LIGHT_OPTIONS = ["50W", "60W", "80W", "120W", "150W", "180W"]
 
 export const BED_OPTIONS = ["USB포트추가", "조명추가", "서랍추가", "헤드조명", "수납추가", "헤드추가"]
 
+export const SOFA_OPTIONS = ["쿠션포함", "카우치포함", "헤드레스트 추가"]
+
 export const storeFilterConfig: StoreFilterConfig = {
   baseFilters: [
     {
@@ -119,6 +121,39 @@ export const storeFilterConfig: StoreFilterConfig = {
           type: "multi-select",
           optionKey: "옵션",
           options: BED_OPTIONS,
+        },
+      ],
+    },
+    {
+      matchAny: ["소파"],
+      filters: [
+        {
+          id: "sofa-options",
+          label: "옵션",
+          type: "multi-select",
+          optionKey: "옵션",
+          options: SOFA_OPTIONS,
+        },
+      ],
+    },
+    {
+      matchAny: ["의자"],
+      filters: [
+        {
+          id: "chair-backrest-color",
+          label: "등판색상",
+          type: "color",
+          optionKey: "등판색상",
+          options: COLOR_OPTIONS,
+          swatchMap: COLOR_SWATCH_MAP,
+        },
+        {
+          id: "chair-seat-color",
+          label: "좌판색상",
+          type: "color",
+          optionKey: "좌판색상",
+          options: COLOR_OPTIONS,
+          swatchMap: COLOR_SWATCH_MAP,
         },
       ],
     },

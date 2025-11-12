@@ -74,7 +74,7 @@ export function MultiSelectFilterDropdown({
       {open && (
         <div
           className={`absolute right-0 top-full z-20 mt-2 rounded-lg border border-gray-200 bg-white shadow-lg ${
-            config.type === "multi-select" && config.optionKey === "옵션" ? "w-[360px]" : "w-[320px]"
+            config.type === "multi-select" && config.optionKey === "옵션" ? "w-[400px]" : "w-[400px]"
           }`}
         >
           <div className="flex items-center justify-between border-b px-4 py-3">
@@ -117,7 +117,7 @@ export function MultiSelectFilterDropdown({
                 >
                   {swatch ? (
                     <span
-                      className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-gray-200"
+                      className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border border-gray-200"
                       style={{ backgroundColor: swatch }}
                     ></span>
                   ) : null}
