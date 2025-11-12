@@ -148,6 +148,39 @@ export const storeFilterConfig: StoreFilterConfig = {
         },
       ],
     },
+    {
+      matchAny: ["수납"],
+      filters: [
+        {
+          id: "storage-size",
+          label: "사이즈",
+          type: "range-group",
+          ranges: [
+            {
+              id: "storage-width",
+              label: "가로",
+              rangeKey: "가로",
+              unit: "cm",
+              placeholders: { min: "최소", max: "최대" },
+            },
+            {
+              id: "storage-depth",
+              label: "세로",
+              rangeKey: "세로",
+              unit: "cm",
+              placeholders: { min: "최소", max: "최대" },
+            },
+            {
+              id: "storage-height",
+              label: "높이",
+              rangeKey: "높이",
+              unit: "cm",
+              placeholders: { min: "최소", max: "최대" },
+            },
+          ],
+        },
+      ],
+    },
   ],
 }
 

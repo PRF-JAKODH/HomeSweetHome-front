@@ -87,7 +87,11 @@ export function MultiSelectFilterDropdown({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 px-4 py-3">
+          <div
+            className={`px-4 py-3 grid gap-2 ${
+              config.type === "color" || config.type === "multi-select" ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
             {config.options.map((option) => {
               const isSelected = selectedValues.includes(option)
               const swatch = swatchMap[option]
@@ -97,7 +101,7 @@ export function MultiSelectFilterDropdown({
                   key={option}
                   type="button"
                   onClick={() => handleToggle(option)}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
                     isSelected
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
