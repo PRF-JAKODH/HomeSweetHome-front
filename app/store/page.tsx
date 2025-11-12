@@ -7,46 +7,18 @@ import { ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
-import { ProductSortType } from "@/types/api/product"
+import { ProductSortType, RangeFilter as ApiRangeFilter } from "@/types/api/product"
 import { useSearchParams, useRouter } from "next/navigation" // useRouter 추가
-
-
-const COLOR_OPTIONS = [
-  "화이트",
-  "블랙",
-  "브라운",
-  "골드",
-  "오렌지",
-  "그린",
-  "네이비",
-  "핑크",
-  "그레이",
-  "베이지",
-  "실버",
-  "레드",
-  "옐로우",
-  "블루",
-]
-
-const COLOR_SWATCH_MAP: Record<string, string> = {
-  화이트: "#FFFFFF",
-  블랙: "#000000",
-  브라운: "#8B4513",
-  골드: "#D4AF37",
-  오렌지: "#FF8A3D",
-  그린: "#3CB371",
-  네이비: "#253552",
-  핑크: "#FFB6C1",
-  그레이: "#A9A9A9",
-  베이지: "#D9C7A3",
-  실버: "#C0C0C0",
-  레드: "#FF3B30",
-  옐로우: "#FFD700",
-  블루: "#1E90FF",
-}
-
-const LIGHT_OPTIONS = ["50W", "60W", "80W", "120W", "150W", "180W"]
-const BED_OPTIONS = ["USB포트추가", "조명추가", "서랍추가", "헤드조명", "수납추가", "헤드추가"]
+import MultiSelectFilterDropdown from "@/components/store/filters/multi-select-filter"
+import RangeGroupFilterDropdown from "@/components/store/filters/range-group-filter"
+import {
+  storeFilterConfig,
+  FilterConfig,
+  MultiSelectFilterConfig,
+  RangeGroupFilterConfig,
+  RangeValue,
+} from "./filter-config"
+import { useStoreFilters } from "@/lib/hooks/use-store-filters"
 
 export default function StorePage() {
   const searchParams = useSearchParams()
@@ -58,25 +30,10 @@ export default function StorePage() {
   const [isClient, setIsClient] = useState(false)
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
-  const [showColorFilter, setShowColorFilter] = useState(false)
-  const [selectedColors, setSelectedColors] = useState<string[]>([])
-  const [showVoltageFilter, setShowVoltageFilter] = useState(false)
-  const [selectedVoltages, setSelectedVoltages] = useState<string[]>([])
-  const [showBedOptionFilter, setShowBedOptionFilter] = useState(false)
-  const [selectedBedOptions, setSelectedBedOptions] = useState<string[]>([])
-  const [showSizeFilter, setShowSizeFilter] = useState(false)
-  const [widthRangeInput, setWidthRangeInput] = useState<{ min: string; max: string }>({ min: "", max: "" })
-  const [heightRangeInput, setHeightRangeInput] = useState<{ min: string; max: string }>({ min: "", max: "" })
-  const [selectedWidthRange, setSelectedWidthRange] = useState<{ min?: number; max?: number }>({})
-  const [selectedHeightRange, setSelectedHeightRange] = useState<{ min?: number; max?: number }>({})
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
-  const colorDropdownRef = useRef<HTMLDivElement>(null)
-  const voltageDropdownRef = useRef<HTMLDivElement>(null)
-  const bedOptionsDropdownRef = useRef<HTMLDivElement>(null)
-  const sizeDropdownRef = useRef<HTMLDivElement>(null)
   
   // URL에서 검색 키워드와 카테고리 ID 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
@@ -134,40 +91,85 @@ export default function StorePage() {
   // 상품 조회 (무한 스크롤)
   const currentCategoryId = selectedSubSubCategory || selectedSubCategory || selectedMainCategory
   
-  const isLightingCategory = categoryNameTrail.includes("조명")
-  const isBedCategory = categoryNameTrail.includes("침대")
-  const isFabricCategory = categoryNameTrail.includes("패브릭")
+  const filtersToRender = useMemo<FilterConfig[]>(() => {
+    const categoryFilters = storeFilterConfig.categoryFilters.flatMap((group) =>
+      group.matchAny.some((name) => categoryNameTrail.includes(name)) ? group.filters : []
+    )
+    return [...storeFilterConfig.baseFilters, ...categoryFilters]
+  }, [categoryNameTrail])
 
-  const optionFilters = useMemo(() => {
-    const filters: Record<string, string[]> = {}
-    if (selectedColors.length > 0) {
-      filters["색상"] = selectedColors
-    }
-    if (selectedVoltages.length > 0) {
-      filters["전압"] = selectedVoltages
-    }
-    if (selectedBedOptions.length > 0) {
-      filters["옵션"] = selectedBedOptions
-    }
-    return Object.keys(filters).length > 0 ? filters : undefined
-  }, [selectedColors, selectedVoltages, selectedBedOptions])
+  const {
+    selectedOptions,
+    selectedRanges,
+    optionFilters,
+    rangeFilters,
+    toggleOption,
+    clearOption,
+    setRangeValues,
+    clearRange,
+  } = useStoreFilters(filtersToRender)
 
-  const rangeFilters = useMemo(() => {
-    const ranges: Record<string, { minValue?: number; maxValue?: number }> = {}
-    if (selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined) {
-      ranges["가로"] = {
-        minValue: selectedWidthRange.min,
-        maxValue: selectedWidthRange.max,
+  const optionConfigMap = useMemo(() => {
+    const map = new Map<string, MultiSelectFilterConfig>()
+    filtersToRender.forEach((filter) => {
+      if (filter.type === "multi-select" || filter.type === "color") {
+        map.set(filter.optionKey, filter)
       }
-    }
-    if (selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined) {
-      ranges["세로"] = {
-        minValue: selectedHeightRange.min,
-        maxValue: selectedHeightRange.max,
+    })
+    return map
+  }, [filtersToRender])
+
+  const rangeConfigMap = useMemo(() => {
+    const map = new Map<string, { label: string; unit?: string }>()
+    filtersToRender.forEach((filter) => {
+      if (filter.type === "range-group") {
+        filter.ranges.forEach((range) => {
+          map.set(range.rangeKey, { label: range.label, unit: range.unit })
+        })
       }
-    }
-    return Object.keys(ranges).length > 0 ? ranges : undefined
-  }, [selectedWidthRange, selectedHeightRange])
+    })
+    return map
+  }, [filtersToRender])
+
+  const selectedChips = useMemo(
+    () =>
+      [
+        ...Array.from(optionConfigMap.entries()).flatMap(([optionKey, config]) => {
+          const values = selectedOptions[optionKey] ?? []
+          return values.map((value) => ({
+            id: `${optionKey}-${value}`,
+            label: `${config.label}: ${value}`,
+            onRemove: () => toggleOption(optionKey, value),
+          }))
+        }),
+        ...Array.from(rangeConfigMap.entries())
+          .map(([rangeKey, config]) => {
+            const value = selectedRanges[rangeKey]
+            if (!value || (value.min === undefined && value.max === undefined)) {
+              return null
+            }
+
+            return {
+              id: `range-${rangeKey}`,
+              label: `${config.label}: ${value.min ?? "-"}${config.unit ?? ""} ~ ${value.max ?? "-"}${config.unit ?? ""}`,
+              onRemove: () => clearRange(rangeKey),
+            }
+          })
+          .filter(Boolean) as { id: string; label: string; onRemove: () => void }[],
+      ],
+    [optionConfigMap, selectedOptions, toggleOption, rangeConfigMap, selectedRanges, clearRange]
+  )
+
+  const apiRangeFilters = useMemo(() => {
+    if (!rangeFilters) return undefined
+    return Object.entries(rangeFilters).reduce<Record<string, ApiRangeFilter>>((acc, [key, value]) => {
+      acc[key] = {
+        minValue: value.min,
+        maxValue: value.max,
+      }
+      return acc
+    }, {})
+  }, [rangeFilters])
 
   const {
     products,
@@ -182,7 +184,7 @@ export default function StorePage() {
     12,
     searchKeyword,
     optionFilters,
-    rangeFilters,
+    apiRangeFilters,
   )
 
   useEffect(() => {
@@ -215,28 +217,14 @@ export default function StorePage() {
     }
   }, [])
 
-  // 드롭다운 외부 클릭 시 닫기
+  // 정렬 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
+    if (!showSortOptions) return
+
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (showSortOptions && !(target as Element).closest('.sort-dropdown')) {
+      const target = event.target as Element
+      if (!target.closest('.sort-dropdown')) {
         setShowSortOptions(false)
-      }
-      if (showColorFilter && colorDropdownRef.current && !colorDropdownRef.current.contains(target)) {
-        setShowColorFilter(false)
-      }
-      if (showVoltageFilter && voltageDropdownRef.current && !voltageDropdownRef.current.contains(target)) {
-        setShowVoltageFilter(false)
-      }
-      if (
-        showBedOptionFilter &&
-        bedOptionsDropdownRef.current &&
-        !bedOptionsDropdownRef.current.contains(target)
-      ) {
-        setShowBedOptionFilter(false)
-      }
-      if (showSizeFilter && sizeDropdownRef.current && !sizeDropdownRef.current.contains(target)) {
-        setShowSizeFilter(false)
       }
     }
 
@@ -244,31 +232,7 @@ export default function StorePage() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSortOptions, showColorFilter, showVoltageFilter, showBedOptionFilter, showSizeFilter])
-
-  useEffect(() => {
-    if (!isLightingCategory && selectedVoltages.length > 0) {
-      setSelectedVoltages([])
-      setShowVoltageFilter(false)
-    }
-  }, [isLightingCategory, selectedVoltages.length])
-
-  useEffect(() => {
-    if (!isBedCategory && selectedBedOptions.length > 0) {
-      setSelectedBedOptions([])
-      setShowBedOptionFilter(false)
-    }
-  }, [isBedCategory, selectedBedOptions.length])
-
-  useEffect(() => {
-    if (!isFabricCategory) {
-      setSelectedWidthRange({})
-      setSelectedHeightRange({})
-      setWidthRangeInput({ min: "", max: "" })
-      setHeightRangeInput({ min: "", max: "" })
-      setShowSizeFilter(false)
-    }
-  }, [isFabricCategory])
+  }, [showSortOptions])
 
   // 무한 스크롤 Intersection Observer 설정
   useEffect(() => {
@@ -342,64 +306,6 @@ export default function StorePage() {
   }
 
   const categoryPath = categoryNameTrail.join(" > ")
-
-  const toggleColorSelection = (color: string) => {
-    setSelectedColors((prev) => {
-      if (prev.includes(color)) {
-        return prev.filter((item) => item !== color)
-      }
-      return [...prev, color]
-    })
-  }
-
-  const clearSelectedColors = () => {
-    setSelectedColors([])
-  }
-
-  const toggleVoltageSelection = (watt: string) => {
-    setSelectedVoltages((prev) => {
-      if (prev.includes(watt)) {
-        return prev.filter((item) => item !== watt)
-      }
-      return [...prev, watt]
-    })
-  }
-
-  const clearSelectedVoltages = () => {
-    setSelectedVoltages([])
-  }
-
-  const toggleBedOptionSelection = (option: string) => {
-    setSelectedBedOptions((prev) => {
-      if (prev.includes(option)) {
-        return prev.filter((item) => item !== option)
-      }
-      return [...prev, option]
-    })
-  }
-
-  const clearSelectedBedOptions = () => {
-    setSelectedBedOptions([])
-  }
-
-  const applyWidthRange = () => {
-    const min = widthRangeInput.min.trim() === "" ? undefined : Number(widthRangeInput.min)
-    const max = widthRangeInput.max.trim() === "" ? undefined : Number(widthRangeInput.max)
-    setSelectedWidthRange({ min, max })
-  }
-
-  const applyHeightRange = () => {
-    const min = heightRangeInput.min.trim() === "" ? undefined : Number(heightRangeInput.min)
-    const max = heightRangeInput.max.trim() === "" ? undefined : Number(heightRangeInput.max)
-    setSelectedHeightRange({ min, max })
-  }
-
-  const clearSizeFilters = () => {
-    setSelectedWidthRange({})
-    setSelectedHeightRange({})
-    setWidthRangeInput({ min: "", max: "" })
-    setHeightRangeInput({ min: "", max: "" })
-  }
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -565,341 +471,42 @@ export default function StorePage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-3 md:ml-auto md:items-center">
-                  {isFabricCategory && (
-                    <div ref={sizeDropdownRef} className="relative">
-                      <Button
-                        variant={
-                          selectedWidthRange.min !== undefined ||
-                          selectedWidthRange.max !== undefined ||
-                          selectedHeightRange.min !== undefined ||
-                          selectedHeightRange.max !== undefined
-                            ? "default"
-                            : "outline"
-                        }
-                        size="default"
-                        className={`flex items-center gap-2 ${
-                          selectedWidthRange.min !== undefined ||
-                          selectedWidthRange.max !== undefined ||
-                          selectedHeightRange.min !== undefined ||
-                          selectedHeightRange.max !== undefined
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                            : ""
-                        }`}
-                        onClick={() => {
-                          setShowSizeFilter((prev) => !prev)
-                          setWidthRangeInput({
-                            min: selectedWidthRange.min !== undefined ? String(selectedWidthRange.min) : "",
-                            max: selectedWidthRange.max !== undefined ? String(selectedWidthRange.max) : "",
-                          })
-                          setHeightRangeInput({
-                            min: selectedHeightRange.min !== undefined ? String(selectedHeightRange.min) : "",
-                            max: selectedHeightRange.max !== undefined ? String(selectedHeightRange.max) : "",
-                          })
-                        }}
-                      >
-                        사이즈
-                        {(selectedWidthRange.min !== undefined ||
-                          selectedWidthRange.max !== undefined ||
-                          selectedHeightRange.min !== undefined ||
-                          selectedHeightRange.max !== undefined) && (
-                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
-                            {(selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined ? 1 : 0) +
-                              (selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined ? 1 : 0)}
-                          </span>
-                        )}
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showSizeFilter ? "rotate-180" : ""}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </Button>
+                  {filtersToRender.map((filter) => {
+                    if (filter.type === "range-group") {
+                      const rangeFilter = filter as RangeGroupFilterConfig
+                      const groupSelected = rangeFilter.ranges.reduce<Record<string, RangeValue | undefined>>(
+                        (acc, range) => {
+                          acc[range.rangeKey] = selectedRanges[range.rangeKey]
+                          return acc
+                        },
+                        {}
+                      )
 
-                      {showSizeFilter && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-[400px] rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <div className="flex items-center justify-between border-b px-4 py-3">
-                            <span className="text-sm font-semibold text-foreground">사이즈 범위</span>
-                            <button
-                              onClick={clearSizeFilters}
-                              className="text-xs text-text-secondary hover:text-foreground"
-                              type="button"
-                            >
-                              초기화
-                            </button>
-                          </div>
-                          <div className="space-y-4 px-4 py-3">
-                            <div>
-                              <p className="mb-2 text-sm font-semibold text-foreground">가로</p>
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  inputMode="numeric"
-                                  value={widthRangeInput.min}
-                                  onChange={(e) => setWidthRangeInput((prev) => ({ ...prev, min: e.target.value }))}
-                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                                  placeholder="최소"
-                                />
-                                <span className="text-sm text-text-secondary">cm ~</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  inputMode="numeric"
-                                  value={widthRangeInput.max}
-                                  onChange={(e) => setWidthRangeInput((prev) => ({ ...prev, max: e.target.value }))}
-                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                                  placeholder="최대"
-                                />
-                                <span className="text-sm text-text-secondary">cm</span>
-                                <Button
-                                  size="sm"
-                                  onClick={applyWidthRange}
-                                  className="bg-gray-600 text-white hover:bg-gray-700"
-                                  type="button"
-                                >
-                                  적용
-                                </Button>
-                              </div>
-                            </div>
+                      return (
+                        <RangeGroupFilterDropdown
+                          key={filter.id}
+                          config={rangeFilter}
+                          selectedRanges={groupSelected}
+                          onApplyRange={(rangeKey, values) => setRangeValues(rangeKey, values)}
+                          onClearRange={(rangeKey) => clearRange(rangeKey)}
+                          onClearGroup={() => rangeFilter.ranges.forEach((range) => clearRange(range.rangeKey))}
+                        />
+                      )
+                    }
 
-                            <div>
-                              <p className="mb-2 text-sm font-semibold text-foreground">세로</p>
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  inputMode="numeric"
-                                  value={heightRangeInput.min}
-                                  onChange={(e) => setHeightRangeInput((prev) => ({ ...prev, min: e.target.value }))}
-                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                                  placeholder="최소"
-                                />
-                                <span className="text-sm text-text-secondary">cm ~</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  inputMode="numeric"
-                                  value={heightRangeInput.max}
-                                  onChange={(e) => setHeightRangeInput((prev) => ({ ...prev, max: e.target.value }))}
-                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                                  placeholder="최대"
-                                />
-                                <span className="text-sm text-text-secondary">cm</span>
-                                <Button
-                                  size="sm"
-                                  onClick={applyHeightRange}
-                                  className="bg-gray-600 text-white hover:bg-gray-700"
-                                  type="button"
-                                >
-                                  적용
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    const multiFilter = filter as MultiSelectFilterConfig
+                    const values = selectedOptions[multiFilter.optionKey] ?? []
 
-                  <div ref={colorDropdownRef} className="relative">
-                    <Button
-                      variant={selectedColors.length > 0 ? "default" : "outline"}
-                      size="default"
-                      className={`flex items-center gap-2 ${
-                        selectedColors.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
-                      }`}
-                      onClick={() => setShowColorFilter((prev) => !prev)}
-                    >
-                      색상
-                      {selectedColors.length > 0 && (
-                        <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
-                          {selectedColors.length}
-                        </span>
-                      )}
-                      <svg
-                        className={`w-4 h-4 transition-transform ${showColorFilter ? "rotate-180" : ""}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </Button>
-
-                    {showColorFilter && (
-                      <div className="absolute right-0 top-full z-20 mt-2 w-[290px] rounded-lg border border-gray-200 bg-white shadow-lg">
-                        <div className="flex items-center justify-between border-b px-4 py-3">
-                          <span className="text-sm font-semibold text-foreground">색상 선택</span>
-                          <button
-                            onClick={clearSelectedColors}
-                            className="text-xs text-text-secondary hover:text-foreground"
-                            type="button"
-                          >
-                            초기화
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 px-4 py-3">
-                          {COLOR_OPTIONS.map((color) => {
-                            const isSelected = selectedColors.includes(color)
-                            const swatchColor = COLOR_SWATCH_MAP[color] || "#E5E7EB"
-                            return (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={() => toggleColorSelection(color)}
-                                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                                  isSelected
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
-                                }`}
-                              >
-                                <span
-                                  className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-gray-200"
-                                  style={{ backgroundColor: swatchColor }}
-                                ></span>
-                                <span className="truncate">{color}</span>
-                                <span className="ml-auto text-xs text-text-secondary">
-                                  <input type="checkbox" readOnly checked={isSelected} />
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {isLightingCategory && (
-                    <div ref={voltageDropdownRef} className="relative">
-                      <Button
-                        variant={selectedVoltages.length > 0 ? "default" : "outline"}
-                        size="default"
-                        className={`flex items-center gap-2 ${
-                          selectedVoltages.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
-                        }`}
-                        onClick={() => setShowVoltageFilter((prev) => !prev)}
-                      >
-                        전압
-                        {selectedVoltages.length > 0 && (
-                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
-                            {selectedVoltages.length}
-                          </span>
-                        )}
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showVoltageFilter ? "rotate-180" : ""}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </Button>
-
-                      {showVoltageFilter && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <div className="flex items-center justify-between border-b px-4 py-3">
-                            <span className="text-sm font-semibold text-foreground">전압 선택</span>
-                            <button
-                              onClick={clearSelectedVoltages}
-                              className="text-xs text-text-secondary hover:text-foreground"
-                              type="button"
-                            >
-                              초기화
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2 px-4 py-3">
-                            {LIGHT_OPTIONS.map((option) => {
-                              const isSelected = selectedVoltages.includes(option)
-                              return (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  onClick={() => toggleVoltageSelection(option)}
-                                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                                    isSelected
-                                      ? "border-primary bg-primary/10 text-primary"
-                                      : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
-                                  }`}
-                                >
-                                  <span className="font-medium">{option}</span>
-                                  <span className="ml-auto text-xs text-text-secondary">
-                                    <input type="checkbox" readOnly checked={isSelected} />
-                                  </span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {isBedCategory && (
-                    <div ref={bedOptionsDropdownRef} className="relative">
-                      <Button
-                        variant={selectedBedOptions.length > 0 ? "default" : "outline"}
-                        size="default"
-                        className={`flex items-center gap-2 ${
-                          selectedBedOptions.length > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
-                        }`}
-                        onClick={() => setShowBedOptionFilter((prev) => !prev)}
-                      >
-                        옵션
-                        {selectedBedOptions.length > 0 && (
-                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
-                            {selectedBedOptions.length}
-                          </span>
-                        )}
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showBedOptionFilter ? "rotate-180" : ""}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </Button>
-
-                      {showBedOptionFilter && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <div className="flex items-center justify-between border-b px-4 py-3">
-                            <span className="text-sm font-semibold text-foreground">옵션 선택</span>
-                            <button
-                              onClick={clearSelectedBedOptions}
-                              className="text-xs text-text-secondary hover:text-foreground"
-                              type="button"
-                            >
-                              초기화
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2 px-4 py-3">
-                            {BED_OPTIONS.map((option) => {
-                              const isSelected = selectedBedOptions.includes(option)
-                              return (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  onClick={() => toggleBedOptionSelection(option)}
-                                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                                    isSelected
-                                      ? "border-primary bg-primary/10 text-primary"
-                                      : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
-                                  }`}
-                                >
-                                  <span className="font-medium">{option}</span>
-                                  <span className="ml-auto text-xs text-text-secondary">
-                                    <input type="checkbox" readOnly checked={isSelected} />
-                                  </span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    return (
+                      <MultiSelectFilterDropdown
+                        key={filter.id}
+                        config={multiFilter}
+                        selectedValues={values}
+                        onOptionToggle={(value) => toggleOption(multiFilter.optionKey, value)}
+                        onClear={() => clearOption(multiFilter.optionKey)}
+                      />
+                    )
+                  })}
 
                   <div className="relative sort-dropdown">
                     <Button
@@ -983,95 +590,25 @@ export default function StorePage() {
                 </div>
               </div>
 
-              {(selectedColors.length > 0 ||
-                selectedVoltages.length > 0 ||
-                selectedBedOptions.length > 0 ||
-                selectedWidthRange.min !== undefined ||
-                selectedWidthRange.max !== undefined ||
-                selectedHeightRange.min !== undefined ||
-                selectedHeightRange.max !== undefined) && (
+              {selectedChips.length > 0 && (
                 <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                   <span className="font-medium text-primary">선택한 옵션</span>
-                  {selectedColors.map((color) => (
+                  {selectedChips.map((chip) => (
                     <span
-                      key={`color-${color}`}
+                      key={chip.id}
                       className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
                     >
-                      색상: {color}
+                      {chip.label}
                       <button
                         type="button"
                         className="text-xs text-text-secondary hover:text-destructive"
-                        onClick={() => toggleColorSelection(color)}
-                        aria-label={`${color} 선택 해제`}
+                        onClick={chip.onRemove}
+                        aria-label={`${chip.label} 선택 해제`}
                       >
                         ×
                       </button>
                     </span>
                   ))}
-                  {selectedVoltages.map((volt) => (
-                    <span
-                      key={`volt-${volt}`}
-                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
-                    >
-                      전압: {volt}
-                      <button
-                        type="button"
-                        className="text-xs text-text-secondary hover:text-destructive"
-                        onClick={() => toggleVoltageSelection(volt)}
-                        aria-label={`${volt} 선택 해제`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  {selectedBedOptions.map((option) => (
-                    <span
-                      key={`bed-${option}`}
-                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
-                    >
-                      옵션: {option}
-                      <button
-                        type="button"
-                        className="text-xs text-text-secondary hover:text-destructive"
-                        onClick={() => toggleBedOptionSelection(option)}
-                        aria-label={`${option} 선택 해제`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  {(selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined) && (
-                    <span className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow">
-                      가로: {selectedWidthRange.min ?? "-"}cm ~ {selectedWidthRange.max ?? "-"}cm
-                      <button
-                        type="button"
-                        className="text-xs text-text-secondary hover:text-destructive"
-                        onClick={() => {
-                          setSelectedWidthRange({})
-                          setWidthRangeInput({ min: "", max: "" })
-                        }}
-                        aria-label="가로 선택 해제"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {(selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined) && (
-                    <span className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow">
-                      세로: {selectedHeightRange.min ?? "-"}cm ~ {selectedHeightRange.max ?? "-"}cm
-                      <button
-                        type="button"
-                        className="text-xs text-text-secondary hover:text-destructive"
-                        onClick={() => {
-                          setSelectedHeightRange({})
-                          setHeightRangeInput({ min: "", max: "" })
-                        }}
-                        aria-label="세로 선택 해제"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
                 </div>
               )}
 
