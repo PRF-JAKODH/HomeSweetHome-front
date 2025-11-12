@@ -20,6 +20,7 @@ import {
   GetProductPreviewsResponse,
   ProductFilterRequest,
   ProductSortType,
+  RangeFilter,
   SkuStockResponse,
   GetProductStockResponse,
   ProductManageResponse,
@@ -134,6 +135,10 @@ export const filterProductPreviews = async ({
 
   if (filters.optionFilters && Object.keys(filters.optionFilters).length > 0) {
     payload.optionFilters = filters.optionFilters
+  }
+
+  if (filters.rangeFilters && Object.keys(filters.rangeFilters).length > 0) {
+    payload.rangeFilters = filters.rangeFilters as Record<string, RangeFilter>
   }
 
   const response = await apiClient.post<GetProductPreviewsResponse>(

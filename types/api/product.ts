@@ -125,6 +125,12 @@ export interface ProductFilterRequest {
   categoryId?: number
   keyword?: string
   optionFilters?: Record<string, string[]>
+  rangeFilters?: Record<string, RangeFilter>
+}
+
+export interface RangeFilter {
+  minValue?: number | null
+  maxValue?: number | null
 }
 
 // 상품 프리뷰 조회 응답

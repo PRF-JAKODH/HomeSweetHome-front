@@ -64,6 +64,11 @@ export default function StorePage() {
   const [selectedVoltages, setSelectedVoltages] = useState<string[]>([])
   const [showBedOptionFilter, setShowBedOptionFilter] = useState(false)
   const [selectedBedOptions, setSelectedBedOptions] = useState<string[]>([])
+  const [showSizeFilter, setShowSizeFilter] = useState(false)
+  const [widthRangeInput, setWidthRangeInput] = useState<{ min: string; max: string }>({ min: "", max: "" })
+  const [heightRangeInput, setHeightRangeInput] = useState<{ min: string; max: string }>({ min: "", max: "" })
+  const [selectedWidthRange, setSelectedWidthRange] = useState<{ min?: number; max?: number }>({})
+  const [selectedHeightRange, setSelectedHeightRange] = useState<{ min?: number; max?: number }>({})
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   
   // 무한 스크롤을 위한 observer ref
@@ -71,6 +76,7 @@ export default function StorePage() {
   const colorDropdownRef = useRef<HTMLDivElement>(null)
   const voltageDropdownRef = useRef<HTMLDivElement>(null)
   const bedOptionsDropdownRef = useRef<HTMLDivElement>(null)
+  const sizeDropdownRef = useRef<HTMLDivElement>(null)
   
   // URL에서 검색 키워드와 카테고리 ID 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
@@ -130,6 +136,7 @@ export default function StorePage() {
   
   const isLightingCategory = categoryNameTrail.includes("조명")
   const isBedCategory = categoryNameTrail.includes("침대")
+  const isFabricCategory = categoryNameTrail.includes("패브릭")
 
   const optionFilters = useMemo(() => {
     const filters: Record<string, string[]> = {}
@@ -145,6 +152,23 @@ export default function StorePage() {
     return Object.keys(filters).length > 0 ? filters : undefined
   }, [selectedColors, selectedVoltages, selectedBedOptions])
 
+  const rangeFilters = useMemo(() => {
+    const ranges: Record<string, { minValue?: number; maxValue?: number }> = {}
+    if (selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined) {
+      ranges["가로"] = {
+        minValue: selectedWidthRange.min,
+        maxValue: selectedWidthRange.max,
+      }
+    }
+    if (selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined) {
+      ranges["세로"] = {
+        minValue: selectedHeightRange.min,
+        maxValue: selectedHeightRange.max,
+      }
+    }
+    return Object.keys(ranges).length > 0 ? ranges : undefined
+  }, [selectedWidthRange, selectedHeightRange])
+
   const {
     products,
     isLoading: productsLoading,
@@ -158,6 +182,7 @@ export default function StorePage() {
     12,
     searchKeyword,
     optionFilters,
+    rangeFilters,
   )
 
   useEffect(() => {
@@ -210,13 +235,16 @@ export default function StorePage() {
       ) {
         setShowBedOptionFilter(false)
       }
+      if (showSizeFilter && sizeDropdownRef.current && !sizeDropdownRef.current.contains(target)) {
+        setShowSizeFilter(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSortOptions, showColorFilter, showVoltageFilter, showBedOptionFilter])
+  }, [showSortOptions, showColorFilter, showVoltageFilter, showBedOptionFilter, showSizeFilter])
 
   useEffect(() => {
     if (!isLightingCategory && selectedVoltages.length > 0) {
@@ -231,6 +259,16 @@ export default function StorePage() {
       setShowBedOptionFilter(false)
     }
   }, [isBedCategory, selectedBedOptions.length])
+
+  useEffect(() => {
+    if (!isFabricCategory) {
+      setSelectedWidthRange({})
+      setSelectedHeightRange({})
+      setWidthRangeInput({ min: "", max: "" })
+      setHeightRangeInput({ min: "", max: "" })
+      setShowSizeFilter(false)
+    }
+  }, [isFabricCategory])
 
   // 무한 스크롤 Intersection Observer 설정
   useEffect(() => {
@@ -342,6 +380,25 @@ export default function StorePage() {
 
   const clearSelectedBedOptions = () => {
     setSelectedBedOptions([])
+  }
+
+  const applyWidthRange = () => {
+    const min = widthRangeInput.min.trim() === "" ? undefined : Number(widthRangeInput.min)
+    const max = widthRangeInput.max.trim() === "" ? undefined : Number(widthRangeInput.max)
+    setSelectedWidthRange({ min, max })
+  }
+
+  const applyHeightRange = () => {
+    const min = heightRangeInput.min.trim() === "" ? undefined : Number(heightRangeInput.min)
+    const max = heightRangeInput.max.trim() === "" ? undefined : Number(heightRangeInput.max)
+    setSelectedHeightRange({ min, max })
+  }
+
+  const clearSizeFilters = () => {
+    setSelectedWidthRange({})
+    setSelectedHeightRange({})
+    setWidthRangeInput({ min: "", max: "" })
+    setHeightRangeInput({ min: "", max: "" })
   }
 
   // 클라이언트 사이드에서만 렌더링
@@ -508,6 +565,144 @@ export default function StorePage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-3 md:ml-auto md:items-center">
+                  {isFabricCategory && (
+                    <div ref={sizeDropdownRef} className="relative">
+                      <Button
+                        variant={
+                          selectedWidthRange.min !== undefined ||
+                          selectedWidthRange.max !== undefined ||
+                          selectedHeightRange.min !== undefined ||
+                          selectedHeightRange.max !== undefined
+                            ? "default"
+                            : "outline"
+                        }
+                        size="default"
+                        className={`flex items-center gap-2 ${
+                          selectedWidthRange.min !== undefined ||
+                          selectedWidthRange.max !== undefined ||
+                          selectedHeightRange.min !== undefined ||
+                          selectedHeightRange.max !== undefined
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : ""
+                        }`}
+                        onClick={() => {
+                          setShowSizeFilter((prev) => !prev)
+                          setWidthRangeInput({
+                            min: selectedWidthRange.min !== undefined ? String(selectedWidthRange.min) : "",
+                            max: selectedWidthRange.max !== undefined ? String(selectedWidthRange.max) : "",
+                          })
+                          setHeightRangeInput({
+                            min: selectedHeightRange.min !== undefined ? String(selectedHeightRange.min) : "",
+                            max: selectedHeightRange.max !== undefined ? String(selectedHeightRange.max) : "",
+                          })
+                        }}
+                      >
+                        사이즈
+                        {(selectedWidthRange.min !== undefined ||
+                          selectedWidthRange.max !== undefined ||
+                          selectedHeightRange.min !== undefined ||
+                          selectedHeightRange.max !== undefined) && (
+                          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+                            {(selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined ? 1 : 0) +
+                              (selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined ? 1 : 0)}
+                          </span>
+                        )}
+                        <svg
+                          className={`w-4 h-4 transition-transform ${showSizeFilter ? "rotate-180" : ""}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </Button>
+
+                      {showSizeFilter && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-[400px] rounded-lg border border-gray-200 bg-white shadow-lg">
+                          <div className="flex items-center justify-between border-b px-4 py-3">
+                            <span className="text-sm font-semibold text-foreground">사이즈 범위</span>
+                            <button
+                              onClick={clearSizeFilters}
+                              className="text-xs text-text-secondary hover:text-foreground"
+                              type="button"
+                            >
+                              초기화
+                            </button>
+                          </div>
+                          <div className="space-y-4 px-4 py-3">
+                            <div>
+                              <p className="mb-2 text-sm font-semibold text-foreground">가로</p>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  inputMode="numeric"
+                                  value={widthRangeInput.min}
+                                  onChange={(e) => setWidthRangeInput((prev) => ({ ...prev, min: e.target.value }))}
+                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                                  placeholder="최소"
+                                />
+                                <span className="text-sm text-text-secondary">cm ~</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  inputMode="numeric"
+                                  value={widthRangeInput.max}
+                                  onChange={(e) => setWidthRangeInput((prev) => ({ ...prev, max: e.target.value }))}
+                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                                  placeholder="최대"
+                                />
+                                <span className="text-sm text-text-secondary">cm</span>
+                                <Button
+                                  size="sm"
+                                  onClick={applyWidthRange}
+                                  className="bg-gray-600 text-white hover:bg-gray-700"
+                                  type="button"
+                                >
+                                  적용
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="mb-2 text-sm font-semibold text-foreground">세로</p>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  inputMode="numeric"
+                                  value={heightRangeInput.min}
+                                  onChange={(e) => setHeightRangeInput((prev) => ({ ...prev, min: e.target.value }))}
+                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                                  placeholder="최소"
+                                />
+                                <span className="text-sm text-text-secondary">cm ~</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  inputMode="numeric"
+                                  value={heightRangeInput.max}
+                                  onChange={(e) => setHeightRangeInput((prev) => ({ ...prev, max: e.target.value }))}
+                                  className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                                  placeholder="최대"
+                                />
+                                <span className="text-sm text-text-secondary">cm</span>
+                                <Button
+                                  size="sm"
+                                  onClick={applyHeightRange}
+                                  className="bg-gray-600 text-white hover:bg-gray-700"
+                                  type="button"
+                                >
+                                  적용
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div ref={colorDropdownRef} className="relative">
                     <Button
                       variant={selectedColors.length > 0 ? "default" : "outline"}
@@ -788,7 +983,13 @@ export default function StorePage() {
                 </div>
               </div>
 
-              {(selectedColors.length > 0 || selectedVoltages.length > 0 || selectedBedOptions.length > 0) && (
+              {(selectedColors.length > 0 ||
+                selectedVoltages.length > 0 ||
+                selectedBedOptions.length > 0 ||
+                selectedWidthRange.min !== undefined ||
+                selectedWidthRange.max !== undefined ||
+                selectedHeightRange.min !== undefined ||
+                selectedHeightRange.max !== undefined) && (
                 <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                   <span className="font-medium text-primary">선택한 옵션</span>
                   {selectedColors.map((color) => (
@@ -839,6 +1040,38 @@ export default function StorePage() {
                       </button>
                     </span>
                   ))}
+                  {(selectedWidthRange.min !== undefined || selectedWidthRange.max !== undefined) && (
+                    <span className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow">
+                      가로: {selectedWidthRange.min ?? "-"}cm ~ {selectedWidthRange.max ?? "-"}cm
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={() => {
+                          setSelectedWidthRange({})
+                          setWidthRangeInput({ min: "", max: "" })
+                        }}
+                        aria-label="가로 선택 해제"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {(selectedHeightRange.min !== undefined || selectedHeightRange.max !== undefined) && (
+                    <span className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow">
+                      세로: {selectedHeightRange.min ?? "-"}cm ~ {selectedHeightRange.max ?? "-"}cm
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={() => {
+                          setSelectedHeightRange({})
+                          setHeightRangeInput({ min: "", max: "" })
+                        }}
+                        aria-label="세로 선택 해제"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
                 </div>
               )}
 

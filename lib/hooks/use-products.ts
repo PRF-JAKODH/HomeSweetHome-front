@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ProductSortType } from '@/types/api/product'
+import { ProductSortType, RangeFilter } from '@/types/api/product'
 import { getProductPreviews, filterProductPreviews } from '@/lib/api/products'
 
 export const useInfiniteProductPreviews = (
@@ -7,7 +7,8 @@ export const useInfiniteProductPreviews = (
   sortType: ProductSortType = 'LATEST',
   limit: number = 10,
   keyword?: string,
-  optionFilters?: Record<string, string[]>
+  optionFilters?: Record<string, string[]>,
+  rangeFilters?: Record<string, RangeFilter>
 ) => {
   const sanitizedOptionFilters = optionFilters
     ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
@@ -23,6 +24,26 @@ export const useInfiniteProductPreviews = (
     sanitizedOptionFilters !== undefined && Object.keys(sanitizedOptionFilters).length > 0
   const optionFiltersKey = hasOptionFilters ? JSON.stringify(sanitizedOptionFilters) : null
 
+  const sanitizedRangeFilters = rangeFilters
+    ? Object.entries(rangeFilters).reduce<Record<string, RangeFilter>>((acc, [key, range]) => {
+        if (!range) return acc
+        const { minValue, maxValue } = range
+        if (minValue == null && maxValue == null) {
+          return acc
+        }
+
+        acc[key] = {
+          minValue: minValue ?? undefined,
+          maxValue: maxValue ?? undefined,
+        }
+        return acc
+      }, {})
+    : undefined
+
+  const hasRangeFilters =
+    sanitizedRangeFilters !== undefined && Object.keys(sanitizedRangeFilters).length > 0
+  const rangeFiltersKey = hasRangeFilters ? JSON.stringify(sanitizedRangeFilters) : null
+
   const {
     data,
     fetchNextPage,
@@ -32,9 +53,9 @@ export const useInfiniteProductPreviews = (
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey],
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey],
     queryFn: ({ pageParam }) => {
-      if (hasOptionFilters && sanitizedOptionFilters) {
+      if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
         return filterProductPreviews({
           cursorId: pageParam,
           limit,
@@ -43,6 +64,7 @@ export const useInfiniteProductPreviews = (
             categoryId,
             keyword: keyword || undefined,
             optionFilters: sanitizedOptionFilters,
+            rangeFilters: sanitizedRangeFilters,
           },
         })
       }
