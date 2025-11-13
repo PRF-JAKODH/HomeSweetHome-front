@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect, useRef, useMemo } from "react"
@@ -337,7 +338,12 @@ export default function StorePage() {
   }
 
   const categoryPath = categoryNameTrail.join(" > ")
-  const heroCategoryName = searchKeyword ? undefined : selectedCategory?.name ?? "전체"
+  const heroCategoryName =
+    selectedCategory?.name ??
+    selectedSubCategoryData?.name ??
+    "전체"
+  const hasCategorySelection =
+    selectedMainCategory !== null || selectedSubCategory !== null || selectedSubSubCategory !== null
 
   const handleRecentViewRemove = async (id: number) => {
     try {
@@ -497,7 +503,13 @@ export default function StorePage() {
 
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-4">
-              <CategoryHero categoryName={heroCategoryName} />
+              {searchKeyword ? (
+                <CategoryHero categoryName={heroCategoryName} />
+              ) : hasCategorySelection ? (
+                <CategoryHero categoryName={heroCategoryName} />
+              ) : (
+                <CategoryHero variant="search" />
+              )}
               {isAuthenticated && recentViews.length > 0 ? (
                 <section className="mb-10 space-y-4">
                   <header className="flex items-center justify-between">
