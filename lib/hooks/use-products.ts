@@ -12,7 +12,18 @@ export const useInfiniteProductPreviews = (
 ) => {
   const sanitizedOptionFilters = optionFilters
     ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
-        const filteredValues = (values ?? []).filter((value) => Boolean(value))
+        const filteredValues = (values ?? []).reduce<string[]>((valueAcc, value) => {
+          if (!value) return valueAcc
+          if (key === "전압") {
+            const numeric = value.replace(/[^0-9]/g, "")
+            if (numeric) {
+              valueAcc.push(numeric)
+            }
+            return valueAcc
+          }
+          valueAcc.push(value)
+          return valueAcc
+        }, [])
         if (filteredValues.length > 0) {
           acc[key] = filteredValues
         }
