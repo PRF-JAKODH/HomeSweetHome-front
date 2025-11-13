@@ -35,11 +35,11 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 px-4 py-40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl rounded-3xl border border-white/20 bg-white/85 p-8 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] backdrop-blur"
+        className="relative w-full max-w-3xl rounded-3xl border border-white/15 bg-white/70 p-8 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] backdrop-blur-md"
         onClick={(event) => event.stopPropagation()}
       >
         <form onSubmit={onSubmit} className="space-y-10">
@@ -53,7 +53,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
               placeholder="브랜드, 상품, 프로필, 태그 등을 검색하세요"
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              className="h-14 w-full appearance-none rounded-none border-none bg-transparent pr-12 text-[26px] font-semibold text-gray-900 placeholder:text-gray-400 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-none outline-none"
+              className="h-16 w-full appearance-none rounded-none border-none bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-300 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-none outline-none tracking-tight"
             />
             {keyword && (
               <button
@@ -65,7 +65,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
                 ×
               </button>
             )}
-            <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-primary" />
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-black/80" />
           </div>
         </form>
       </div>
