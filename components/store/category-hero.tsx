@@ -65,7 +65,7 @@ export function CategoryHero({ categoryName, variant = "default" }: CategoryHero
   const descriptionLines = content.description.split("\n").filter(Boolean)
 
   return (
-    <section className="mb-10 flex flex-col gap-6 rounded-3xl bg-white/80 p-6 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.2)] ring-1 ring-black/5 backdrop-blur-sm md:flex-row md:items-center md:gap-10">
+    <section className="group mb-10 flex flex-col gap-6 rounded-3xl bg-white/80 p-6 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.2)] ring-1 ring-black/5 backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_28px_60px_-24px_rgba(0,0,0,0.25)] md:flex-row md:items-center md:gap-10">
       <div className="flex-1 space-y-4">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
           {variant === "search" ? "Homesweethome Philosophy" : "Homesweethome Picks"}
