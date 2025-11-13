@@ -23,6 +23,12 @@ export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => 
   }
   return Array.isArray((response as any)?.data) ? (response as any).data : []
 }
+
+export const deleteRecentViewItem = async (productId: number): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.RECENT_VIEWS_DELETE_ONE, {
+    params: { productId },
+  })
+}
 /**
  * 상품 관련 API 함수들
  */

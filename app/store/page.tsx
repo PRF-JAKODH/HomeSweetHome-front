@@ -19,7 +19,7 @@ import {
   RangeValue,
 } from "./filter-config"
 import { useStoreFilters } from "@/lib/hooks/use-store-filters"
-import { getRecentViews } from "@/lib/api/products"
+import { deleteRecentViewItem, getRecentViews } from "@/lib/api/products"
 import { useAuthStore } from "@/stores/auth-store"
 import { CategoryHero } from "@/components/store/category-hero"
 
@@ -339,6 +339,15 @@ export default function StorePage() {
   const categoryPath = categoryNameTrail.join(" > ")
   const heroCategoryName = searchKeyword ? undefined : selectedCategory?.name ?? "전체"
 
+  const handleRecentViewRemove = async (id: number) => {
+    try {
+      await deleteRecentViewItem(id)
+      setRecentViews((prev) => prev.filter((item) => item.id !== id))
+    } catch (error) {
+      console.error("최근 본 상품을 삭제하지 못했습니다.", error)
+    }
+  }
+
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
     return (
@@ -496,41 +505,53 @@ export default function StorePage() {
                   </header>
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                     {recentViews.map((item) => (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => router.push(`/store/products/${item.id}`)}
-                        className="group flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                        className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                       >
-                        <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
-                          <img
-                            src={item.imageUrl || "/placeholder.svg"}
-                            alt={item.name}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                        <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
-                          <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
-                          <div className="space-y-1">
-                            {typeof item.discountRate === "number" && item.discountRate > 0 && (
-                              <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
-                            )}
-                            <p className="text-base font-bold text-gray-900">
-                              {typeof item.discountedPrice === "number"
-                                ? `${item.discountedPrice.toLocaleString()}원`
-                                : typeof item.basePrice === "number"
-                                  ? `${item.basePrice.toLocaleString()}원`
-                                  : "가격 정보 없음"}
-                            </p>
-                            {typeof item.discountRate === "number" &&
-                              item.discountRate > 0 &&
-                              typeof item.basePrice === "number" && (
-                                <p className="text-xs text-muted-foreground line-through">
-                                  {item.basePrice.toLocaleString()}원
-                                </p>
-                              )}
+                        <button
+                          onClick={() => router.push(`/store/products/${item.id}`)}
+                          className="flex flex-1 flex-col"
+                        >
+                          <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                            <img
+                              src={item.imageUrl || "/placeholder.svg"}
+                              alt={item.name}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            />
                           </div>
-                        </div>
-                      </button>
+                          <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
+                            <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
+                            <div className="space-y-1">
+                              {typeof item.discountRate === "number" && item.discountRate > 0 && (
+                                <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
+                              )}
+                              <p className="text-base font-bold text-gray-900">
+                                {typeof item.discountedPrice === "number"
+                                  ? `${item.discountedPrice.toLocaleString()}원`
+                                  : typeof item.basePrice === "number"
+                                    ? `${item.basePrice.toLocaleString()}원`
+                                    : "가격 정보 없음"}
+                              </p>
+                              {typeof item.discountRate === "number" &&
+                                item.discountRate > 0 &&
+                                typeof item.basePrice === "number" && (
+                                  <p className="text-xs text-muted-foreground line-through">
+                                    {item.basePrice.toLocaleString()}원
+                                  </p>
+                                )}
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRecentViewRemove(item.id)}
+                          className="absolute right-2 top-2 hidden h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white text-sm transition hover:bg-black group-hover:flex"
+                          aria-label="최근 본 상품에서 제거"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </section>
