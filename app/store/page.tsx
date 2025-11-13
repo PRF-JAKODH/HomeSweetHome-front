@@ -36,6 +36,7 @@ export default function StorePage() {
   const [showSortOptions, setShowSortOptions] = useState(false)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   const [recentViews, setRecentViews] = useState<RecentViewPreviewResponse[]>([])
+  const [carouselIndex, setCarouselIndex] = useState(0)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   
   // 무한 스크롤을 위한 observer ref
@@ -209,6 +210,7 @@ export default function StorePage() {
         const views = await getRecentViews()
         if (active) {
           setRecentViews(Array.isArray(views) ? views.slice(0, 10) : [])
+          setCarouselIndex(0)
         }
       } catch (error) {
         console.error("최근 본 상품을 불러오지 못했습니다.", error)
@@ -345,10 +347,30 @@ export default function StorePage() {
   const hasCategorySelection =
     selectedMainCategory !== null || selectedSubCategory !== null || selectedSubSubCategory !== null
 
+  const recentViewPages = useMemo(() => {
+    const chunkSize = 5
+    const pages: RecentViewPreviewResponse[][] = []
+    for (let i = 0; i < recentViews.length; i += chunkSize) {
+      pages.push(recentViews.slice(i, i + chunkSize))
+    }
+    return pages
+  }, [recentViews])
+
+  const recentViewTotalPages = recentViewPages.length || 1
+
+  useEffect(() => {
+    setCarouselIndex((prev) => Math.min(prev, Math.max(recentViewTotalPages - 1, 0)))
+  }, [recentViewTotalPages])
+
   const handleRecentViewRemove = async (id: number) => {
     try {
       await deleteRecentViewItem(id)
-      setRecentViews((prev) => prev.filter((item) => item.id !== id))
+      setRecentViews((prev) => {
+        const next = prev.filter((item) => item.id !== id)
+        const nextPageCount = Math.ceil(next.length / 5) || 1
+        setCarouselIndex((current) => Math.min(current, Math.max(nextPageCount - 1, 0)))
+        return next
+      })
     } catch (error) {
       console.error("최근 본 상품을 삭제하지 못했습니다.", error)
     }
@@ -514,57 +536,119 @@ export default function StorePage() {
                 <section className="mb-10 space-y-4">
                   <header className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-foreground">최근 본 상품</h3>
-                  </header>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {recentViews.map((item) => (
-                      <div
-                        key={item.id}
-                        className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                    <div className="hidden items-center gap-2 md:flex">
+                      <button
+                        type="button"
+                        onClick={() => setCarouselIndex((prev) => Math.max(prev - 1, 0))}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                        disabled={carouselIndex === 0}
+                        aria-label="최근 본 상품 이전"
                       >
-                        <button
-                          onClick={() => router.push(`/store/products/${item.id}`)}
-                          className="flex flex-1 flex-col"
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCarouselIndex((prev) =>
+                            prev >= Math.max(recentViewTotalPages - 1, 0) ? prev : prev + 1
+                          )
+                        }
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                        disabled={carouselIndex >= Math.max(recentViewTotalPages - 1, 0)}
+                        aria-label="최근 본 상품 다음"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  </header>
+                  <div className="overflow-hidden">
+                    <div
+                      className="flex transition-transform duration-300 ease-in-out"
+                      style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+                    >
+                      {recentViewPages.map((page, pageIndex) => (
+                        <div
+                          key={`recent-page-${pageIndex}`}
+                          className="flex w-full min-w-full justify-start gap-4"
                         >
-                          <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
-                            <img
-                              src={item.imageUrl || "/placeholder.svg"}
-                              alt={item.name}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
+                          <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            {page.map((item) => (
+                              <div
+                                key={item.id}
+                                className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                              >
+                                <button
+                                  onClick={() => router.push(`/store/products/${item.id}`)}
+                                  className="flex flex-1 flex-col"
+                                >
+                                  <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                                    <img
+                                      src={item.imageUrl || "/placeholder.svg"}
+                                      alt={item.name}
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                    />
+                                  </div>
+                                  <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
+                                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
+                                    <div className="space-y-1">
+                                      {typeof item.discountRate === "number" && item.discountRate > 0 && (
+                                        <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
+                                      )}
+                                      <p className="text-base font-bold text-gray-900">
+                                        {typeof item.discountedPrice === "number"
+                                          ? `${item.discountedPrice.toLocaleString()}원`
+                                          : typeof item.basePrice === "number"
+                                            ? `${item.basePrice.toLocaleString()}원`
+                                            : "가격 정보 없음"}
+                                      </p>
+                                      {typeof item.discountRate === "number" &&
+                                        item.discountRate > 0 &&
+                                        typeof item.basePrice === "number" && (
+                                          <p className="text-xs text-muted-foreground line-through">
+                                            {item.basePrice.toLocaleString()}원
+                                          </p>
+                                        )}
+                                    </div>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRecentViewRemove(item.id)}
+                                  className="absolute right-2 top-2 hidden h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white text-sm transition hover:bg-black group-hover:flex"
+                                  aria-label="최근 본 상품에서 제거"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                          <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
-                            <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
-                            <div className="space-y-1">
-                              {typeof item.discountRate === "number" && item.discountRate > 0 && (
-                                <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
-                              )}
-                              <p className="text-base font-bold text-gray-900">
-                                {typeof item.discountedPrice === "number"
-                                  ? `${item.discountedPrice.toLocaleString()}원`
-                                  : typeof item.basePrice === "number"
-                                    ? `${item.basePrice.toLocaleString()}원`
-                                    : "가격 정보 없음"}
-                              </p>
-                              {typeof item.discountRate === "number" &&
-                                item.discountRate > 0 &&
-                                typeof item.basePrice === "number" && (
-                                  <p className="text-xs text-muted-foreground line-through">
-                                    {item.basePrice.toLocaleString()}원
-                                  </p>
-                                )}
-                            </div>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRecentViewRemove(item.id)}
-                          className="absolute right-2 top-2 hidden h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white text-sm transition hover:bg-black group-hover:flex"
-                          aria-label="최근 본 상품에서 제거"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 md:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setCarouselIndex((prev) => Math.max(prev - 1, 0))}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                      disabled={carouselIndex === 0}
+                      aria-label="최근 본 상품 이전"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCarouselIndex((prev) =>
+                          prev >= Math.max(recentViewTotalPages - 1, 0) ? prev : prev + 1
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                      disabled={carouselIndex >= Math.max(recentViewTotalPages - 1, 0)}
+                      aria-label="최근 본 상품 다음"
+                    >
+                      ›
+                    </button>
                   </div>
                 </section>
               ) : null}
