@@ -1,9 +1,15 @@
+export const getRecentSearches = async (): Promise<string[]> => {
+  const response = await apiClient.get<string[]>(PRODUCT_ENDPOINTS.SEARCH_RECENT)
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
 /**
  * 상품 관련 API 함수들
  */
 
 import { apiClient } from './client'
-import { PRODUCT_ENDPOINTS } from './endpoints'
 import {
   Product,
   GetProductsRequest,
@@ -31,6 +37,7 @@ import {
   SkuStockUpdateRequest,
   ProductSkuUpdateRequest,
 } from '@/types/api/product'
+import { PRODUCT_ENDPOINTS } from './endpoints'
 import { ApiResponse } from '@/types/api/common'
 
 // 상품 목록 조회
