@@ -2,7 +2,6 @@
 
 import { Search, ShoppingCart, Menu, User, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -11,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useCart } from "@/lib/hooks/use-cart"
 import { useAuthStore } from "@/stores/auth-store"
 import { NotificationDropdown } from "@/components/notification/notification-dropdown"
+import { SearchModal } from "@/components/search/search-modal"
 
 export function Header() {
   const router = useRouter()
@@ -21,6 +21,7 @@ export function Header() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState("")
+  const [showSearchModal, setShowSearchModal] = useState(false)
 
   // 장바구니 개수 계산 (인증된 상태에서만)
   const cartCount = isAuthenticated ? (cartData?.contents?.length || 0) : 0
@@ -99,11 +100,20 @@ export function Header() {
     e.preventDefault()
     if (searchKeyword.trim()) {
       router.push(`/store?keyword=${encodeURIComponent(searchKeyword.trim())}`)
+      setShowSearchModal(false)
     }
   }
 
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchKeyword(e.target.value)
+  }
+
+  const openSearchModal = () => {
+    setShowSearchModal(true)
+  }
+
+  const closeSearchModal = () => {
+    setShowSearchModal(false)
   }
 
   const markAsRead = (id: number) => {
@@ -165,58 +175,46 @@ export function Header() {
             </nav>
           </div>
 
-          {/* Search Bar */}
-          <div className="hidden flex-1 max-w-md md:block">
-            <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
-              <Input
-                type="search"
-                placeholder="검색어를 입력하세요"
-                value={searchKeyword}
-                onChange={handleSearchInputChange}
-                className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
-              />
-            </form>
-          </div>
-
           {/* Actions */}
-          {!isLoading && (
-            <>
-              {isAuthenticated ? (
+          <div className="flex items-center gap-2">
+            {!isAuthenticated && (
+              <Button variant="ghost" size="icon" onClick={openSearchModal} aria-label="검색 열기">
+                <Search className="h-5 w-5" />
+              </Button>
+            )}
+
+            {!isLoading && (
+              <>
+                {isAuthenticated ? (
                   <UserActions
                     userType={userType}
                     cartCount={cartCount}
                     cartLoading={cartLoading}
                     onLogout={handleLogout}
+                    onSearchClick={openSearchModal}
                   />
-              ) : (
-                 <>
+                ) : (
                   <Button
                     onClick={handleLogin}
                     className="text-sm font-medium bg-primary hover:bg-primary/90 text-white px-6"
                   >
                     로그인
                   </Button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Mobile Search */}
-        <div className="pb-3 md:hidden">
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
-            <Input
-              type="search"
-              placeholder="검색어를 입력하세요"
-              value={searchKeyword}
-              onChange={handleSearchInputChange}
-              className="w-full pl-12 pr-4 h-12 bg-white border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm hover:shadow-md transition-all text-base"
-            />
-          </form>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {showSearchModal && (
+        <SearchModal
+          keyword={searchKeyword}
+          onKeywordChange={setSearchKeyword}
+          onSubmit={handleSearch}
+          onClose={closeSearchModal}
+        />
+      )}
     </header>
   )
 }
@@ -291,24 +289,6 @@ function Navigation() {
   )
 }
 
-// SearchBar 컴포넌트
-interface SearchBarProps {
-  className?: string
-}
-
-function SearchBar({ className = "" }: SearchBarProps) {
-  return (
-    <div className={`relative ${className}`}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-      <Input
-        type="search"
-        placeholder="검색어를 입력하세요"
-        className="w-full pl-10 pr-4 h-10 bg-background-section border-transparent focus:border-primary"
-      />
-    </div>
-  )
-}
-
 // NotificationDropdown 컴포넌트
 interface NotificationDropdownProps {}
 
@@ -322,6 +302,7 @@ interface UserActionsProps {
   cartCount: number
   cartLoading?: boolean
   onLogout: () => void
+  onSearchClick: () => void
 }
 
 function UserActions({ 
@@ -329,11 +310,15 @@ function UserActions({
   cartCount, 
   cartLoading = false,
   onLogout,
+  onSearchClick,
 }: UserActionsProps) {
   const router = useRouter()
 
   return (
     <div className="flex items-center gap-2">
+      <Button variant="ghost" size="icon" onClick={onSearchClick} aria-label="검색 열기">
+        <Search className="h-5 w-5" />
+      </Button>
       <NotificationDropdownWrapper />
       <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
         <MessageCircle className="h-5 w-5" />
