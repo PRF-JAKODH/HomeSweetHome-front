@@ -5,6 +5,16 @@ export const getRecentSearches = async (): Promise<string[]> => {
   }
   return Array.isArray((response as any)?.data) ? (response as any).data : []
 }
+
+export const deleteRecentSearchKeyword = async (keyword: string): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_DELETE_KEYWORD, {
+    params: { keyword },
+  })
+}
+
+export const clearRecentSearches = async (): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT)
+}
 /**
  * 상품 관련 API 함수들
  */

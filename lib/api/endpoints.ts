@@ -16,6 +16,7 @@ export const PRODUCT_ENDPOINTS = {
   FILTER_PRODUCT_PREVIEWS: '/api/v1/products/previews/filter',
   SEARCH_AUTHENTICATED: '/api/v1/search/authenticated',
   SEARCH_RECENT: '/api/v1/search/recent',
+  SEARCH_RECENT_DELETE_KEYWORD: '/api/v1/search/recent/keyword',
   
   // 상품 검색 및 필터
   SEARCH_PRODUCTS: '/api/v1/products/search',

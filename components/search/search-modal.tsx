@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { getRecentSearches } from "@/lib/api/products"
+import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches } from "@/lib/api/products"
 import { useAuthStore } from "@/stores/auth-store"
 
 interface SearchModalProps {
@@ -68,8 +68,13 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
     inputRef.current?.focus()
   }
 
-  const handleKeywordRemove = (value: string) => {
-    setRecentSearches((prev) => prev.filter((item) => item !== value))
+  const handleKeywordRemove = async (value: string) => {
+    try {
+      await deleteRecentSearchKeyword(value)
+      setRecentSearches((prev) => prev.filter((item) => item !== value))
+    } catch (error) {
+      console.error("최근 검색어를 삭제하지 못했습니다.", error)
+    }
   }
 
   return (
@@ -94,16 +99,16 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
               onChange={(event) => onKeywordChange(event.target.value)}
               className="h-16 w-full appearance-none rounded-[28px] border border-transparent bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 transition-all duration-200 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(53,197,240,0.35)] focus-visible:ring-0 focus-visible:outline-none tracking-tight"
             />
-            {keyword && (
-              <button
-                type="button"
-                onClick={() => onKeywordChange("")}
-                className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-gray-400 transition hover:text-gray-600"
-                aria-label="검색어 지우기"
-              >
-                ×
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => onKeywordChange("")}
+              className={`absolute right-0 top-1/2 -translate-y-1/2 rounded-full text-gray-300 transition hover:text-gray-600 ${
+                keyword ? "flex h-7 w-7 items-center justify-center" : "hidden"
+              }`}
+              aria-label="검색어 지우기"
+            >
+              ×
+            </button>
             <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-primary/40 transition-colors group-focus-within:bg-primary" />
           </div>
           {isAuthenticated && recentSearches.length > 0 ? (
@@ -112,7 +117,14 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
                 <h3 className="text-lg font-semibold text-foreground">최근 검색어</h3>
                 <button
                   type="button"
-                  onClick={() => setRecentSearches([])}
+                  onClick={async () => {
+                    try {
+                      await clearRecentSearches()
+                      setRecentSearches([])
+                    } catch (error) {
+                      console.error("최근 검색어를 초기화하지 못했습니다.", error)
+                    }
+                  }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   지우기
