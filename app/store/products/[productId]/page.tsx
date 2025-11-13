@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageCircle, ChevronRight } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getProduct, getProductStock, getProductPreviews } from "@/lib/api/products"
+import { getProduct, getProductDetailAuthenticated, getProductStock, getProductPreviews } from "@/lib/api/products"
 import { getCategoryHierarchy } from "@/lib/api/categories"
 import { getProductReviews, getProductReviewStatistics, createProductReview } from "@/lib/api/reviews"
 import { useAddToCart } from "@/lib/hooks/use-cart"
@@ -143,8 +143,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         setError(null)
 
         // 상품 정보와 재고 정보를 먼저 가져오기
+        const productFetcher = isAuthenticated ? getProductDetailAuthenticated : getProduct
+
         const [productResponse, stockResponse] = await Promise.all([
-          getProduct(resolvedParams.productId),
+          productFetcher(resolvedParams.productId),
           getProductStock(resolvedParams.productId).catch(() => ({ data: [] })) // 재고 API 실패 시 빈 배열로 fallback
         ])
 
@@ -229,7 +231,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     }
 
     fetchProduct()
-  }, [resolvedParams.productId])
+  }, [resolvedParams.productId, isAuthenticated])
 
   // 리뷰 데이터 가져오기
   useEffect(() => {

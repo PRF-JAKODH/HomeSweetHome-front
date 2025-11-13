@@ -7,13 +7,13 @@ export const getRecentSearches = async (): Promise<string[]> => {
 }
 
 export const deleteRecentSearchKeyword = async (keyword: string): Promise<void> => {
-  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_DELETE_KEYWORD, {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT, {
     params: { keyword },
   })
 }
 
 export const clearRecentSearches = async (): Promise<void> => {
-  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT)
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_CLEAR_ALL)
 }
 /**
  * 상품 관련 API 함수들
@@ -60,6 +60,10 @@ export const getProducts = async (params?: GetProductsRequest): Promise<GetProdu
 // 상품 상세 조회
 export const getProduct = async (id: string): Promise<GetProductResponse> => {
   return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT(id))
+}
+
+export const getProductDetailAuthenticated = async (id: string): Promise<GetProductResponse> => {
+  return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.SEARCH_PRODUCT_DETAIL(id))
 }
 
 // 상품 생성
