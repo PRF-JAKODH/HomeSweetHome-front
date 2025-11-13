@@ -50,10 +50,10 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
               inputMode="search"
               enterKeyHint="search"
               autoComplete="off"
-              placeholder="브랜드, 상품, 프로필, 태그 등을 검색하세요"
+              placeholder="브랜드, 상품 등을 검색하세요"
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              className="h-16 w-full appearance-none rounded-none border-none bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-300 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-none outline-none tracking-tight"
+              className="h-16 w-full appearance-none rounded-none border-none bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-none outline-none tracking-tight"
             />
             {keyword && (
               <button
