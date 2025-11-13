@@ -48,16 +48,18 @@ export function MultiSelectFilterDropdown({
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
-        variant={hasSelection ? "default" : "outline"}
+        variant="ghost"
         size="default"
-        className={`flex items-center gap-2 ${
-          hasSelection ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+        className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+          hasSelection
+            ? "border-gray-900 bg-white text-gray-900 shadow-sm"
+            : "border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200"
         }`}
         onClick={() => setOpen((prev) => !prev)}
       >
         {config.label}
         {hasSelection && (
-          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+          <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
             {selectedValues.length}
           </span>
         )}
@@ -67,24 +69,24 @@ export function MultiSelectFilterDropdown({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 9l6 6 6-6" />
         </svg>
       </Button>
 
       {open && (
         <div
-          className={`absolute right-0 top-full z-20 mt-2 rounded-lg border border-gray-200 bg-white shadow-lg ${
+          className={`absolute right-0 top-full z-20 mt-2 rounded-2xl border border-gray-100 bg-white shadow-xl ${
             config.type === "multi-select" && config.optionKey === "옵션" ? "w-[400px]" : "w-[400px]"
           }`}
         >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="text-sm font-semibold text-foreground">{config.label} 선택</span>
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <span className="text-sm font-semibold text-gray-900">{config.label} 선택</span>
             <button
               onClick={() => {
                 onClear()
                 setOpen(false)
               }}
-              className="text-xs text-text-secondary hover:text-foreground"
+              className="text-xs text-gray-500 hover:text-gray-700"
               type="button"
             >
               초기화
@@ -109,10 +111,10 @@ export function MultiSelectFilterDropdown({
                   key={option}
                   type="button"
                   onClick={() => handleToggle(option)}
-                  className={`flex w-full items-center gap-2 rounded-md border px-4 py-2 text-sm transition-colors ${
+                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
                     isSelected
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-gray-200 hover:border-primary/50 hover:bg-primary/5"
+                      ? "border-gray-900 bg-gray-900/5 text-gray-900"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                   }`}
                 >
                   {swatch ? (
@@ -121,8 +123,13 @@ export function MultiSelectFilterDropdown({
                       style={{ backgroundColor: swatch }}
                     ></span>
                   ) : null}
-                  <span className="flex-1 truncate text-left">{option}</span>
-                  <input type="checkbox" readOnly checked={isSelected} />
+                  <span className="flex-1 truncate text-left text-gray-800">{option}</span>
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={isSelected}
+                    className="h-4 w-4 accent-gray-900"
+                  />
                 </button>
               )
             })}

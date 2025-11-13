@@ -94,16 +94,18 @@ export function RangeGroupFilterDropdown({
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
-        variant={selectedCount > 0 ? "default" : "outline"}
+        variant="ghost"
         size="default"
-        className={`flex items-center gap-2 ${
-          selectedCount > 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+        className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+          selectedCount > 0
+            ? "border-gray-900 bg-white text-gray-900 shadow-sm"
+            : "border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200"
         }`}
         onClick={() => setOpen((prev) => !prev)}
       >
         {config.label}
         {selectedCount > 0 && (
-          <span className="rounded bg-primary-foreground/10 px-2 py-0.5 text-xs font-semibold text-primary-foreground md:text-xs">
+          <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white md:text-xs">
             {selectedCount}
           </span>
         )}
@@ -113,18 +115,18 @@ export function RangeGroupFilterDropdown({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 9l6 6 6-6" />
         </svg>
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[480px] rounded-lg border border-gray-200 bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="text-sm font-semibold text-foreground">{config.label} 범위</span>
+        <div className="absolute right-0 top-full z-20 mt-2 w-[480px] rounded-2xl border border-gray-100 bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <span className="text-sm font-semibold text-gray-900">{config.label} 범위</span>
             <Button
               size="sm"
               onClick={handleClearGroup}
-              className="bg-gray-200 text-gray-700 hover:bg-gray-300"
+              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
               type="button"
             >
               전체 초기화
@@ -150,7 +152,7 @@ export function RangeGroupFilterDropdown({
                           [range.rangeKey]: { ...prev[range.rangeKey], min: e.target.value },
                         }))
                       }
-                      className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                      className="w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
                       placeholder={range.placeholders?.min ?? "최소"}
                     />
                     <span className="text-sm text-text-secondary">{range.unit ?? ""} ~</span>
@@ -165,14 +167,14 @@ export function RangeGroupFilterDropdown({
                           [range.rangeKey]: { ...prev[range.rangeKey], max: e.target.value },
                         }))
                       }
-                      className="w-28 rounded border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                      className="w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
                       placeholder={range.placeholders?.max ?? "최대"}
                     />
                     <span className="text-sm text-text-secondary">{range.unit ?? ""}</span>
                     <Button
                       size="sm"
                       onClick={() => handleApply(range.rangeKey)}
-                      className="bg-gray-600 text-white hover:bg-gray-700"
+                      className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white hover:bg-gray-800"
                       type="button"
                     >
                       적용
@@ -181,7 +183,7 @@ export function RangeGroupFilterDropdown({
                       size="sm"
                       type="button"
                       onClick={() => handleClear(range.rangeKey)}
-                      className="bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
                     >
                       초기화
                     </Button>

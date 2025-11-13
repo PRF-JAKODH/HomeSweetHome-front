@@ -3,7 +3,7 @@
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect, useRef, useMemo } from "react"
-import { ChevronRight } from "lucide-react"
+import { ArrowDown, ArrowUp, Check, ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
@@ -510,79 +510,67 @@ export default function StorePage() {
 
                   <div className="relative sort-dropdown">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="default"
-                      className="flex items-center gap-2 text-base text-gray-700 hover:bg-gray-50"
+                      className={`flex items-center gap-2 rounded-full bg-transparent px-2 py-1 text-sm font-medium transition-colors ${
+                        showSortOptions ? "text-gray-900" : "text-gray-700 hover:text-gray-900"
+                      }`}
                       onClick={toggleSortOptions}
                     >
                       {getSortTypeLabel(sortType)}
-                      <svg
-                        className={`w-4 h-4 transition-transform ${showSortOptions ? "rotate-180" : ""}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <span className="flex flex-col leading-none">
+                        <ArrowUp className="h-4 w-4 -mb-1 text-gray-800" />
+                        <ArrowDown className="h-4 w-4 text-gray-400" />
+                      </span>
                     </Button>
 
                     {showSortOptions && (
-                      <div className="absolute right-0 top-full z-10 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
-                        <div className="p-2">
-                          <div className="grid grid-cols-1 gap-2">
-                            <button
-                              onClick={() => handleSortTypeChange("POPULAR")}
-                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
-                                sortType === "POPULAR" ? "bg-sky-50 text-sky-600" : "text-gray-700"
-                              }`}
-                            >
-                              <div
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                  sortType === "POPULAR" ? "border-sky-600 bg-sky-600" : "border-gray-300"
-                                }`}
-                              ></div>
-                              리뷰순
-                            </button>
-                            <button
-                              onClick={() => handleSortTypeChange("LATEST")}
-                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
-                                sortType === "LATEST" ? "bg-sky-50 text-sky-600" : "text-gray-700"
-                              }`}
-                            >
-                              <div
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                  sortType === "LATEST" ? "border-sky-600 bg-sky-600" : "border-gray-300"
-                                }`}
-                              ></div>
-                              최신순
-                            </button>
-                            <button
-                              onClick={() => handleSortTypeChange("PRICE_LOW")}
-                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
-                                sortType === "PRICE_LOW" ? "bg-sky-50 text-sky-600" : "text-gray-700"
-                              }`}
-                            >
-                              <div
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                  sortType === "PRICE_LOW" ? "border-sky-600 bg-sky-600" : "border-gray-300"
-                                }`}
-                              ></div>
-                              낮은가격순
-                            </button>
-                            <button
-                              onClick={() => handleSortTypeChange("PRICE_HIGH")}
-                              className={`flex items-center gap-2 rounded p-2 text-sm hover:bg-sky-100 ${
-                                sortType === "PRICE_HIGH" ? "bg-sky-50 text-sky-600" : "text-gray-700"
-                              }`}
-                            >
-                              <div
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                  sortType === "PRICE_HIGH" ? "border-sky-600 bg-sky-600" : "border-gray-300"
-                                }`}
-                              ></div>
-                              높은가격순
-                            </button>
-                          </div>
+                      <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+                        <div className="py-1">
+                          <button
+                            onClick={() => handleSortTypeChange("POPULAR")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "POPULAR"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            리뷰순
+                            {sortType === "POPULAR" && <Check className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange("LATEST")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "LATEST"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            최신순
+                            {sortType === "LATEST" && <Check className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange("PRICE_LOW")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "PRICE_LOW"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            낮은가격순
+                            {sortType === "PRICE_LOW" && <Check className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleSortTypeChange("PRICE_HIGH")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "PRICE_HIGH"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            높은가격순
+                            {sortType === "PRICE_HIGH" && <Check className="h-4 w-4" />}
+                          </button>
                         </div>
                       </div>
                     )}
