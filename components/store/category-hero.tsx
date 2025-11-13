@@ -27,12 +27,12 @@ const CATEGORY_HERO_CONTENT: Record<string, CategoryHeroContent> = {
   조명: {
     image: "/modern-lamp.jpg",
     title: "조명",
-    description: "따뜻한 분위기를 만들어주는 조명을 만나보세요.",
+    description: "따뜻한 분위기를 만들어주는 감각적인 디자인의 조명을 만나보세요.",
   },
   수납: {
     image: "/modern-storage.jpg",
     title: "수납",
-    description: "공간을 효율적으로 활용하는 수납 솔루션을 만나보세요.",
+    description: "수납은 기능을 넘어 하나의 디자인 요소가 됩니다.",
   }
 }
 
