@@ -19,6 +19,7 @@ import {
   RangeValue,
 } from "./filter-config"
 import { useStoreFilters } from "@/lib/hooks/use-store-filters"
+import { CategoryHero } from "@/components/store/category-hero"
 
 export default function StorePage() {
   const searchParams = useSearchParams()
@@ -306,6 +307,7 @@ export default function StorePage() {
   }
 
   const categoryPath = categoryNameTrail.join(" > ")
+  const heroCategoryName = searchKeyword ? undefined : selectedCategory?.name ?? "전체"
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -456,6 +458,7 @@ export default function StorePage() {
 
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-4">
+              <CategoryHero categoryName={heroCategoryName} />
               <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-semibold text-foreground">
