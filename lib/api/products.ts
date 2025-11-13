@@ -109,6 +109,12 @@ export const getProductPreviews = async (params: GetProductPreviewsRequest = {})
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params })
 }
 
+export const searchProductPreviewsAuthenticated = async (
+  params: GetProductPreviewsRequest = {}
+): Promise<GetProductPreviewsResponse> => {
+  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params })
+}
+
 type FilterProductPreviewsParams = {
   cursorId?: number
   limit?: number

@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { ProductSortType, RangeFilter } from '@/types/api/product'
-import { getProductPreviews, filterProductPreviews } from '@/lib/api/products'
+import { getProductPreviews, filterProductPreviews, searchProductPreviewsAuthenticated } from '@/lib/api/products'
+import { useAuthStore } from '@/stores/auth-store'
 
 export const useInfiniteProductPreviews = (
   categoryId?: number,
@@ -10,6 +11,8 @@ export const useInfiniteProductPreviews = (
   optionFilters?: Record<string, string[]>,
   rangeFilters?: Record<string, RangeFilter>
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
   const sanitizedOptionFilters = optionFilters
     ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
         const filteredValues = (values ?? []).reduce<string[]>((valueAcc, value) => {
@@ -64,7 +67,7 @@ export const useInfiniteProductPreviews = (
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey],
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated],
     queryFn: ({ pageParam }) => {
       if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
         return filterProductPreviews({
@@ -80,13 +83,19 @@ export const useInfiniteProductPreviews = (
         })
       }
 
-      return getProductPreviews({
+      const baseParams = {
         categoryId,
         limit,
         sortType,
         cursorId: pageParam,
         keyword: keyword || undefined,
-      })
+      }
+
+      if (isAuthenticated) {
+        return searchProductPreviewsAuthenticated(baseParams)
+      }
+
+      return getProductPreviews(baseParams)
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
