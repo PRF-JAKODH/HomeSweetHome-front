@@ -19,6 +19,7 @@ export const PRODUCT_ENDPOINTS = {
   SEARCH_RECENT_DELETE_KEYWORD: '/api/v1/recent-keyword',
   SEARCH_RECENT_CLEAR_ALL: '/api/v1/recent-keyword/all',
   SEARCH_PRODUCT_DETAIL: (productId: string | number) => `/api/v1/search/${productId}`,
+  RECENT_VIEWS: '/api/v1/recent-view',
   
   // 상품 검색 및 필터
   SEARCH_PRODUCTS: '/api/v1/products/search',

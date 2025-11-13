@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, Check, ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
-import { ProductSortType, RangeFilter as ApiRangeFilter } from "@/types/api/product"
+import { ProductSortType, RangeFilter as ApiRangeFilter, RecentViewPreviewResponse } from "@/types/api/product"
 import { useSearchParams, useRouter } from "next/navigation" // useRouter 추가
 import MultiSelectFilterDropdown from "@/components/store/filters/multi-select-filter"
 import RangeGroupFilterDropdown from "@/components/store/filters/range-group-filter"
@@ -19,6 +19,8 @@ import {
   RangeValue,
 } from "./filter-config"
 import { useStoreFilters } from "@/lib/hooks/use-store-filters"
+import { getRecentViews } from "@/lib/api/products"
+import { useAuthStore } from "@/stores/auth-store"
 import { CategoryHero } from "@/components/store/category-hero"
 
 export default function StorePage() {
@@ -32,6 +34,8 @@ export default function StorePage() {
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
+  const [recentViews, setRecentViews] = useState<RecentViewPreviewResponse[]>([])
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -191,6 +195,32 @@ export default function StorePage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRecentViews([])
+      return
+    }
+
+    let active = true
+    ;(async () => {
+      try {
+        const views = await getRecentViews()
+        if (active) {
+          setRecentViews(Array.isArray(views) ? views.slice(0, 10) : [])
+        }
+      } catch (error) {
+        console.error("최근 본 상품을 불러오지 못했습니다.", error)
+        if (active) {
+          setRecentViews([])
+        }
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [isAuthenticated])
 
   // URL 파라미터로 카테고리 설정
   useEffect(() => {
@@ -459,6 +489,52 @@ export default function StorePage() {
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-4">
               <CategoryHero categoryName={heroCategoryName} />
+              {isAuthenticated && recentViews.length > 0 ? (
+                <section className="mb-10 space-y-4">
+                  <header className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-foreground">최근 본 상품</h3>
+                  </header>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {recentViews.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => router.push(`/store/products/${item.id}`)}
+                        className="group flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                      >
+                        <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                          <img
+                            src={item.imageUrl || "/placeholder.svg"}
+                            alt={item.name}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
+                          <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
+                          <div className="space-y-1">
+                            {typeof item.discountRate === "number" && item.discountRate > 0 && (
+                              <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
+                            )}
+                            <p className="text-base font-bold text-gray-900">
+                              {typeof item.discountedPrice === "number"
+                                ? `${item.discountedPrice.toLocaleString()}원`
+                                : typeof item.basePrice === "number"
+                                  ? `${item.basePrice.toLocaleString()}원`
+                                  : "가격 정보 없음"}
+                            </p>
+                            {typeof item.discountRate === "number" &&
+                              item.discountRate > 0 &&
+                              typeof item.basePrice === "number" && (
+                                <p className="text-xs text-muted-foreground line-through">
+                                  {item.basePrice.toLocaleString()}원
+                                </p>
+                              )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
               <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-semibold text-foreground">

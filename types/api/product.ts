@@ -112,6 +112,15 @@ export interface ProductPreviewResponse {
   updatedAt: string
 }
 
+export interface RecentViewPreviewResponse {
+  id: number
+  name: string
+  imageUrl: string | null
+  basePrice: number | null
+  discountRate: number | null
+  discountedPrice: number | null
+}
+
 // 상품 프리뷰 조회 요청 파라미터
 export interface GetProductPreviewsRequest {
   cursorId?: number

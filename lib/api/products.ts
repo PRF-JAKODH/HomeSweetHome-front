@@ -7,13 +7,21 @@ export const getRecentSearches = async (): Promise<string[]> => {
 }
 
 export const deleteRecentSearchKeyword = async (keyword: string): Promise<void> => {
-  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT, {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_DELETE_KEYWORD, {
     params: { keyword },
   })
 }
 
 export const clearRecentSearches = async (): Promise<void> => {
   await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_CLEAR_ALL)
+}
+
+export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => {
+  const response = await apiClient.get<RecentViewPreviewResponse[]>(PRODUCT_ENDPOINTS.RECENT_VIEWS)
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
 }
 /**
  * 상품 관련 API 함수들
@@ -46,6 +54,7 @@ import {
   ProductImageUpdateRequest,
   SkuStockUpdateRequest,
   ProductSkuUpdateRequest,
+  RecentViewPreviewResponse,
 } from '@/types/api/product'
 import { PRODUCT_ENDPOINTS } from './endpoints'
 import { ApiResponse } from '@/types/api/common'
