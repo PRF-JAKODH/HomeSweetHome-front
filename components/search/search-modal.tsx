@@ -43,7 +43,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
         onClick={(event) => event.stopPropagation()}
       >
         <form onSubmit={onSubmit} className="space-y-10">
-          <div className="relative pb-5">
+          <div className="group relative pb-5">
             <Input
               ref={inputRef}
               type="text"
@@ -53,7 +53,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
               placeholder="브랜드, 상품 등을 검색하세요"
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              className="h-16 w-full appearance-none rounded-none border-none bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-none outline-none tracking-tight"
+              className="h-16 w-full appearance-none rounded-[28px] border border-transparent bg-transparent pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 transition-all duration-200 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(53,197,240,0.35)] focus-visible:ring-0 focus-visible:outline-none tracking-tight"
             />
             {keyword && (
               <button
@@ -65,7 +65,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
                 ×
               </button>
             )}
-            <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-black/80" />
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-primary/40 transition-colors group-focus-within:bg-primary" />
           </div>
         </form>
       </div>
