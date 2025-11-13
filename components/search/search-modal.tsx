@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { Search, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { getRecentSearches } from "@/lib/api/products"
+import { useAuthStore } from "@/stores/auth-store"
 
 interface SearchModalProps {
   keyword: string
@@ -13,6 +15,8 @@ interface SearchModalProps {
 
 export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: SearchModalProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -32,6 +36,41 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
       window.removeEventListener("keydown", handleKeyDown)
     }
   }, [onClose])
+
+  useEffect(() => {
+    let active = true
+    if (!isAuthenticated) {
+      setRecentSearches([])
+      return
+    }
+
+    ;(async () => {
+      try {
+        const recent = await getRecentSearches()
+        if (active) {
+          setRecentSearches(recent ?? [])
+        }
+      } catch (error) {
+        console.error("최근 검색어를 불러오지 못했습니다.", error)
+        if (active) {
+          setRecentSearches([])
+        }
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [isAuthenticated])
+
+  const handleKeywordClick = (value: string) => {
+    onKeywordChange(value)
+    inputRef.current?.focus()
+  }
+
+  const handleKeywordRemove = (value: string) => {
+    setRecentSearches((prev) => prev.filter((item) => item !== value))
+  }
 
   return (
     <div
@@ -67,6 +106,41 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
             )}
             <span className="pointer-events-none absolute inset-x-0 bottom-0 block h-1 rounded-full bg-primary/40 transition-colors group-focus-within:bg-primary" />
           </div>
+          {isAuthenticated && recentSearches.length > 0 ? (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">최근 검색어</h3>
+                <button
+                  type="button"
+                  onClick={() => setRecentSearches([])}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  지우기
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {recentSearches.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => handleKeywordClick(item)}
+                    className="group/recent flex items-center gap-2 rounded-full border border-gray-200 bg-white/70 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-primary hover:bg-primary/10 hover:text-primary"
+                  >
+                    <span className="truncate max-w-[160px]">{item}</span>
+                    <span
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleKeywordRemove(item)
+                      }}
+                      className="text-gray-400 transition group-hover/recent:text-primary"
+                    >
+                      ×
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </form>
       </div>
     </div>
