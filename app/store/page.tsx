@@ -401,8 +401,8 @@ export default function StorePage() {
                   onClick={handleAllCategoriesClick}
                   className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
                     selectedMainCategory === null
-                      ? "bg-primary text-white"
-                      : "bg-background text-foreground hover:bg-background-section"
+                      ? "bg-gray-900 text-white"
+                      : "bg-background text-foreground hover:bg-muted"
                   }`}
                 >
                   <span>전체</span>
@@ -422,8 +422,8 @@ export default function StorePage() {
                         }}
                         className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
                           selectedMainCategory === category.id
-                            ? "bg-primary text-white"
-                            : "bg-background text-foreground hover:bg-background-section"
+                            ? "bg-gray-900 text-white"
+                            : "bg-background text-foreground hover:bg-muted"
                         }`}
                       >
                         <span>{category.name}</span>
@@ -453,8 +453,8 @@ export default function StorePage() {
                                     }}
                                     className={`w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
                                       selectedSubCategory === subCategory.id
-                                        ? "bg-primary/20 text-primary"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-background-section"
+                                        ? "bg-gray-200 text-gray-900"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                     }`}
                                   >
                                     <span>{subCategory.name}</span>
@@ -479,8 +479,8 @@ export default function StorePage() {
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
                                             className={`w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
                                               selectedSubSubCategory === subSubCategory.id
-                                                ? "bg-primary/20 text-primary"
-                                                : "text-muted-foreground hover:text-foreground hover:bg-background-section"
+                                                ? "bg-gray-200 text-gray-900"
+                                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                             }`}
                                           >
                                             {subSubCategory.name}
