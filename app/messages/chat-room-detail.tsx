@@ -195,6 +195,8 @@ export function ChatRoomDetail({
 
   useEffect(() => {
     if (!roomType) return
+    if (roomType === "INDIVIDUAL" && (!partnerName || partnerName === "상대방")) return
+    if (roomType === "GROUP" && (!roomName || roomName.trim() === "")) return
 
     updateRoomSummary({
       id: roomId,
@@ -209,6 +211,8 @@ export function ChatRoomDetail({
   useEffect(() => {
     if (!roomType) return
     if (messages.length === 0) return
+    if (roomType === "INDIVIDUAL" && (!partnerName || partnerName === "상대방")) return
+    if (roomType === "GROUP" && (!roomName || roomName.trim() === "")) return
 
     const lastMessage = messages[messages.length - 1]
     const lastMessagePreview =

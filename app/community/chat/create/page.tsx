@@ -16,6 +16,7 @@ export interface CreateGroupRoomRequest {
   ownerId: number
   roomName: string
   roomThumbnailUrl?: File | null // ✅ 선택값으로 변경
+  roomType: string // GROUP
 }
 
 // Response DTO
@@ -87,6 +88,7 @@ export default function CreateChatRoomPage() {
       const formData = new FormData()
       formData.append("ownerId", String(user.id))
       formData.append("roomName", roomName.trim())
+      formData.append("roomType", "GROUP") // 그룹 채팅방 타입 명시
       if (thumbnailFile) {
         formData.append("roomThumbnailUrl", thumbnailFile) // ✅ 선택적으로만 추가
       }
