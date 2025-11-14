@@ -495,7 +495,7 @@ const handleChatWithSeller = async () => {
     }
 
     // 채팅방 페이지로 이동
-    router.push(`/messages/${roomId}`)
+    router.push(`/messages?roomId=${roomId}&type=INDIVIDUAL`)
   } catch (error: any) {
     console.error("❌ 채팅방 생성 실패:", error)
     toast({

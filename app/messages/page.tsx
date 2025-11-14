@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import apiClient from "@/lib/api"
 import { useAuthStore } from "@/stores/auth-store"
 import { MessageCircle } from "lucide-react"
@@ -87,6 +87,7 @@ function formatRelativeTime(isoString: string | null | undefined): string {
 
 export default function MessagesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<"dm" | "chatroom">("dm")
   const [dmList, setDmList] = useState<Room[]>([])
   const [groupList, setGroupList] = useState<GroupRoom[]>([])
@@ -181,6 +182,10 @@ export default function MessagesPage() {
 
   const handleSelectRoom = (id: number, type: RoomType, name: string) => {
     setSelectedRoom({ id, type, name })
+    const query = new URLSearchParams(searchParams?.toString())
+    query.set("roomId", String(id))
+    query.set("type", type)
+    router.replace(`/messages?${query.toString()}`)
     if (isMobile) {
       router.push(`/messages/${id}?type=${type}`)
     }
@@ -239,6 +244,39 @@ export default function MessagesPage() {
     }
     fetchMyGroupRooms()
   }, [])
+
+  useEffect(() => {
+    const roomIdParam = searchParams?.get("roomId")
+    const roomTypeParam = (searchParams?.get("type") as RoomType | null) ?? null
+    if (!roomIdParam) return
+    const numericRoomId = Number(roomIdParam)
+    if (Number.isNaN(numericRoomId)) return
+
+    const targetType = roomTypeParam ?? "INDIVIDUAL"
+    const sourceList = targetType === "GROUP" ? groupList : dmList
+    const targetRoom =
+      targetType === "GROUP"
+        ? sourceList.find((room) => room.id === numericRoomId)
+        : sourceList.find((room) => room.id === numericRoomId)
+
+    if (targetRoom) {
+      setSelectedRoom({
+        id: numericRoomId,
+        type: targetType,
+        name: targetType === "GROUP" ? (targetRoom as GroupRoom).roomName : (targetRoom as Room).opponentName,
+      })
+    } else if (!selectedRoom) {
+      setSelectedRoom({
+        id: numericRoomId,
+        type: targetType,
+        name: "",
+      })
+    }
+
+    if (isMobile) {
+      router.replace(`/messages/${numericRoomId}?type=${targetType}`)
+    }
+  }, [searchParams, dmList, groupList, isMobile, selectedRoom, router])
 
   return (
     <div className="min-h-screen lg:h-screen bg-background lg:overflow-hidden">

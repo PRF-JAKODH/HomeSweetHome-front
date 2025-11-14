@@ -70,6 +70,28 @@ export type PreMessageResponse = {
 const sortMessagesBySentAt = (msgs: Message[]) =>
   [...msgs].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
 
+const mergeMessages = (...messageLists: Message[][]) => {
+  const messageMap = new Map<number, Message>()
+
+  messageLists.flat().forEach((message) => {
+    if (!message?.messageId) return
+    const existing = messageMap.get(message.messageId)
+    if (!existing) {
+      messageMap.set(message.messageId, message)
+      return
+    }
+
+    // 최신 정보(에러/성공 상태 포함)를 우선으로 반영
+    const existingTime = new Date(existing.sentAt).getTime()
+    const incomingTime = new Date(message.sentAt).getTime()
+    if (incomingTime >= existingTime || existing.status === "sending") {
+      messageMap.set(message.messageId, { ...existing, ...message })
+    }
+  })
+
+  return sortMessagesBySentAt(Array.from(messageMap.values()))
+}
+
 type ChatRoomDetailProps = {
   roomId: number
   initialRoomType?: RoomType | null
@@ -325,7 +347,7 @@ export function ChatRoomDetail({
         status: "sent" as const,
       }))
 
-      setMessages(sortMessagesBySentAt(parsedMessages))
+      setMessages(mergeMessages(parsedMessages))
       setHasMore(hasNext)
 
       setTimeout(() => scrollToBottom(), 100)
@@ -354,7 +376,7 @@ export function ChatRoomDetail({
         status: "sent",
       }
 
-      setMessages((prev) => sortMessagesBySentAt([...prev, newMessage]))
+      setMessages((prev) => mergeMessages(prev, [newMessage]))
       setTimeout(() => scrollToBottom(), 100)
     } catch (error) {
       console.error("❌ 메시지 파싱 실패:", error)
@@ -392,7 +414,7 @@ export function ChatRoomDetail({
       images: selectedImages.length > 0 ? selectedImages : undefined,
     }
 
-    setMessages((prev) => sortMessagesBySentAt([...prev, tempMessage]))
+    setMessages((prev) => mergeMessages(prev, [tempMessage]))
 
     try {
       sendChatMessage("/pub/chat.send", {
@@ -461,7 +483,7 @@ export function ChatRoomDetail({
       const container = chatContainerRef.current
       const previousScrollHeight = container?.scrollHeight || 0
 
-      setMessages((prev) => sortMessagesBySentAt([...parsedNewMessages, ...prev]))
+      setMessages((prev) => mergeMessages(parsedNewMessages, prev))
       setHasMore(hasNext)
 
       setTimeout(() => {
