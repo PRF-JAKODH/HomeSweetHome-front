@@ -13,6 +13,7 @@ import {
   unsubscribeFromTopic,
 } from "@/lib/hooks/chat-socket"
 import { useAuthStore } from "@/stores/auth-store"
+import { useMessagesStore } from "@/stores/messages-store"
 
 // ============================================
 // 타입 정의
@@ -176,6 +177,7 @@ export function ChatRoomDetail({
 
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
+  const updateRoomSummary = useMessagesStore((state) => state.updateRoomSummary)
 
   useEffect(() => {
     setRoomType(searchParamsType)
@@ -190,6 +192,41 @@ export function ChatRoomDetail({
     setShowSettings(false)
     isSubscribedRef.current = false
   }, [roomId])
+
+  useEffect(() => {
+    if (!roomType) return
+
+    updateRoomSummary({
+      id: roomId,
+      type: roomType,
+      opponentName: roomType === "INDIVIDUAL" ? partnerName : undefined,
+      opponentAvatar: roomType === "INDIVIDUAL" ? thumbnailUrl : undefined,
+      roomName: roomType === "GROUP" ? roomName : undefined,
+      thumbnail: roomType === "GROUP" ? thumbnailUrl : undefined,
+    })
+  }, [roomType, partnerName, roomName, thumbnailUrl, roomId, updateRoomSummary])
+
+  useEffect(() => {
+    if (!roomType) return
+    if (messages.length === 0) return
+
+    const lastMessage = messages[messages.length - 1]
+    const lastMessagePreview =
+      lastMessage.content?.trim() ||
+      (lastMessage.images && lastMessage.images.length > 0 ? "사진을 보냈습니다." : "")
+    const displayTime = formatListTime(lastMessage.sentAt) || lastMessage.timestamp
+
+    updateRoomSummary({
+      id: roomId,
+      type: roomType,
+      lastMessage: lastMessagePreview,
+      time: displayTime,
+      opponentName: roomType === "INDIVIDUAL" ? partnerName : undefined,
+      opponentAvatar: roomType === "INDIVIDUAL" ? thumbnailUrl : undefined,
+      roomName: roomType === "GROUP" ? roomName : undefined,
+      thumbnail: roomType === "GROUP" ? thumbnailUrl : undefined,
+    })
+  }, [messages, roomType, partnerName, roomName, thumbnailUrl, roomId, updateRoomSummary])
 
   useEffect(() => {
     if (!roomId || !accessToken) return
@@ -526,6 +563,24 @@ export function ChatRoomDetail({
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const formatListTime = (isoString?: string): string => {
+    if (!isoString) return "방금 전"
+    const messageTime = new Date(isoString)
+    if (Number.isNaN(messageTime.getTime())) return "방금 전"
+
+    const now = new Date()
+    const diffMs = now.getTime() - messageTime.getTime()
+    const diffMinutes = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMinutes < 1) return "방금 전"
+    if (diffMinutes < 60) return `${diffMinutes}분 전`
+    if (diffHours < 24) return `${diffHours}시간 전`
+    if (diffDays < 7) return `${diffDays}일 전`
+    return messageTime.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })
   }
 
   const handleLeaveRoom = () => {

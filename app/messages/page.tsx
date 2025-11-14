@@ -1,12 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useRouter, useSearchParams } from "next/navigation"
 import apiClient from "@/lib/api"
 import { useAuthStore } from "@/stores/auth-store"
 import { MessageCircle } from "lucide-react"
 import { ChatRoomDetail, type RoomType } from "@/app/messages/chat-room-detail"
+import {
+  useMessagesStore,
+  type DirectMessageRoom,
+  type GroupMessageRoom,
+} from "@/stores/messages-store"
 
 // 타입 정의 수정 - 옵셔널 필드 명시
 type IndividualRoomListResponseDto = {
@@ -28,26 +33,6 @@ type GroupRoomListResponse = {
   memberCount: number
   lastMessage: string | null
   lastMessageAt: string | null
-}
-
-type Room = {
-  id: number
-  opponentId: number
-  opponentName: string
-  opponentAvatar: string
-  lastMessage: string
-  time: string
-  unread?: number  
-}
-
-type GroupRoom = {
-  id: number
-  roomName: string
-  thumbnail: string
-  lastMessage: string
-  time: string
-  memberCount: number
-  unread?: number  
 }
 
 /**
@@ -88,14 +73,17 @@ function formatRelativeTime(isoString: string | null | undefined): string {
 export default function MessagesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const searchParamsString = useMemo(() => searchParams?.toString() ?? "", [searchParams])
   const [activeTab, setActiveTab] = useState<"dm" | "chatroom">("dm")
-  const [dmList, setDmList] = useState<Room[]>([])
-  const [groupList, setGroupList] = useState<GroupRoom[]>([])
   const [loadingDm, setLoadingDm] = useState(false)
   const [loadingGroup, setLoadingGroup] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRoom, setSelectedRoom] = useState<{ id: number; type: RoomType; name: string } | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const dmList = useMessagesStore((state) => state.dmList)
+  const groupList = useMessagesStore((state) => state.groupList)
+  const setDmList = useMessagesStore((state) => state.setDmList)
+  const setGroupList = useMessagesStore((state) => state.setGroupList)
 
   /**
    * 내가 속한 개인 채팅방 목록 불러오기
@@ -132,7 +120,7 @@ export default function MessagesPage() {
         })
 
         // 백엔드 응답 → 프론트엔드 타입으로 변환
-        const mapped: Room[] = res.data.map((room) => ({
+        const mapped: DirectMessageRoom[] = res.data.map((room) => ({
           id: room.roomId,
           opponentId: room.partnerId,
           opponentName: room.partnerName,
@@ -181,11 +169,22 @@ export default function MessagesPage() {
       )
 
   const handleSelectRoom = (id: number, type: RoomType, name: string) => {
-    setSelectedRoom({ id, type, name })
-    const query = new URLSearchParams(searchParams?.toString())
-    query.set("roomId", String(id))
-    query.set("type", type)
-    router.replace(`/messages?${query.toString()}`)
+    setSelectedRoom((prev) => {
+      if (prev && prev.id === id && prev.type === type && prev.name === name) {
+        return prev
+      }
+      return { id, type, name }
+    })
+
+    const currentRoomId = searchParams?.get("roomId")
+    const currentType = searchParams?.get("type")
+    if (currentRoomId !== String(id) || currentType !== type) {
+      const query = new URLSearchParams(searchParams?.toString())
+      query.set("roomId", String(id))
+      query.set("type", type)
+      router.replace(`/messages?${query.toString()}`)
+    }
+
     if (isMobile) {
       router.push(`/messages/${id}?type=${type}`)
     }
@@ -225,7 +224,7 @@ export default function MessagesPage() {
           })
         })
 
-        const mapped: GroupRoom[] = res.data.map((room) => ({
+        const mapped: GroupMessageRoom[] = res.data.map((room) => ({
           id: room.roomId,
           roomName: room.roomName,
           thumbnail: room.thumbnailUrl || "/placeholder.svg",
@@ -246,6 +245,7 @@ export default function MessagesPage() {
   }, [])
 
   useEffect(() => {
+    if (!searchParamsString) return
     const roomIdParam = searchParams?.get("roomId")
     const roomTypeParam = (searchParams?.get("type") as RoomType | null) ?? null
     if (!roomIdParam) return
@@ -253,30 +253,33 @@ export default function MessagesPage() {
     if (Number.isNaN(numericRoomId)) return
 
     const targetType = roomTypeParam ?? "INDIVIDUAL"
-    const sourceList = targetType === "GROUP" ? groupList : dmList
-    const targetRoom =
+    const resolvedName =
       targetType === "GROUP"
-        ? sourceList.find((room) => room.id === numericRoomId)
-        : sourceList.find((room) => room.id === numericRoomId)
+        ? (() => {
+            const room = groupList.find((item) => item.id === numericRoomId)
+            return room ? room.roomName : selectedRoom?.name ?? ""
+          })()
+        : (() => {
+            const room = dmList.find((item) => item.id === numericRoomId)
+            return room ? room.opponentName : selectedRoom?.name ?? ""
+          })()
 
-    if (targetRoom) {
-      setSelectedRoom({
+    setSelectedRoom((prev) => {
+      if (prev && prev.id === numericRoomId && prev.type === targetType && prev.name === resolvedName) {
+        return prev
+      }
+
+      return {
         id: numericRoomId,
         type: targetType,
-        name: targetType === "GROUP" ? (targetRoom as GroupRoom).roomName : (targetRoom as Room).opponentName,
-      })
-    } else if (!selectedRoom) {
-      setSelectedRoom({
-        id: numericRoomId,
-        type: targetType,
-        name: "",
-      })
-    }
+        name: resolvedName,
+      }
+    })
 
     if (isMobile) {
       router.replace(`/messages/${numericRoomId}?type=${targetType}`)
     }
-  }, [searchParams, dmList, groupList, isMobile, selectedRoom, router])
+  }, [searchParamsString, dmList, groupList, isMobile, router, selectedRoom])
 
   return (
     <div className="min-h-screen lg:h-screen bg-background lg:overflow-hidden">
