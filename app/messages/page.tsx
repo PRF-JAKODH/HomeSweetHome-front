@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import apiClient from "@/lib/api"
 import { useAuthStore } from "@/stores/auth-store"
+import { MessageCircle } from "lucide-react"
+import { ChatRoomDetail, type RoomType } from "@/app/messages/chat-room-detail"
 
 // 타입 정의 수정 - 옵셔널 필드 명시
 type IndividualRoomListResponseDto = {
@@ -90,6 +92,9 @@ export default function MessagesPage() {
   const [groupList, setGroupList] = useState<GroupRoom[]>([])
   const [loadingDm, setLoadingDm] = useState(false)
   const [loadingGroup, setLoadingGroup] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedRoom, setSelectedRoom] = useState<{ id: number; type: RoomType; name: string } | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   /**
    * 내가 속한 개인 채팅방 목록 불러오기
@@ -146,6 +151,40 @@ export default function MessagesPage() {
 
     fetchMyIndividualRooms()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const filteredDmList = !normalizedQuery
+    ? dmList
+    : dmList.filter(
+        (dm) =>
+          dm.opponentName.toLowerCase().includes(normalizedQuery) ||
+          dm.lastMessage.toLowerCase().includes(normalizedQuery),
+      )
+
+  const filteredGroupList = !normalizedQuery
+    ? groupList
+    : groupList.filter(
+        (room) =>
+          room.roomName.toLowerCase().includes(normalizedQuery) ||
+          room.lastMessage.toLowerCase().includes(normalizedQuery),
+      )
+
+  const handleSelectRoom = (id: number, type: RoomType, name: string) => {
+    setSelectedRoom({ id, type, name })
+    if (isMobile) {
+      router.push(`/messages/${id}?type=${type}`)
+    }
+  }
 
   /**
    * 내가 속한 그룹 채팅방 목록 불러오기
@@ -206,143 +245,150 @@ export default function MessagesPage() {
       <div className="mx-auto max-w-[1256px] px-4 py-8">
         <h1 className="text-3xl font-bold mb-6">메시지</h1>
 
-        {/* 탭 (개인 / 채팅방 구분) */}
-        <div className="flex gap-4 mb-6 border-b border-divider">
-          <button
-            onClick={() => setActiveTab("dm")}
-            className={`pb-3 px-4 font-medium transition-colors relative ${
-              activeTab === "dm" ? "text-primary" : "text-text-secondary hover:text-foreground"
-            }`}
-          >
-            개인
-            {activeTab === "dm" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-          </button>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <div className="flex gap-4 border-b border-divider">
+              <button
+                onClick={() => setActiveTab("dm")}
+                className={`pb-3 px-4 font-medium transition-colors relative ${
+                  activeTab === "dm" ? "text-primary" : "text-text-secondary hover:text-foreground"
+                }`}
+              >
+                개인
+                {activeTab === "dm" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
+              </button>
 
-          <button
-            onClick={() => setActiveTab("chatroom")}
-            className={`pb-3 px-4 font-medium transition-colors relative ${
-              activeTab === "chatroom" ? "text-primary" : "text-text-secondary hover:text-foreground"
-            }`}
-          >
-            그룹
-            {activeTab === "chatroom" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-          </button>
-        </div>
+              <button
+                onClick={() => setActiveTab("chatroom")}
+                className={`pb-3 px-4 font-medium transition-colors relative ${
+                  activeTab === "chatroom" ? "text-primary" : "text-text-secondary hover:text-foreground"
+                }`}
+              >
+                그룹
+                {activeTab === "chatroom" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
+              </button>
+            </div>
 
-        {/* 검색창 */}
-        <div className="mb-6">
-          <Input
-            type="search"
-            placeholder={activeTab === "dm" ? "사용자 검색" : "채팅방 검색"}
-            className="max-w-md"
-          />
-        </div>
+            <Input
+              type="search"
+              placeholder={activeTab === "dm" ? "사용자 검색" : "채팅방 검색"}
+              className="w-full"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
 
-        {/* 개인 DM 목록 */}
-        {activeTab === "dm" && (
-          <div className="space-y-2">
-            {loadingDm ? (
-              <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
-            ) : dmList.length > 0 ? (
-              dmList.map((dm) => (
-                <div
-                  key={dm.id}
-                  onClick={() => {
-                    console.log("🚀 개인 채팅방 이동:", dm.id)
-                    router.push(`/messages/${dm.id}?type=INDIVIDUAL`)
-                  }}
-                  className="flex items-center gap-4 p-4 rounded-lg hover:bg-background-section cursor-pointer transition-colors"
-                >
-                  {/* 상대방 프로필 이미지 */}
-                  <img
-                    src={dm.opponentAvatar}
-                    alt={dm.opponentName}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
+            <div className="space-y-2">
+              {activeTab === "dm" ? (
+                loadingDm ? (
+                  <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
+                ) : filteredDmList.length > 0 ? (
+                  filteredDmList.map((dm) => {
+                    const isActive = selectedRoom?.id === dm.id && selectedRoom.type === "INDIVIDUAL"
+                    return (
+                      <div
+                        key={dm.id}
+                        onClick={() => handleSelectRoom(dm.id, "INDIVIDUAL", dm.opponentName)}
+                        className={`flex items-center gap-4 rounded-2xl border border-transparent p-4 transition-colors cursor-pointer ${
+                          isActive ? "border-primary/40 bg-primary/5" : "hover:bg-background-section"
+                        }`}
+                      >
+                        <img
+                          src={dm.opponentAvatar}
+                          alt={dm.opponentName}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      {/* 상대방 이름 */}
-                      <span className="font-medium text-foreground">{dm.opponentName}</span>
-
-                      <div className="flex items-center gap-2">
-                        {/* 마지막 메시지 시간 */}
-                        <span className="text-xs text-text-tertiary">{dm.time}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-foreground">{dm.opponentName}</span>
+                            <span className="text-xs text-text-tertiary">{dm.time}</span>
+                          </div>
+                          <p className="text-sm text-text-secondary truncate">{dm.lastMessage}</p>
+                        </div>
                       </div>
-                    </div>
-                    {/* 마지막 메시지 미리보기 */}
-                    <p className="text-sm text-text-secondary truncate">{dm.lastMessage}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-text-secondary">아직 참여 중인 1:1 대화가 없습니다.</p>
-            )}
-          </div>
-        )}
+                    )
+                  })
+                ) : (
+                  <p className="text-text-secondary">아직 참여 중인 1:1 대화가 없습니다.</p>
+                )
+              ) : loadingGroup ? (
+                <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
+              ) : filteredGroupList.length > 0 ? (
+                filteredGroupList.map((room) => {
+                  const isActive = selectedRoom?.id === room.id && selectedRoom.type === "GROUP"
+                  return (
+                    <div
+                      key={room.id}
+                      onClick={() => handleSelectRoom(room.id, "GROUP", room.roomName)}
+                      className={`flex items-center gap-4 rounded-2xl border border-transparent p-4 transition-colors cursor-pointer ${
+                        isActive ? "border-primary/40 bg-primary/5" : "hover:bg-background-section"
+                      }`}
+                    >
+                      <img
+                        src={room.thumbnail}
+                        alt={room.roomName}
+                        className="w-12 h-12 rounded-lg object-cover"
+                      />
 
-        {/* 그룹 채팅방 목록 */}
-        {activeTab === "chatroom" && (
-          <div className="space-y-2">
-            {loadingGroup ? (
-              <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
-            ) : groupList.length > 0 ? (
-              groupList.map((room) => (
-                <div
-                  key={room.id}
-                  onClick={() => {
-                    console.log("🚀 그룹 채팅방 이동:", room.id)
-                    router.push(`/messages/${room.id}?type=GROUP`)
-                  }}
-                  className="flex items-center gap-4 p-4 rounded-lg hover:bg-background-section cursor-pointer transition-colors"
-                >
-                  {/* 채팅방 썸네일 이미지 */}
-                  <img
-                    src={room.thumbnail}
-                    alt={room.roomName}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      {/* 채팅방 이름 */}
-                      <span className="font-medium text-foreground">{room.roomName}</span>
-
-                      <div className="flex items-center gap-2">
-                        {/* 안읽은 메시지 배지 */}
-                        {room.unread && room.unread > 0 && (
-                          <span className="h-6 w-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                            {room.unread}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-foreground">{room.roomName}</span>
+                          <div className="flex items-center gap-2">
+                            {room.unread && room.unread > 0 && (
+                              <span className="h-6 w-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
+                                {room.unread}
+                              </span>
+                            )}
+                            <span className="text-xs text-text-tertiary">{room.time}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-text-secondary truncate flex-1">{room.lastMessage}</p>
+                          <span className="text-xs text-text-tertiary whitespace-nowrap flex items-center gap-1">
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                              />
+                            </svg>
+                            {room.memberCount}명
                           </span>
-                        )}
-                        {/* 마지막 메시지 시간 */}
-                        <span className="text-xs text-text-tertiary">{room.time}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {/* 마지막 메시지 미리보기 */}
-                      <p className="text-sm text-text-secondary truncate flex-1">{room.lastMessage}</p>
-                      {/* 참여자 수 */}
-                      <span className="text-xs text-text-tertiary whitespace-nowrap flex items-center gap-1">
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                          />
-                        </svg>
-                        {room.memberCount}명
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
+                  )
+                })
+              ) : (
+                <p className="text-text-secondary">아직 참여 중인 그룹 채팅방이 없습니다.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="hidden lg:flex flex-col rounded-3xl border border-divider bg-background p-0 min-h-[720px] lg:min-h-0 overflow-hidden">
+            {selectedRoom ? (
+              <ChatRoomDetail
+                key={`${selectedRoom.type}-${selectedRoom.id}`}
+                roomId={selectedRoom.id}
+                initialRoomType={selectedRoom.type}
+                embedded
+                onClose={() => setSelectedRoom(null)}
+                className="h-full min-h-0"
+              />
             ) : (
-              <p className="text-text-secondary">아직 참여 중인 그룹 채팅방이 없습니다.</p>
+              <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground gap-3">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
+                  <MessageCircle className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">채팅을 선택해 주세요</h3>
+                <p className="text-sm text-text-secondary max-w-xs">
+                  왼쪽 목록에서 메시지를 선택하면 이 영역에서 대화를 바로 확인할 수 있습니다.
+                </p>
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
