@@ -46,6 +46,7 @@ type Message = {
   senderId: number
   content: string
   timestamp: string
+  sentAt: string
   isMe: boolean
   images?: string[]
   status?: "sending" | "sent" | "error"
@@ -65,6 +66,9 @@ export type PreMessageResponse = {
   messages: ChatMessageDto[]
   hasNext: boolean
 }
+
+const sortMessagesBySentAt = (msgs: Message[]) =>
+  [...msgs].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
 
 type ChatRoomDetailProps = {
   roomId: number
@@ -145,6 +149,7 @@ export function ChatRoomDetail({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const topSentinelRef = useRef<HTMLDivElement>(null)
   const isSubscribedRef = useRef(false)
 
   const user = useAuthStore((s) => s.user)
@@ -310,18 +315,17 @@ export function ChatRoomDetail({
 
       const { messages: newMessages, hasNext } = response.data
 
-      const parsedMessages = newMessages
-        .map((msg: ChatMessageDto) => ({
-          messageId: msg.messageId,
-          senderId: msg.senderId,
-          content: msg.content,
-          timestamp: formatTimestamp(msg.sentAt),
-          isMe: msg.senderId === myUserId,
-          status: "sent" as const,
-        }))
-        .reverse()
+      const parsedMessages = newMessages.map((msg: ChatMessageDto) => ({
+        messageId: msg.messageId,
+        senderId: msg.senderId,
+        content: msg.content,
+        timestamp: formatTimestamp(msg.sentAt),
+        sentAt: msg.sentAt,
+        isMe: msg.senderId === myUserId,
+        status: "sent" as const,
+      }))
 
-      setMessages(parsedMessages)
+      setMessages(sortMessagesBySentAt(parsedMessages))
       setHasMore(hasNext)
 
       setTimeout(() => scrollToBottom(), 100)
@@ -345,11 +349,12 @@ export function ChatRoomDetail({
         senderId: payload.senderId,
         content: payload.content,
         timestamp: formatTimestamp(payload.sentAt),
+        sentAt: payload.sentAt,
         isMe: false,
         status: "sent",
       }
 
-      setMessages((prev) => [...prev, newMessage])
+      setMessages((prev) => sortMessagesBySentAt([...prev, newMessage]))
       setTimeout(() => scrollToBottom(), 100)
     } catch (error) {
       console.error("❌ 메시지 파싱 실패:", error)
@@ -381,12 +386,13 @@ export function ChatRoomDetail({
       senderId: senderId,
       content: inputValue,
       timestamp: formatTimestamp(new Date().toISOString()),
+      sentAt: new Date().toISOString(),
       isMe: true,
       status: "sending",
       images: selectedImages.length > 0 ? selectedImages : undefined,
     }
 
-    setMessages((prev) => [...prev, tempMessage])
+    setMessages((prev) => sortMessagesBySentAt([...prev, tempMessage]))
 
     try {
       sendChatMessage("/pub/chat.send", {
@@ -421,11 +427,19 @@ export function ChatRoomDetail({
   }
 
   const fetchOlderMessages = async (lastMessageId: number) => {
-    if (loadingMore || !hasMore) return
+    if (loadingMore) {
+      console.log("⏳ 이전 메시지 로딩 중 - 중복 호출 방지")
+      return
+    }
+    if (!hasMore) {
+      console.log("🔚 hasMore=false - 추가 메시지 없음")
+      return
+    }
 
     setLoadingMore(true)
 
     try {
+      console.log("📤 이전 메시지 요청", { roomId, lastMessageId })
       const response = await apiClient.get(`/api/v1/chat/rooms/${roomId}/messages`, {
         params: { lastMessageId, size: 30 },
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -439,6 +453,7 @@ export function ChatRoomDetail({
         senderId: msg.senderId,
         content: msg.content,
         timestamp: formatTimestamp(msg.sentAt),
+        sentAt: msg.sentAt,
         isMe: msg.senderId === myUserId,
         status: "sent" as const,
       }))
@@ -446,7 +461,7 @@ export function ChatRoomDetail({
       const container = chatContainerRef.current
       const previousScrollHeight = container?.scrollHeight || 0
 
-      setMessages((prev) => [...parsedNewMessages.reverse(), ...prev])
+      setMessages((prev) => sortMessagesBySentAt([...parsedNewMessages, ...prev]))
       setHasMore(hasNext)
 
       setTimeout(() => {
@@ -455,6 +470,7 @@ export function ChatRoomDetail({
           container.scrollTop = newScrollHeight - previousScrollHeight
         }
       }, 0)
+      console.log("✅ 이전 메시지 로드 완료", { fetched: parsedNewMessages.length, hasNext })
     } catch (error) {
       console.error("❌ 이전 메시지 불러오기 실패:", error)
     } finally {
@@ -508,18 +524,26 @@ export function ChatRoomDetail({
 
   useEffect(() => {
     const container = chatContainerRef.current
-    if (!container) return
+    const sentinel = topSentinelRef.current
+    if (!container || !sentinel || !hasMore) return
 
-    const handleScroll = async () => {
-      if (container.scrollTop < 50 && hasMore && !loadingMore) {
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        const [entry] = entries
+        if (!entry || !entry.isIntersecting || loadingMore) return
         const firstMessageId = messages[0]?.messageId
         if (!firstMessageId) return
         await fetchOlderMessages(firstMessageId)
-      }
-    }
+      },
+      {
+        root: container,
+        threshold: 0,
+        rootMargin: "50px 0px 0px 0px",
+      },
+    )
 
-    container.addEventListener("scroll", handleScroll)
-    return () => container.removeEventListener("scroll", handleScroll)
+    observer.observe(sentinel)
+    return () => observer.disconnect()
   }, [messages, loadingMore, hasMore])
 
   if (loading) {
@@ -712,6 +736,7 @@ export function ChatRoomDetail({
       )}
 
       <main ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4">
+        <div ref={topSentinelRef} className="h-1" aria-hidden />
         {messages.map((message) => (
           <div key={message.messageId} className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}>
             <div className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"}`}>

@@ -241,11 +241,11 @@ export default function MessagesPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-[1256px] px-4 py-8">
+    <div className="min-h-screen lg:h-screen bg-background lg:overflow-hidden">
+      <div className="mx-auto flex h-full max-w-[1256px] flex-col px-4 py-8 lg:py-10 lg:pb-12 lg:pt-10">
         <h1 className="text-3xl font-bold mb-6">메시지</h1>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
           <div className="space-y-6">
             <div className="flex gap-4 border-b border-divider">
               <button
@@ -366,7 +366,7 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-col rounded-3xl border border-divider bg-background p-0 min-h-[720px] lg:min-h-0 overflow-hidden">
+          <div className="hidden lg:flex flex-col h-full min-h-0 rounded-3xl border border-divider bg-background p-0 overflow-hidden">
             {selectedRoom ? (
               <ChatRoomDetail
                 key={`${selectedRoom.type}-${selectedRoom.id}`}

@@ -1,15 +1,19 @@
 "use client"
 
+import React from "react"
 import { ChatRoomDetail, type RoomType } from "@/app/messages/chat-room-detail"
 
 type PageProps = {
-  params: { roomId: string }
-  searchParams: { type?: string }
+  params: Promise<{ roomId: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 export default function MessagesRoomPage({ params, searchParams }: PageProps) {
-  const roomId = Number(params.roomId)
-  const initialRoomType = (searchParams?.type as RoomType | undefined) ?? null
+  const resolvedParams = React.use(params)
+  const resolvedSearchParams = React.use(searchParams)
+
+  const roomId = Number(resolvedParams.roomId)
+  const initialRoomType = (resolvedSearchParams?.type as RoomType | undefined) ?? null
 
   if (Number.isNaN(roomId)) {
     return (
@@ -20,8 +24,14 @@ export default function MessagesRoomPage({ params, searchParams }: PageProps) {
   }
 
   return (
-    <div className="flex flex-col h-[90vh] min-h-0 bg-background max-w-[1256px] mx-auto rounded-3xl border border-divider overflow-hidden">
-      <ChatRoomDetail roomId={roomId} initialRoomType={initialRoomType} className="h-full min-h-0" />
+    <div className="h-screen bg-background overflow-hidden">
+      <div className="mx-auto flex h-full max-w-[1256px] px-4 py-6">
+        <ChatRoomDetail
+          roomId={roomId}
+          initialRoomType={initialRoomType}
+          className="flex-1 min-h-0 rounded-3xl border border-divider overflow-hidden"
+        />
+      </div>
     </div>
   )
 }
