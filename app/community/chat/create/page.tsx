@@ -16,6 +16,7 @@ export interface CreateGroupRoomRequest {
   ownerId: number
   roomName: string
   roomThumbnailUrl?: File | null // ✅ 선택값으로 변경
+  roomType: string // GROUP
 }
 
 // Response DTO
@@ -87,6 +88,7 @@ export default function CreateChatRoomPage() {
       const formData = new FormData()
       formData.append("ownerId", String(user.id))
       formData.append("roomName", roomName.trim())
+      formData.append("roomType", "GROUP") // 그룹 채팅방 타입 명시
       if (thumbnailFile) {
         formData.append("roomThumbnailUrl", thumbnailFile) // ✅ 선택적으로만 추가
       }
@@ -106,7 +108,8 @@ export default function CreateChatRoomPage() {
           : "새로운 채팅방이 생성되었습니다.",
       })
 
-      router.push(`/messages/${roomId}`)
+      // 메시지 페이지로 이동하여 그룹 채팅방 조회
+      router.push(`/messages?roomId=${roomId}&type=GROUP`)
     } catch (error: any) {
       console.error("❌ 채팅방 생성 실패:", error)
       toast({

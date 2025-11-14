@@ -65,8 +65,8 @@ const sortOptions: SortOption[] = [
 ]
 
 const categories = [
-  { id: "shopping-talk", name: "쇼핑수다", image: "/shopping-talk-icon-new.png" },
-  { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
+  { id: "shopping-talk", name: "쇼핑수다", image: "/assorted-home-goods.png" },
+  { id: "chat-rooms", name: "오늘의채팅방", image: "/nordic-style-chat.jpg" },
 ]
 
 const mapPostToUI = (post: CommunityPost) => ({
@@ -185,37 +185,44 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             <h2 className="mb-6 text-2xl font-bold text-foreground">커뮤니티</h2>
 
-            {/* Horizontal Scrollable Categories */}
-            <div className="relative">
-              <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
-                {categories.map((category) => {
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedTab(category.id)}
-                      className={`group flex flex-col items-center gap-3 flex-shrink-0 transition-all ${selectedTab === category.id ? "opacity-100" : "opacity-60 hover:opacity-80"
-                        }`}
-                    >
-                      <div
-                        className={`flex h-24 w-24 items-center justify-center rounded-full bg-background-section transition-all ${selectedTab === category.id ? "ring-2 ring-primary" : ""
-                          }`}
-                      >
+            <div className="grid gap-4 md:grid-cols-2">
+              {categories.map((category) => {
+                const isSelected = selectedTab === category.id
+
+                return (
+                  <button
+                    type="button"
+                    key={category.id}
+                    onClick={() => setSelectedTab(category.id)}
+                    className={`group relative flex items-center gap-6 rounded-3xl p-6 text-left transition-all duration-200 ${
+                      isSelected
+                        ? "bg-white/90 border border-white/60 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] md:hover:-translate-y-1"
+                        : "bg-white/60 border border-black/5 hover:bg-white/80 hover:shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] md:hover:-translate-y-1"
+                    } backdrop-blur-sm`}
+                  >
+                    <div className="relative h-20 w-20 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-300 shadow-inner">
                         <img
                           src={category.image || "/placeholder.svg"}
-                          alt={category.name}
-                          className="h-16 w-16 object-contain transition-transform group-hover:scale-110"
-                        />
-                      </div>
-                      <span
-                        className={`text-sm font-medium transition-colors ${selectedTab === category.id ? "text-primary" : "text-foreground"
-                          }`}
-                      >
+                        alt={category.name}
+                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                        Homesweethome Community
+                      </span>
+                      <span className="text-xl font-bold text-foreground">
                         {category.name}
                       </span>
-                    </button>
-                  )
-                })}
-              </div>
+                      <p className="text-sm text-muted-foreground">
+                        {category.id === "shopping-talk"
+                          ? "가구·인테리어 쇼핑 정보를 나누고 이야기하는 공간"
+                          : "주제별 채팅방에 참여해 실시간으로 소통해보세요"}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -225,12 +232,7 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             {selectedTab === "shopping-talk" && (
               <div>
-                {/* Header with write button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">쇼핑수다</h3>
-                    <p className="mt-1 text-sm text-text-secondary">가구, 인테리어 쇼핑 정보를 나누는 공간</p>
-                  </div>
+                <div className="mb-6 flex justify-end">
                   <a href="/community/shopping-talk/create">
                     <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
                   </a>
@@ -389,12 +391,7 @@ export default function CommunityPage() {
 
             {selectedTab === "chat-rooms" && (
               <div>
-                {/* Header with create button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">오늘의채팅방</h3>
-                    <p className="mt-1 text-sm text-text-secondary">관심사가 같은 사람들과 실시간으로 소통하세요</p>
-                  </div>
+                <div className="mb-6 flex justify-end">
                   <a href="/community/chat/create">
                     <Button className="bg-primary hover:bg-primary/90">채팅방 만들기</Button>
                   </a>
@@ -415,7 +412,7 @@ export default function CommunityPage() {
                     {chatRooms.map((room) => (
                       <a
                         key={room.id}
-                        href={`/messages/${room.id}`}
+                        href={`/messages?roomId=${room.id}&type=GROUP`}
                         className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
                       >
                         <div className="aspect-video overflow-hidden bg-background-section">

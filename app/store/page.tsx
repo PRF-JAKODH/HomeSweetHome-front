@@ -1,15 +1,28 @@
 "use client"
 
+import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect, useRef } from "react"
-import { ChevronRight } from "lucide-react"
+import { useState, useEffect, useRef, useMemo, type CSSProperties } from "react"
+import { ArrowDown, ArrowUp, Check, ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
 import { Category } from "@/types/api/category"
-import { ProductSortType } from "@/types/api/product"
+import { ProductSortType, RangeFilter as ApiRangeFilter, RecentViewPreviewResponse } from "@/types/api/product"
 import { useSearchParams, useRouter } from "next/navigation" // useRouter 추가
-
+import MultiSelectFilterDropdown from "@/components/store/filters/multi-select-filter"
+import RangeGroupFilterDropdown from "@/components/store/filters/range-group-filter"
+import {
+  storeFilterConfig,
+  FilterConfig,
+  MultiSelectFilterConfig,
+  RangeGroupFilterConfig,
+  RangeValue,
+} from "./filter-config"
+import { useStoreFilters } from "@/lib/hooks/use-store-filters"
+import { deleteRecentViewItem, getRecentViews } from "@/lib/api/products"
+import { useAuthStore } from "@/stores/auth-store"
+import { CategoryHero } from "@/components/store/category-hero"
 
 export default function StorePage() {
   const searchParams = useSearchParams()
@@ -22,6 +35,9 @@ export default function StorePage() {
   const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
+  const [recentViews, setRecentViews] = useState<RecentViewPreviewResponse[]>([])
+  const [carouselIndex, setCarouselIndex] = useState(0)
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   
   // 무한 스크롤을 위한 observer ref
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -70,21 +86,144 @@ export default function StorePage() {
   const subSubCategoryParentId = selectedSubCategory && subCategories.length > 0 ? selectedSubCategory : 0
   const { data: subSubCategories = [], isLoading: subSubCategoriesLoading } = useCategoriesByParent(subSubCategoryParentId)
 
+  const selectedCategory = topCategories.find((cat) => cat.id === selectedMainCategory)
+  const selectedSubCategoryData = subCategories.find((cat) => cat.id === selectedSubCategory)
+  const selectedSubSubCategoryData = subSubCategories.find((cat) => cat.id === selectedSubSubCategory)
+  const categoryNameTrail = [
+    selectedCategory?.name,
+    selectedSubCategoryData?.name,
+    selectedSubSubCategoryData?.name,
+  ].filter((name): name is string => Boolean(name))
+
   // 상품 조회 (무한 스크롤)
   const currentCategoryId = selectedSubSubCategory || selectedSubCategory || selectedMainCategory
   
-  const { 
-    products, 
-    isLoading: productsLoading, 
-    isLoadingMore, 
-    hasNext, 
-    error: productsError, 
-    loadMore 
-  } = useInfiniteProductPreviews(currentCategoryId || undefined, sortType, 12, searchKeyword)
+  const filtersToRender = useMemo<FilterConfig[]>(() => {
+    const categoryFilters = storeFilterConfig.categoryFilters.flatMap((group) =>
+      group.matchAny.some((name) => categoryNameTrail.includes(name)) ? group.filters : []
+    )
+    return [...storeFilterConfig.baseFilters, ...categoryFilters]
+  }, [categoryNameTrail])
+
+  const {
+    selectedOptions,
+    selectedRanges,
+    optionFilters,
+    rangeFilters,
+    toggleOption,
+    clearOption,
+    setRangeValues,
+    clearRange,
+  } = useStoreFilters(filtersToRender)
+
+  const optionConfigMap = useMemo(() => {
+    const map = new Map<string, MultiSelectFilterConfig>()
+    filtersToRender.forEach((filter) => {
+      if (filter.type === "multi-select" || filter.type === "color") {
+        map.set(filter.optionKey, filter)
+      }
+    })
+    return map
+  }, [filtersToRender])
+
+  const rangeConfigMap = useMemo(() => {
+    const map = new Map<string, { label: string; unit?: string }>()
+    filtersToRender.forEach((filter) => {
+      if (filter.type === "range-group") {
+        filter.ranges.forEach((range) => {
+          map.set(range.rangeKey, { label: range.label, unit: range.unit })
+        })
+      }
+    })
+    return map
+  }, [filtersToRender])
+
+  const selectedChips = useMemo(
+    () =>
+      [
+        ...Array.from(optionConfigMap.entries()).flatMap(([optionKey, config]) => {
+          const values = selectedOptions[optionKey] ?? []
+          return values.map((value) => ({
+            id: `${optionKey}-${value}`,
+            label: `${config.label}: ${value}`,
+            onRemove: () => toggleOption(optionKey, value),
+          }))
+        }),
+        ...Array.from(rangeConfigMap.entries())
+          .map(([rangeKey, config]) => {
+            const value = selectedRanges[rangeKey]
+            if (!value || (value.min === undefined && value.max === undefined)) {
+              return null
+            }
+
+            return {
+              id: `range-${rangeKey}`,
+              label: `${config.label}: ${value.min ?? "-"}${config.unit ?? ""} ~ ${value.max ?? "-"}${config.unit ?? ""}`,
+              onRemove: () => clearRange(rangeKey),
+            }
+          })
+          .filter(Boolean) as { id: string; label: string; onRemove: () => void }[],
+      ],
+    [optionConfigMap, selectedOptions, toggleOption, rangeConfigMap, selectedRanges, clearRange]
+  )
+
+  const apiRangeFilters = useMemo(() => {
+    if (!rangeFilters) return undefined
+    return Object.entries(rangeFilters).reduce<Record<string, ApiRangeFilter>>((acc, [key, value]) => {
+      acc[key] = {
+        minValue: value.min,
+        maxValue: value.max,
+      }
+      return acc
+    }, {})
+  }, [rangeFilters])
+
+  const {
+    products,
+    isLoading: productsLoading,
+    isLoadingMore,
+    hasNext,
+    error: productsError,
+    loadMore,
+  } = useInfiniteProductPreviews(
+    currentCategoryId || undefined,
+    sortType,
+    12,
+    searchKeyword,
+    optionFilters,
+    apiRangeFilters,
+  )
 
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRecentViews([])
+      return
+    }
+
+    let active = true
+    ;(async () => {
+      try {
+        const views = await getRecentViews()
+        if (active) {
+          setRecentViews(Array.isArray(views) ? views.slice(0, 10) : [])
+          setCarouselIndex(0)
+        }
+      } catch (error) {
+        console.error("최근 본 상품을 불러오지 못했습니다.", error)
+        if (active) {
+          setRecentViews([])
+        }
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [isAuthenticated])
 
   // URL 파라미터로 카테고리 설정
   useEffect(() => {
@@ -112,11 +251,13 @@ export default function StorePage() {
     }
   }, [])
 
-  // 드롭다운 외부 클릭 시 닫기
+  // 정렬 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
+    if (!showSortOptions) return
+
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element
-      if (showSortOptions && !target.closest('.sort-dropdown')) {
+      if (!target.closest('.sort-dropdown')) {
         setShowSortOptions(false)
       }
     }
@@ -198,17 +339,55 @@ export default function StorePage() {
     setExpandedCategories(newExpanded)
   }
 
-  const selectedCategory = topCategories.find(cat => cat.id === selectedMainCategory)
-  const selectedSubCategoryData = subCategories.find(cat => cat.id === selectedSubCategory)
-  const selectedSubSubCategoryData = subSubCategories.find(cat => cat.id === selectedSubSubCategory)
-  
-  const categoryPath = [
-    selectedCategory?.name,
-    selectedSubCategoryData?.name,
-    selectedSubSubCategoryData?.name,
-  ]
-    .filter(Boolean)
-    .join(" > ")
+  const categoryPath = categoryNameTrail.join(" > ")
+  const heroCategoryName =
+    selectedCategory?.name ??
+    selectedSubCategoryData?.name ??
+    "전체"
+  const hasCategorySelection =
+    selectedMainCategory !== null || selectedSubCategory !== null || selectedSubSubCategory !== null
+
+  const recentViewPages = useMemo(() => {
+    const chunkSize = 5
+    const pages: RecentViewPreviewResponse[][] = []
+    for (let i = 0; i < recentViews.length; i += chunkSize) {
+      pages.push(recentViews.slice(i, i + chunkSize))
+    }
+    return pages
+  }, [recentViews])
+
+  const recentViewTotalPages = recentViewPages.length || 1
+
+  const glassHighlightStyle: CSSProperties = {
+    background: "rgba(255, 255, 255, 0.25)",
+    border: "1px solid rgba(255, 255, 255, 0.4)",
+    boxShadow:
+      "0 30px 60px -30px rgba(15, 23, 42, 0.45), 0 18px 30px -24px rgba(15, 23, 42, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.55)",
+    backdropFilter: "blur(40px) saturate(250%)",
+    WebkitBackdropFilter: "blur(40px) saturate(250%)",
+    color: "#0f172a",
+  }
+
+  const glassHighlightHoverClass =
+    "transform-gpu transition-transform duration-200 hover:-translate-y-0.5"
+
+  useEffect(() => {
+    setCarouselIndex((prev) => Math.min(prev, Math.max(recentViewTotalPages - 1, 0)))
+  }, [recentViewTotalPages])
+
+  const handleRecentViewRemove = async (id: number) => {
+    try {
+      await deleteRecentViewItem(id)
+      setRecentViews((prev) => {
+        const next = prev.filter((item) => item.id !== id)
+        const nextPageCount = Math.ceil(next.length / 5) || 1
+        setCarouselIndex((current) => Math.min(current, Math.max(nextPageCount - 1, 0)))
+        return next
+      })
+    } catch (error) {
+      console.error("최근 본 상품을 삭제하지 못했습니다.", error)
+    }
+  }
 
   // 클라이언트 사이드에서만 렌더링
   if (!isClient) {
@@ -251,17 +430,27 @@ export default function StorePage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 py-6">
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
-              <div className="space-y-2">
+              <div className="glass-sidebar relative overflow-hidden rounded-3xl p-4">
+                <div className="glass-sidebar-bg" />
+                <div className="relative space-y-2">
                 {/* 전체 카테고리 버튼 */}
                 <button
                   onClick={handleAllCategoriesClick}
-                  className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
+                  style={selectedMainCategory === null ? glassHighlightStyle : undefined}
+                  className={`relative w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
                     selectedMainCategory === null
-                      ? "bg-primary text-white"
-                      : "bg-background text-foreground hover:bg-background-section"
+                      ? `${glassHighlightHoverClass} text-slate-900`
+                      : "bg-background text-foreground hover:bg-muted"
                   }`}
                 >
                   <span>전체</span>
+                  {selectedMainCategory === null && (
+                    <>
+                      <span className="glass-orb glass-orb-1" />
+                      <span className="glass-orb glass-orb-2" />
+                      <span className="glass-orb glass-orb-3" />
+                    </>
+                  )}
                 </button>
 
                 {/* 상위 카테고리 목록 */}
@@ -276,10 +465,13 @@ export default function StorePage() {
                           handleMainCategoryChange(category.id)
                           toggleCategory(category.id)
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
+                        style={
+                          selectedMainCategory === category.id ? glassHighlightStyle : undefined
+                        }
+                        className={`relative w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
                           selectedMainCategory === category.id
-                            ? "bg-primary text-white"
-                            : "bg-background text-foreground hover:bg-background-section"
+                            ? `${glassHighlightHoverClass} text-slate-900`
+                            : "bg-background text-foreground hover:bg-muted"
                         }`}
                       >
                         <span>{category.name}</span>
@@ -288,6 +480,13 @@ export default function StorePage() {
                             isExpanded ? "rotate-90" : ""
                           }`}
                         />
+                        {selectedMainCategory === category.id && (
+                          <>
+                            <span className="glass-orb glass-orb-1" />
+                            <span className="glass-orb glass-orb-2" />
+                            <span className="glass-orb glass-orb-3" />
+                          </>
+                        )}
                       </button>
 
                       {/* 하위 카테고리 (토글) */}
@@ -307,10 +506,15 @@ export default function StorePage() {
                                       handleSubCategoryChange(subCategory.id)
                                       toggleCategory(subCategory.id)
                                     }}
-                                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
+                                    style={
                                       selectedSubCategory === subCategory.id
-                                        ? "bg-primary/20 text-primary"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-background-section"
+                                        ? glassHighlightStyle
+                                        : undefined
+                                    }
+                                    className={`relative w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
+                                      selectedSubCategory === subCategory.id
+                                        ? `${glassHighlightHoverClass} text-slate-900`
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                     }`}
                                   >
                                     <span>{subCategory.name}</span>
@@ -319,6 +523,13 @@ export default function StorePage() {
                                         isSubExpanded ? "rotate-90" : ""
                                       }`}
                                     />
+                                    {selectedSubCategory === subCategory.id && (
+                                      <>
+                                        <span className="glass-orb glass-orb-sub-1" />
+                                        <span className="glass-orb glass-orb-sub-2" />
+                                        <span className="glass-orb glass-orb-sub-3" />
+                                      </>
+                                    )}
                                   </button>
 
                                   {/* 하위의 하위 카테고리 (3레벨) */}
@@ -333,13 +544,25 @@ export default function StorePage() {
                                           <button
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
-                                            className={`w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
+                                            style={
                                               selectedSubSubCategory === subSubCategory.id
-                                                ? "bg-primary/20 text-primary"
-                                                : "text-muted-foreground hover:text-foreground hover:bg-background-section"
+                                                ? glassHighlightStyle
+                                                : undefined
+                                            }
+                                            className={`relative w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
+                                              selectedSubSubCategory === subSubCategory.id
+                                                ? `${glassHighlightHoverClass} text-slate-900`
+                                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                             }`}
                                           >
                                             {subSubCategory.name}
+                                            {selectedSubSubCategory === subSubCategory.id && (
+                                              <>
+                                                <span className="glass-orb glass-orb-xs-1" />
+                                                <span className="glass-orb glass-orb-xs-2" />
+                                                <span className="glass-orb glass-orb-xs-3" />
+                                              </>
+                                            )}
                                           </button>
                                         ))
                                       ) : null}
@@ -354,18 +577,143 @@ export default function StorePage() {
                     </div>
                   )
                 })}
+                </div>
               </div>
             </div>
 
             {/* 오른쪽 - 상품 영역 */}
             <div className="lg:col-span-4">
-              <div className="mb-8 flex items-center justify-between">
+              {searchKeyword ? (
+                <CategoryHero categoryName={heroCategoryName} />
+              ) : hasCategorySelection ? (
+                <CategoryHero categoryName={heroCategoryName} />
+              ) : (
+                <CategoryHero variant="search" />
+              )}
+              {isAuthenticated && recentViews.length > 0 ? (
+                <section className="mb-10 space-y-4">
+                  <header className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-foreground">최근 본 상품</h3>
+                    <div className="hidden items-center gap-2 md:flex">
+                      <button
+                        type="button"
+                        onClick={() => setCarouselIndex((prev) => Math.max(prev - 1, 0))}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                        disabled={carouselIndex === 0}
+                        aria-label="최근 본 상품 이전"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCarouselIndex((prev) =>
+                            prev >= Math.max(recentViewTotalPages - 1, 0) ? prev : prev + 1
+                          )
+                        }
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                        disabled={carouselIndex >= Math.max(recentViewTotalPages - 1, 0)}
+                        aria-label="최근 본 상품 다음"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  </header>
+                  <div className="overflow-hidden">
+                    <div
+                      className="flex transition-transform duration-300 ease-in-out"
+                      style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+                    >
+                      {recentViewPages.map((page, pageIndex) => (
+                        <div
+                          key={`recent-page-${pageIndex}`}
+                          className="flex w-full min-w-full justify-start gap-4"
+                        >
+                          <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            {page.map((item) => (
+                              <div
+                                key={item.id}
+                                className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                              >
+                                <button
+                                  onClick={() => router.push(`/store/products/${item.id}`)}
+                                  className="flex flex-1 flex-col"
+                                >
+                                  <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                                    <img
+                                      src={item.imageUrl || "/placeholder.svg"}
+                                      alt={item.name}
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                    />
+                                  </div>
+                                  <div className="flex flex-1 flex-col gap-1 px-3 py-3 text-left">
+                                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.name}</p>
+                                    <div className="space-y-1">
+                                      {typeof item.discountRate === "number" && item.discountRate > 0 && (
+                                        <span className="text-xs font-semibold text-primary">{item.discountRate}%</span>
+                                      )}
+                                      <p className="text-base font-bold text-gray-900">
+                                        {typeof item.discountedPrice === "number"
+                                          ? `${item.discountedPrice.toLocaleString()}원`
+                                          : typeof item.basePrice === "number"
+                                            ? `${item.basePrice.toLocaleString()}원`
+                                            : "가격 정보 없음"}
+                                      </p>
+                                      {typeof item.discountRate === "number" &&
+                                        item.discountRate > 0 &&
+                                        typeof item.basePrice === "number" && (
+                                          <p className="text-xs text-muted-foreground line-through">
+                                            {item.basePrice.toLocaleString()}원
+                                          </p>
+                                        )}
+                                    </div>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRecentViewRemove(item.id)}
+                                  className="absolute right-2 top-2 hidden h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white text-sm transition hover:bg-black group-hover:flex"
+                                  aria-label="최근 본 상품에서 제거"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 md:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setCarouselIndex((prev) => Math.max(prev - 1, 0))}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                      disabled={carouselIndex === 0}
+                      aria-label="최근 본 상품 이전"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCarouselIndex((prev) =>
+                          prev >= Math.max(recentViewTotalPages - 1, 0) ? prev : prev + 1
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                      disabled={carouselIndex >= Math.max(recentViewTotalPages - 1, 0)}
+                      aria-label="최근 본 상품 다음"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+              <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-semibold text-foreground">
-                    {searchKeyword 
-                      ? `"${searchKeyword}" 검색 결과` 
-                      : categoryPath ? `${categoryPath} 상품` : '전체'
-                    }
+                    {searchKeyword ? `"${searchKeyword}" 검색 결과` : categoryPath ? `${categoryPath} 상품` : '전체'}
                   </h2>
                   {searchKeyword && (
                     <button
@@ -376,73 +724,135 @@ export default function StorePage() {
                     </button>
                   )}
                 </div>
-                <div className="relative sort-dropdown">
-                  <Button 
-                    variant="outline" 
-                    size="default" 
-                    className="text-base flex items-center gap-2 text-gray-700 hover:bg-gray-50"
-                    onClick={toggleSortOptions}
-                  >
-                    {getSortTypeLabel(sortType)}
-                    <svg className={`w-4 h-4 transition-transform ${showSortOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </Button>
-                  
-                  {showSortOptions && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                      <div className="p-2">
-                        <div className="grid grid-cols-1 gap-2">
+                <div className="flex flex-wrap gap-3 md:ml-auto md:items-center">
+                  {filtersToRender.map((filter) => {
+                    if (filter.type === "range-group") {
+                      const rangeFilter = filter as RangeGroupFilterConfig
+                      const groupSelected = rangeFilter.ranges.reduce<Record<string, RangeValue | undefined>>(
+                        (acc, range) => {
+                          acc[range.rangeKey] = selectedRanges[range.rangeKey]
+                          return acc
+                        },
+                        {}
+                      )
+
+                      return (
+                        <RangeGroupFilterDropdown
+                          key={filter.id}
+                          config={rangeFilter}
+                          selectedRanges={groupSelected}
+                          onApplyRange={(rangeKey, values) => setRangeValues(rangeKey, values)}
+                          onClearRange={(rangeKey) => clearRange(rangeKey)}
+                          onClearGroup={() => rangeFilter.ranges.forEach((range) => clearRange(range.rangeKey))}
+                        />
+                      )
+                    }
+
+                    const multiFilter = filter as MultiSelectFilterConfig
+                    const values = selectedOptions[multiFilter.optionKey] ?? []
+
+                    return (
+                      <MultiSelectFilterDropdown
+                        key={filter.id}
+                        config={multiFilter}
+                        selectedValues={values}
+                        onOptionToggle={(value) => toggleOption(multiFilter.optionKey, value)}
+                        onClear={() => clearOption(multiFilter.optionKey)}
+                      />
+                    )
+                  })}
+
+                  <div className="relative sort-dropdown">
+                    <Button
+                      variant="ghost"
+                      size="default"
+                      className={`flex items-center gap-2 rounded-full bg-transparent px-2 py-1 text-sm font-medium transition-colors ${
+                        showSortOptions ? "text-gray-900" : "text-gray-700 hover:text-gray-900"
+                      }`}
+                      onClick={toggleSortOptions}
+                    >
+                      {getSortTypeLabel(sortType)}
+                      <span className="flex flex-col leading-none">
+                        <ArrowUp className="h-4 w-4 -mb-1 text-gray-800" />
+                        <ArrowDown className="h-4 w-4 text-gray-400" />
+                      </span>
+                    </Button>
+
+                    {showSortOptions && (
+                      <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+                        <div className="py-1">
                           <button
-                            onClick={() => handleSortTypeChange('POPULAR')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'POPULAR' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
+                            onClick={() => handleSortTypeChange("POPULAR")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "POPULAR"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'POPULAR' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
                             리뷰순
+                            {sortType === "POPULAR" && <Check className="h-4 w-4" />}
                           </button>
                           <button
-                            onClick={() => handleSortTypeChange('LATEST')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'LATEST' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
+                            onClick={() => handleSortTypeChange("LATEST")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "LATEST"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'LATEST' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
                             최신순
+                            {sortType === "LATEST" && <Check className="h-4 w-4" />}
                           </button>
                           <button
-                            onClick={() => handleSortTypeChange('PRICE_LOW')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'PRICE_LOW' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
+                            onClick={() => handleSortTypeChange("PRICE_LOW")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "PRICE_LOW"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'PRICE_LOW' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
                             낮은가격순
+                            {sortType === "PRICE_LOW" && <Check className="h-4 w-4" />}
                           </button>
                           <button
-                            onClick={() => handleSortTypeChange('PRICE_HIGH')}
-                            className={`flex items-center gap-2 p-2 rounded text-sm hover:bg-sky-100 ${
-                              sortType === 'PRICE_HIGH' ? 'bg-sky-50 text-sky-600' : 'text-gray-700'
+                            onClick={() => handleSortTypeChange("PRICE_HIGH")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "PRICE_HIGH"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              sortType === 'PRICE_HIGH' ? 'border-sky-600 bg-sky-600' : 'border-gray-300'
-                            }`}></div>
                             높은가격순
+                            {sortType === "PRICE_HIGH" && <Check className="h-4 w-4" />}
                           </button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {selectedChips.length > 0 && (
+                <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                  <span className="font-medium text-primary">선택한 옵션</span>
+                  {selectedChips.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-foreground shadow"
+                    >
+                      {chip.label}
+                      <button
+                        type="button"
+                        className="text-xs text-text-secondary hover:text-destructive"
+                        onClick={chip.onRemove}
+                        aria-label={`${chip.label} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Product Grid */}
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-3 md:gap-6 auto-rows-fr">
@@ -521,6 +931,125 @@ export default function StorePage() {
           </svg>
         </button>
       )}
+      <style jsx>{`
+        .glass-orb {
+          position: absolute;
+          border-radius: 9999px;
+          pointer-events: none;
+          background: rgba(255, 255, 255, 0.32);
+          mix-blend-mode: screen;
+          opacity: 0.9;
+          filter: blur(0);
+        }
+
+        .glass-orb-1 {
+          width: 48px;
+          height: 48px;
+          top: -16px;
+          right: -14px;
+          animation: glassOrbFloat 8s ease-in-out infinite;
+        }
+
+        .glass-orb-2 {
+          width: 34px;
+          height: 34px;
+          bottom: -14px;
+          left: 55%;
+          animation: glassOrbFloatReverse 9s ease-in-out infinite;
+        }
+
+        .glass-orb-3 {
+          width: 26px;
+          height: 26px;
+          top: 38%;
+          left: -12px;
+          animation: glassOrbFloatAlt 7s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-1 {
+          width: 36px;
+          height: 36px;
+          top: -12px;
+          right: -10px;
+          animation: glassOrbFloat 7.5s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-2 {
+          width: 26px;
+          height: 26px;
+          bottom: -10px;
+          left: 60%;
+          animation: glassOrbFloatReverse 8.5s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-3 {
+          width: 20px;
+          height: 20px;
+          top: 35%;
+          left: -10px;
+          animation: glassOrbFloatAlt 6.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-1 {
+          width: 26px;
+          height: 26px;
+          top: -10px;
+          right: -8px;
+          animation: glassOrbFloat 6.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-2 {
+          width: 18px;
+          height: 18px;
+          bottom: -8px;
+          left: 58%;
+          animation: glassOrbFloatReverse 7.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-3 {
+          width: 14px;
+          height: 14px;
+          top: 32%;
+          left: -6px;
+          animation: glassOrbFloatAlt 6s ease-in-out infinite;
+        }
+
+        @keyframes glassOrbFloat {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(6px, -8px, 0) scale(1.05);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+
+        @keyframes glassOrbFloatReverse {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(-5px, 7px, 0) scale(0.95);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+
+        @keyframes glassOrbFloatAlt {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(4px, -6px, 0) scale(1.08);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+      `}</style>
     </div>
   )
 }

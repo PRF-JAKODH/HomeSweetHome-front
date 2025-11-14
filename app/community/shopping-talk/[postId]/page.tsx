@@ -12,10 +12,10 @@ import apiClient from "@/lib/api"
 
 
 const categoryColors: Record<string, string> = {
-  추천: "bg-primary/10 text-primary",
-  질문: "bg-accent/10 text-accent",
-  정보: "bg-green-500/10 text-green-600",
-  후기: "bg-purple-500/10 text-purple-600",
+  추천: "bg-blue-600/15 text-blue-700 border border-blue-600/30",
+  질문: "bg-orange-500/15 text-orange-700 border border-orange-500/30",
+  정보: "bg-emerald-600/15 text-emerald-700 border border-emerald-600/30",
+  후기: "bg-violet-600/15 text-violet-700 border border-violet-600/30",
 }
 
 
@@ -45,6 +45,7 @@ export default function ShoppingTalkDetailPage() {
 
   // ✅ 현재 로그인한 사용자 (JWT에서 추출)
   const accessToken = useAuthStore((state) => state.accessToken)
+  const currentUser = useAuthStore((state) => state.user)
   const currentUserId = accessToken ? Number(parseJwt(accessToken)?.sub) : null
 
   const [commentText, setCommentText] = useState("")
@@ -165,6 +166,15 @@ export default function ShoppingTalkDetailPage() {
   })
 
   // ✅ API 데이터를 기존 UI 형식으로 변환
+  const placeholderProfile = "/placeholder-user.jpg"
+
+  const getProfileImage = (authorId: number | null | undefined) => {
+    if (currentUser && authorId === currentUser.id) {
+      return currentUser.profileImageUrl || placeholderProfile
+    }
+    return placeholderProfile
+  }
+
   const postData = post ? {
     id: String(post.postId),
     category: "일반",
@@ -172,7 +182,7 @@ export default function ShoppingTalkDetailPage() {
     content: post.content,
     author: post.authorName,
     authorId: String(post.authorId),
-    authorAvatar: "/user-avatar-1.png",
+    authorAvatar: getProfileImage(post.authorId),
     createdAt: formatRelativeTime(post.createdAt),
     views: post.viewCount,
     likes: post.likeCount,
@@ -184,7 +194,7 @@ export default function ShoppingTalkDetailPage() {
     id: comment.commentId,
     author: comment.authorName,
     authorId: comment.authorId,
-    avatar: "/user-avatar-1.png",
+    avatar: getProfileImage(comment.authorId),
     content: comment.content,
     createdAt: formatRelativeTime(comment.createdAt),
     likes: comment.likeCount,
@@ -197,6 +207,12 @@ export default function ShoppingTalkDetailPage() {
       </div>
     )
   }
+
+  if (!post) {
+    return null
+  }
+
+  const resolvedPost = post
 
   // ✅ 본인 게시글 확인
   const isMyPost = currentUserId === post?.authorId
@@ -245,7 +261,7 @@ export default function ShoppingTalkDetailPage() {
       }
 
       // 채팅방 페이지로 이동
-      router.push(`/messages/${roomId}`)
+      router.push(`/messages?roomId=${roomId}&type=INDIVIDUAL`)
 
     } catch (error: any) {
       console.error("❌ 채팅방 생성 실패:", error)
@@ -321,29 +337,26 @@ export default function ShoppingTalkDetailPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-3">
             <span
-              className={`px-3 py-1 rounded-full text-sm font-semibold ${categoryColors[post.category] || "bg-gray-100 text-gray-600"
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${categoryColors[resolvedPost.category ?? "일반"] || "bg-gray-100 text-gray-600"
                 }`}
             >
-              {post.category}
+              {resolvedPost.category ?? "일반"}
             </span>
             <span className="text-sm text-text-secondary">{postData.createdAt}</span>
             <span className="text-sm text-text-secondary">조회 {postData.views}</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-foreground mb-6">{post.title}</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-6">{resolvedPost.title}</h1>
 
           {/* Author Info */}
           <div className="flex items-center justify-between border-y border-divider py-4">
             <div className="flex items-center gap-3">
               <img
-                src={postData.authorAvatar || "/placeholder.svg"}
+                src={postData.authorAvatar || placeholderProfile}
                 alt={postData.author}
                 className="h-12 w-12 rounded-full object-cover"
               />
-              <div>
-                <p className="font-medium text-foreground">{postData.author}</p>
-                <p className="text-sm text-text-secondary">{postData.createdAt}</p>
-              </div>
+              <p className="font-medium text-foreground">{postData.author}</p>
             </div>
             <div className="flex gap-2">
               {/* ✅ 수정/삭제 버튼 */}
@@ -368,17 +381,6 @@ export default function ShoppingTalkDetailPage() {
                   </Button>
                 </>
               )}
-              <Button variant="outline" size="sm" onClick={handleDM} className="gap-2 bg-transparent">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-                DM
-              </Button>
             </div>
           </div>
         </div>
@@ -386,13 +388,13 @@ export default function ShoppingTalkDetailPage() {
         {/* Post Content */}
         <div className="mb-8">
           <div className="prose prose-slate max-w-none">
-            <p className="whitespace-pre-wrap text-foreground leading-relaxed">{post.content}</p>
+            <p className="whitespace-pre-wrap text-foreground leading-relaxed">{resolvedPost.content}</p>
           </div>
 
           {/* Images */}
-          {post.imagesUrl && post.imagesUrl.length > 0 && (
+          {resolvedPost.imagesUrl && resolvedPost.imagesUrl.length > 0 && (
             <div className="mt-6 grid gap-4 grid-cols-1 sm:grid-cols-2">
-              {post.imagesUrl.map((imageUrl: string, index: number) => {
+              {resolvedPost.imagesUrl.map((imageUrl: string, index: number) => {
                 // S3 URL에서 이중 경로 문제 해결
                 // 예: "https://.../path1/path2" → "https://.../path2" 사용
                 const cleanUrl = imageUrl.split('/').slice(0, 4).join('/') + '/' + imageUrl.split('/').pop()
@@ -422,14 +424,15 @@ export default function ShoppingTalkDetailPage() {
         </div>
 
         {/* Post Actions */}
-        <div className="mb-8 flex items-center gap-4 border-y border-divider py-4">
+        <div className="mb-8 flex items-center gap-3 border-y border-divider py-4">
           <button
             onClick={() => togglePostLikeMutation.mutate()}
             disabled={togglePostLikeMutation.isPending || !accessToken}
-            className={`flex items-center gap-2 transition-colors ${isPostLiked ? "text-red-500" : "text-text-secondary hover:text-foreground"
-              } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              isPostLiked ? "border-red-300 bg-red-50 text-red-500" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"
+            } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <svg className="h-6 w-6" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -437,19 +440,19 @@ export default function ShoppingTalkDetailPage() {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
-            <span className="text-sm font-medium">{postData.likes}</span>
+            <span>{postData.likes}</span>
           </button>
 
-          <div className="flex items-center gap-2 text-text-secondary">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-            <span className="text-sm font-medium">{post.comments}</span>
+          <button
+            onClick={handleDM}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed border-divider text-text-secondary" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"}`}
+            disabled={!accessToken}
+          >
+            DM
+          </button>
+
+          <div className="rounded-full border border-divider px-4 py-2 text-sm font-medium text-text-secondary">
+            댓글 {postData.comments}
           </div>
         </div>
 
@@ -489,7 +492,7 @@ export default function ShoppingTalkDetailPage() {
                 <div key={comment.id} className="border-b border-divider pb-4 last:border-0">
                   <div className="mb-2 flex items-start gap-3">
                     <img
-                      src={comment.avatar || "/placeholder.svg"}
+                      src={comment.avatar || placeholderProfile}
                       alt={comment.author}
                       className="h-10 w-10 rounded-full object-cover"
                     />

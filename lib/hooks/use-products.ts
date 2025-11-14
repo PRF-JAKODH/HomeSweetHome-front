@@ -1,13 +1,63 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ProductSortType } from '@/types/api/product'
-import { getProductPreviews } from '@/lib/api/products'
+import { ProductSortType, RangeFilter } from '@/types/api/product'
+import { getProductPreviews, filterProductPreviews, searchProductPreviewsAuthenticated } from '@/lib/api/products'
+import { useAuthStore } from '@/stores/auth-store'
 
 export const useInfiniteProductPreviews = (
   categoryId?: number,
   sortType: ProductSortType = 'LATEST',
   limit: number = 10,
-  keyword?: string
+  keyword?: string,
+  optionFilters?: Record<string, string[]>,
+  rangeFilters?: Record<string, RangeFilter>
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
+  const sanitizedOptionFilters = optionFilters
+    ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
+        const filteredValues = (values ?? []).reduce<string[]>((valueAcc, value) => {
+          if (!value) return valueAcc
+          if (key === "전압") {
+            const numeric = value.replace(/[^0-9]/g, "")
+            if (numeric) {
+              valueAcc.push(numeric)
+            }
+            return valueAcc
+          }
+          valueAcc.push(value)
+          return valueAcc
+        }, [])
+        if (filteredValues.length > 0) {
+          acc[key] = filteredValues
+        }
+        return acc
+      }, {})
+    : undefined
+
+  const hasOptionFilters =
+    sanitizedOptionFilters !== undefined && Object.keys(sanitizedOptionFilters).length > 0
+  const optionFiltersKey = hasOptionFilters ? JSON.stringify(sanitizedOptionFilters) : null
+
+  const sanitizedRangeFilters = rangeFilters
+    ? Object.entries(rangeFilters).reduce<Record<string, RangeFilter>>((acc, [key, range]) => {
+        if (!range) return acc
+        const { minValue, maxValue } = range
+        if (minValue == null && maxValue == null) {
+          return acc
+        }
+
+        acc[key] = {
+          minValue: minValue ?? undefined,
+          maxValue: maxValue ?? undefined,
+        }
+        return acc
+      }, {})
+    : undefined
+
+  const hasRangeFilters =
+    sanitizedRangeFilters !== undefined && Object.keys(sanitizedRangeFilters).length > 0
+  const rangeFiltersKey = hasRangeFilters ? JSON.stringify(sanitizedRangeFilters) : null
+
   const {
     data,
     fetchNextPage,
@@ -17,15 +67,36 @@ export const useInfiniteProductPreviews = (
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit, keyword],
-    queryFn: ({ pageParam }) =>
-      getProductPreviews({
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated],
+    queryFn: ({ pageParam }) => {
+      if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
+        return filterProductPreviews({
+          cursorId: pageParam,
+          limit,
+          sortType,
+          filters: {
+            categoryId,
+            keyword: keyword || undefined,
+            optionFilters: sanitizedOptionFilters,
+            rangeFilters: sanitizedRangeFilters,
+          },
+        })
+      }
+
+      const baseParams = {
         categoryId,
         limit,
         sortType,
         cursorId: pageParam,
         keyword: keyword || undefined,
-      }),
+      }
+
+      if (isAuthenticated) {
+        return searchProductPreviewsAuthenticated(baseParams)
+      }
+
+      return getProductPreviews(baseParams)
+    },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
       return lastPage.hasNext ? lastPage.nextCursorId : undefined
