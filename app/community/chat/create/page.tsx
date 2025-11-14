@@ -31,6 +31,7 @@ export default function CreateChatRoomPage() {
   const { user, isAuthenticated } = useAuthStore()
   const [roomName, setRoomName] = useState("")
   const [thumbnail, setThumbnail] = useState<string | null>(null)
+  const [roomType, setRoomType] = useState("")
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
