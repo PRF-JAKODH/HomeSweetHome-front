@@ -108,7 +108,8 @@ export default function CreateChatRoomPage() {
           : "새로운 채팅방이 생성되었습니다.",
       })
 
-      router.push(`/messages/${roomId}`)
+      // 메시지 페이지로 이동하여 그룹 채팅방 조회
+      router.push(`/messages?roomId=${roomId}&type=GROUP`)
     } catch (error: any) {
       console.error("❌ 채팅방 생성 실패:", error)
       toast({

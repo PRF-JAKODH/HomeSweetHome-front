@@ -193,54 +193,55 @@ export default function MessagesPage() {
   /**
    * 내가 속한 그룹 채팅방 목록 불러오기
    */
-  useEffect(() => {
-    const fetchMyGroupRooms = async () => {
-      try {
-        setLoadingGroup(true)
+  const fetchMyGroupRooms = async () => {
+    try {
+      setLoadingGroup(true)
 
-        const { accessToken } = useAuthStore.getState()
+      const { accessToken } = useAuthStore.getState()
 
-        const res = await apiClient.get<GroupRoomListResponse[]>(
-          "/api/v1/chat/rooms/my/group",
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            }
+      const res = await apiClient.get<GroupRoomListResponse[]>(
+        "/api/v1/chat/rooms/my/group",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           }
-        )
+        }
+      )
 
-        console.log("✅ 그룹 채팅방 목록 API 응답:", res.data)
-        
-        // 각 채팅방의 상세 정보 로깅
-        res.data.forEach((room, index) => {
-          console.log(`📋 [그룹 채팅방 ${index + 1}]`, {
-            roomId: room.roomId,
-            roomName: room.roomName,
-            lastMessage: room.lastMessage,
-            lastMessageAt: room.lastMessageAt,
-            hasLastMessage: !!room.lastMessage,
-            hasLastMessageAt: !!room.lastMessageAt
-          })
-        })
-
-        const mapped: GroupMessageRoom[] = res.data.map((room) => ({
-          id: room.roomId,
+      console.log("✅ 그룹 채팅방 목록 API 응답:", res.data)
+      
+      // 각 채팅방의 상세 정보 로깅
+      res.data.forEach((room, index) => {
+        console.log(`📋 [그룹 채팅방 ${index + 1}]`, {
+          roomId: room.roomId,
           roomName: room.roomName,
-          thumbnail: room.thumbnailUrl || "/placeholder.svg",
-          lastMessage: room.lastMessage || "방 멤버들과 인사를 나눠보세요.",
-          time: formatRelativeTime(room.lastMessageAt),
-          memberCount: Number(room.memberCount) || 0,
-        }))
+          lastMessage: room.lastMessage,
+          lastMessageAt: room.lastMessageAt,
+          hasLastMessage: !!room.lastMessage,
+          hasLastMessageAt: !!room.lastMessageAt
+        })
+      })
 
-        console.log("✅ 변환된 그룹 채팅방 목록:", mapped)
-        setGroupList(mapped)
-      } catch (error) {
-        console.error("❌ 그룹 채팅방 목록 불러오기 실패:", error)
-      } finally {
-        setLoadingGroup(false)
-      }
+      const mapped: GroupMessageRoom[] = res.data.map((room) => ({
+        id: room.roomId,
+        roomName: room.roomName,
+        thumbnail: room.thumbnailUrl || "/placeholder.svg",
+        lastMessage: room.lastMessage || "방 멤버들과 인사를 나눠보세요.",
+        time: formatRelativeTime(room.lastMessageAt),
+        memberCount: Number(room.memberCount) || 0,
+      }))
+
+      console.log("✅ 변환된 그룹 채팅방 목록:", mapped)
+      setGroupList(mapped)
+    } catch (error) {
+      console.error("❌ 그룹 채팅방 목록 불러오기 실패:", error)
+    } finally {
+      setLoadingGroup(false)
     }
+  }
+
+  useEffect(() => {
     fetchMyGroupRooms()
   }, [])
 
@@ -253,6 +254,26 @@ export default function MessagesPage() {
     if (Number.isNaN(numericRoomId)) return
 
     const targetType = roomTypeParam ?? "INDIVIDUAL"
+
+    // 그룹 방인 경우 그룹 탭 활성화 및 목록 새로고침
+    if (targetType === "GROUP") {
+      setActiveTab("chatroom")
+      // 새로 생성된 방이 목록에 포함되도록 그룹 목록 다시 불러오기
+      fetchMyGroupRooms()
+    }
+  }, [searchParamsString])
+
+  // 그룹/개인 목록이 업데이트된 후 방 선택 및 이름 확인
+  useEffect(() => {
+    if (!searchParamsString) return
+    const roomIdParam = searchParams?.get("roomId")
+    const roomTypeParam = (searchParams?.get("type") as RoomType | null) ?? null
+    if (!roomIdParam) return
+    const numericRoomId = Number(roomIdParam)
+    if (Number.isNaN(numericRoomId)) return
+
+    const targetType = roomTypeParam ?? "INDIVIDUAL"
+
     const resolvedName =
       targetType === "GROUP"
         ? (() => {

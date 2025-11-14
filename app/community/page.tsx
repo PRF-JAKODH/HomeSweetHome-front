@@ -412,7 +412,7 @@ export default function CommunityPage() {
                     {chatRooms.map((room) => (
                       <a
                         key={room.id}
-                        href={`/messages/${room.id}`}
+                        href={`/messages?roomId=${room.id}&type=GROUP`}
                         className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
                       >
                         <div className="aspect-video overflow-hidden bg-background-section">
