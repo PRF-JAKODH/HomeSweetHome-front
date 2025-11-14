@@ -79,11 +79,11 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-white/40 px-4 py-40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-white/10 px-4 py-40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl rounded-3xl border border-black/10 bg-white/85 p-8 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] backdrop-blur-md"
+        className="relative w-full max-w-3xl rounded-3xl border border-black/10 bg-white/55 p-8 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] backdrop-blur-md"
         onClick={(event) => event.stopPropagation()}
       >
         <form onSubmit={onSubmit} className="space-y-10">
@@ -97,7 +97,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
               placeholder="브랜드, 상품 등을 검색하세요"
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              className="h-14 w-full appearance-none rounded-2xl border border-gray-300 bg-white/80 pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 transition-all duration-200 focus-visible:border-gray-900 focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] focus-visible:ring-0 focus-visible:outline-none tracking-tight"
+              className="h-14 w-full appearance-none rounded-2xl border border-gray-300 bg-white/45 pr-12 text-[32px] font-semibold text-gray-900 placeholder:text-gray-500 transition-all duration-200 focus-visible:border-gray-900 focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] focus-visible:ring-0 focus-visible:outline-none tracking-tight"
             />
             <button
               type="button"
@@ -136,7 +136,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
                     key={item}
                     type="button"
                     onClick={() => handleKeywordClick(item)}
-                    className="group/recent flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all hover:border-gray-900 hover:bg-gray-900 hover:text-white"
+                    className="group/recent flex items-center gap-2 rounded-full border border-gray-200 bg-white/60 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all hover:border-gray-900 hover:bg-gray-900 hover:text-white"
                   >
                     <span className="truncate max-w-[160px]">{item}</span>
                     <span
