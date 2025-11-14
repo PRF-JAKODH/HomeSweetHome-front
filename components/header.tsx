@@ -146,7 +146,7 @@ export function Header() {
                 className="w-8 h-8"
               />
               <span className="text-2xl font-bold text-foreground">
-                홈스윗<span className="text-primary">홈</span>
+                홈스윗<span className="text-foreground">홈</span>
               </span>
             </a>
 
@@ -269,7 +269,7 @@ function Logo() {
         className="w-8 h-8"
       />
       <span className="text-xl font-bold text-foreground">
-        홈스윗<span className="text-primary">홈</span>
+        홈스윗<span className="text-foreground">홈</span>
       </span>
     </a>
   )
