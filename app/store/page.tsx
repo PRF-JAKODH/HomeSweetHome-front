@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, type CSSProperties } from "react"
 import { ArrowDown, ArrowUp, Check, ChevronRight } from "lucide-react"
 import { useTopCategories, useCategoriesByParent } from "@/lib/hooks/use-categories"
 import { useInfiniteProductPreviews } from "@/lib/hooks/use-products"
@@ -358,6 +358,19 @@ export default function StorePage() {
 
   const recentViewTotalPages = recentViewPages.length || 1
 
+  const glassHighlightStyle: CSSProperties = {
+    background: "rgba(255, 255, 255, 0.25)",
+    border: "1px solid rgba(255, 255, 255, 0.4)",
+    boxShadow:
+      "0 30px 60px -30px rgba(15, 23, 42, 0.45), 0 18px 30px -24px rgba(15, 23, 42, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.55)",
+    backdropFilter: "blur(40px) saturate(250%)",
+    WebkitBackdropFilter: "blur(40px) saturate(250%)",
+    color: "#0f172a",
+  }
+
+  const glassHighlightHoverClass =
+    "transform-gpu transition-transform duration-200 hover:-translate-y-0.5"
+
   useEffect(() => {
     setCarouselIndex((prev) => Math.min(prev, Math.max(recentViewTotalPages - 1, 0)))
   }, [recentViewTotalPages])
@@ -417,17 +430,27 @@ export default function StorePage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 py-6">
             {/* 왼쪽 사이드바 - 카테고리 */}
             <div className="lg:col-span-1">
-              <div className="space-y-2">
+              <div className="glass-sidebar relative overflow-hidden rounded-3xl p-4">
+                <div className="glass-sidebar-bg" />
+                <div className="relative space-y-2">
                 {/* 전체 카테고리 버튼 */}
                 <button
                   onClick={handleAllCategoriesClick}
-                  className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
+                  style={selectedMainCategory === null ? glassHighlightStyle : undefined}
+                  className={`relative w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base mb-2 ${
                     selectedMainCategory === null
-                      ? "bg-gray-900 text-white"
+                      ? `${glassHighlightHoverClass} text-slate-900`
                       : "bg-background text-foreground hover:bg-muted"
                   }`}
                 >
                   <span>전체</span>
+                  {selectedMainCategory === null && (
+                    <>
+                      <span className="glass-orb glass-orb-1" />
+                      <span className="glass-orb glass-orb-2" />
+                      <span className="glass-orb glass-orb-3" />
+                    </>
+                  )}
                 </button>
 
                 {/* 상위 카테고리 목록 */}
@@ -442,9 +465,12 @@ export default function StorePage() {
                           handleMainCategoryChange(category.id)
                           toggleCategory(category.id)
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
+                        style={
+                          selectedMainCategory === category.id ? glassHighlightStyle : undefined
+                        }
+                        className={`relative w-full text-left px-3 py-2 rounded-md transition-all flex items-center justify-between font-medium text-base ${
                           selectedMainCategory === category.id
-                            ? "bg-gray-900 text-white"
+                            ? `${glassHighlightHoverClass} text-slate-900`
                             : "bg-background text-foreground hover:bg-muted"
                         }`}
                       >
@@ -454,6 +480,13 @@ export default function StorePage() {
                             isExpanded ? "rotate-90" : ""
                           }`}
                         />
+                        {selectedMainCategory === category.id && (
+                          <>
+                            <span className="glass-orb glass-orb-1" />
+                            <span className="glass-orb glass-orb-2" />
+                            <span className="glass-orb glass-orb-3" />
+                          </>
+                        )}
                       </button>
 
                       {/* 하위 카테고리 (토글) */}
@@ -473,9 +506,14 @@ export default function StorePage() {
                                       handleSubCategoryChange(subCategory.id)
                                       toggleCategory(subCategory.id)
                                     }}
-                                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
+                                    style={
                                       selectedSubCategory === subCategory.id
-                                        ? "bg-gray-200 text-gray-900"
+                                        ? glassHighlightStyle
+                                        : undefined
+                                    }
+                                    className={`relative w-full text-left px-2 py-1.5 rounded text-sm transition-all flex items-center justify-between font-medium ${
+                                      selectedSubCategory === subCategory.id
+                                        ? `${glassHighlightHoverClass} text-slate-900`
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                     }`}
                                   >
@@ -485,6 +523,13 @@ export default function StorePage() {
                                         isSubExpanded ? "rotate-90" : ""
                                       }`}
                                     />
+                                    {selectedSubCategory === subCategory.id && (
+                                      <>
+                                        <span className="glass-orb glass-orb-sub-1" />
+                                        <span className="glass-orb glass-orb-sub-2" />
+                                        <span className="glass-orb glass-orb-sub-3" />
+                                      </>
+                                    )}
                                   </button>
 
                                   {/* 하위의 하위 카테고리 (3레벨) */}
@@ -499,13 +544,25 @@ export default function StorePage() {
                                           <button
                                             key={subSubCategory.id}
                                             onClick={() => handleSubSubCategoryChange(subSubCategory.id)}
-                                            className={`w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
+                                            style={
                                               selectedSubSubCategory === subSubCategory.id
-                                                ? "bg-gray-200 text-gray-900"
+                                                ? glassHighlightStyle
+                                                : undefined
+                                            }
+                                            className={`relative w-full text-left px-1.5 py-1 rounded text-xs transition-all font-medium ${
+                                              selectedSubSubCategory === subSubCategory.id
+                                                ? `${glassHighlightHoverClass} text-slate-900`
                                                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                             }`}
                                           >
                                             {subSubCategory.name}
+                                            {selectedSubSubCategory === subSubCategory.id && (
+                                              <>
+                                                <span className="glass-orb glass-orb-xs-1" />
+                                                <span className="glass-orb glass-orb-xs-2" />
+                                                <span className="glass-orb glass-orb-xs-3" />
+                                              </>
+                                            )}
                                           </button>
                                         ))
                                       ) : null}
@@ -520,6 +577,7 @@ export default function StorePage() {
                     </div>
                   )
                 })}
+                </div>
               </div>
             </div>
 
@@ -873,6 +931,125 @@ export default function StorePage() {
           </svg>
         </button>
       )}
+      <style jsx>{`
+        .glass-orb {
+          position: absolute;
+          border-radius: 9999px;
+          pointer-events: none;
+          background: rgba(255, 255, 255, 0.32);
+          mix-blend-mode: screen;
+          opacity: 0.9;
+          filter: blur(0);
+        }
+
+        .glass-orb-1 {
+          width: 48px;
+          height: 48px;
+          top: -16px;
+          right: -14px;
+          animation: glassOrbFloat 8s ease-in-out infinite;
+        }
+
+        .glass-orb-2 {
+          width: 34px;
+          height: 34px;
+          bottom: -14px;
+          left: 55%;
+          animation: glassOrbFloatReverse 9s ease-in-out infinite;
+        }
+
+        .glass-orb-3 {
+          width: 26px;
+          height: 26px;
+          top: 38%;
+          left: -12px;
+          animation: glassOrbFloatAlt 7s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-1 {
+          width: 36px;
+          height: 36px;
+          top: -12px;
+          right: -10px;
+          animation: glassOrbFloat 7.5s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-2 {
+          width: 26px;
+          height: 26px;
+          bottom: -10px;
+          left: 60%;
+          animation: glassOrbFloatReverse 8.5s ease-in-out infinite;
+        }
+
+        .glass-orb-sub-3 {
+          width: 20px;
+          height: 20px;
+          top: 35%;
+          left: -10px;
+          animation: glassOrbFloatAlt 6.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-1 {
+          width: 26px;
+          height: 26px;
+          top: -10px;
+          right: -8px;
+          animation: glassOrbFloat 6.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-2 {
+          width: 18px;
+          height: 18px;
+          bottom: -8px;
+          left: 58%;
+          animation: glassOrbFloatReverse 7.5s ease-in-out infinite;
+        }
+
+        .glass-orb-xs-3 {
+          width: 14px;
+          height: 14px;
+          top: 32%;
+          left: -6px;
+          animation: glassOrbFloatAlt 6s ease-in-out infinite;
+        }
+
+        @keyframes glassOrbFloat {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(6px, -8px, 0) scale(1.05);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+
+        @keyframes glassOrbFloatReverse {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(-5px, 7px, 0) scale(0.95);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+
+        @keyframes glassOrbFloatAlt {
+          0% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+          50% {
+            transform: translate3d(4px, -6px, 0) scale(1.08);
+          }
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+      `}</style>
     </div>
   )
 }
