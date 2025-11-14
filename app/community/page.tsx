@@ -232,12 +232,7 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             {selectedTab === "shopping-talk" && (
               <div>
-                {/* Header with write button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">쇼핑수다</h3>
-                    <p className="mt-1 text-sm text-text-secondary">가구, 인테리어 쇼핑 정보를 나누는 공간</p>
-                  </div>
+                <div className="mb-6 flex justify-end">
                   <a href="/community/shopping-talk/create">
                     <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
                   </a>
@@ -396,12 +391,7 @@ export default function CommunityPage() {
 
             {selectedTab === "chat-rooms" && (
               <div>
-                {/* Header with create button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">오늘의채팅방</h3>
-                    <p className="mt-1 text-sm text-text-secondary">관심사가 같은 사람들과 실시간으로 소통하세요</p>
-                  </div>
+                <div className="mb-6 flex justify-end">
                   <a href="/community/chat/create">
                     <Button className="bg-primary hover:bg-primary/90">채팅방 만들기</Button>
                   </a>
