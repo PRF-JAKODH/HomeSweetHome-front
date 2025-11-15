@@ -12,6 +12,7 @@ export const useInfiniteProductPreviews = (
   rangeFilters?: Record<string, RangeFilter>
 ) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isHydrated = useAuthStore((state) => state.isHydrated)
 
   const sanitizedOptionFilters = optionFilters
     ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
@@ -104,6 +105,8 @@ export const useInfiniteProductPreviews = (
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    // 인증 상태가 확정된 후에만 쿼리 실행 (초기 중복 호출 방지)
+    enabled: isHydrated,
   })
 
   // 모든 페이지의 상품을 평탄화하고 중복 제거
