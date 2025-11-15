@@ -5,7 +5,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { 
   addToCart, 
-  getCartItems, 
+  getCartItems,
+  getCartCount,
   deleteCartItem, 
   deleteCartItems, 
   clearCart,
@@ -19,6 +20,7 @@ import { useAuthStore } from '@/stores/auth-store'
 export const CART_QUERY_KEYS = {
   all: ['cart'] as const,
   list: () => [...CART_QUERY_KEYS.all, 'list'] as const,
+  count: () => [...CART_QUERY_KEYS.all, 'count'] as const,
 } as const
 
 /**
@@ -42,6 +44,20 @@ export const useCart = () => {
   return useCartItems()
 }
 
+/**
+ * 장바구니 개수 조회 훅
+ */
+export const useCartCount = () => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  
+  return useQuery({
+    queryKey: CART_QUERY_KEYS.count(),
+    queryFn: () => getCartCount(),
+    staleTime: 1 * 60 * 1000, // 1분
+    enabled: isAuthenticated, // 인증된 상태에서만 쿼리 실행
+  })
+}
+
 
 /**
  * 장바구니에 상품 추가 훅
@@ -58,8 +74,9 @@ export const useAddToCart = () => {
       return addToCart(cartRequest)
     },
     onSuccess: () => {
-      // 장바구니 목록 쿼리 무효화
+      // 장바구니 목록 및 개수 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
+      queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.count() })
     },
   })
 }

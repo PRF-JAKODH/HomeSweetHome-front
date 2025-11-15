@@ -157,12 +157,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         // 카테고리 계층 구조 가져오기
         const categoryResponse = await getCategoryHierarchy(productData.categoryId || 1).catch(() => [])
 
-        // API 응답 구조 확인을 위한 로깅
-        console.log('Product data:', productData)
-        console.log('Stock data:', stockData)
-        console.log('detailImageUrls:', productData.detailImageUrls)
-        console.log('images:', productData.images)
-
         // API 응답을 UI에서 사용할 수 있는 형태로 변환
         const transformedProduct: ExtendedProduct = {
           ...productData,
@@ -239,11 +233,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       try {
         setReviewsLoading(true)
         const reviewsResponse = await getProductReviews(resolvedParams.productId)
-        console.log('리뷰 응답:', reviewsResponse)
-        console.log('리뷰 데이터:', reviewsResponse?.contents)
         // 응답 구조에 따라 수정
         const reviews = reviewsResponse?.contents || []
-        console.log('최종 리뷰 데이터:', reviews)
         setUserReviews(reviews)
         // totalCount는 통계 API에서 가져오므로 여기서는 설정하지 않음
       } catch (err) {

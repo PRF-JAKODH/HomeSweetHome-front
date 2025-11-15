@@ -62,6 +62,7 @@ export const CATEGORY_ENDPOINTS = {
 export const CART_ENDPOINTS = {
   // 장바구니 CRUD
   GET_CART: '/api/v1/carts',
+  GET_CART_COUNT: '/api/v1/carts/count',
   ADD_TO_CART: '/api/v1/carts',
   UPDATE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,
   DELETE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,

@@ -4,7 +4,7 @@
 
 import { apiClient } from './client'
 import { CART_ENDPOINTS } from './endpoints'
-import { CartRequest, Cart, CartResponse, DeleteCartItemsRequest } from '@/types/api/cart'
+import { CartRequest, Cart, CartResponse, DeleteCartItemsRequest, CartCountResponse } from '@/types/api/cart'
 import { ApiResponse, ScrollResponse } from '@/types/api/common'
 
 
@@ -14,6 +14,13 @@ import { ApiResponse, ScrollResponse } from '@/types/api/common'
 export const addToCart = async (cartRequest: CartRequest): Promise<Cart> => {
   const response = await apiClient.post(CART_ENDPOINTS.ADD_TO_CART, cartRequest)
   return response.data as Cart
+}
+
+/**
+ * 장바구니 개수 조회
+ */
+export const getCartCount = async (): Promise<CartCountResponse> => {
+  return await apiClient.get<CartCountResponse>(CART_ENDPOINTS.GET_CART_COUNT)
 }
 
 /**

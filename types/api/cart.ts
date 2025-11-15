@@ -63,3 +63,8 @@ export interface CartResponse {
 export interface DeleteCartItemsRequest {
   cartIds: number[]
 }
+
+// 장바구니 개수 응답
+export interface CartCountResponse {
+  cartCount: number
+}
