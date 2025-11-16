@@ -5,6 +5,8 @@ import { ProductCard } from "@/components/product-card"
 import { Heart, MessageCircle } from "lucide-react"
 import { useCommunityPosts } from '@/lib/hooks/use-community'
 import { formatRelativeTime } from '@/lib/utils'
+import { useTopCategories } from "@/lib/hooks/use-categories"
+import { getCategoryLogo } from "@/lib/utils/category-logo"
 
 // Mock data for popular products
 const popularProducts = [
@@ -114,6 +116,7 @@ export default function HomePage() {
     sort: 'likeCount', // 인기순 (좋아요 순)
     direction: 'desc'
   })
+  const { data: topCategories = [] } = useTopCategories()
 
   const popularShoppingTalk = postsData?.content.map(post => ({
     id: post.postId.toString(),
@@ -147,6 +150,38 @@ export default function HomePage() {
                   홈스윗<span className="text-primary">홈</span>에서 시작하세요
                 </p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Top Categories */}
+        <section className="py-8">
+          <div className="mx-auto max-w-[1256px] px-4">
+            <h2 className="mb-6 text-xl font-bold text-foreground">카테고리별 상품 찾기</h2>
+            <div className="grid grid-cols-4 gap-4 md:gap-6">
+              {topCategories?.map((cat) => {
+                const logoSrc = getCategoryLogo(cat.name)
+                return (
+                  <a
+                    key={cat.id}
+                    href={`/store?category=${cat.id}`}
+                    className="group flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-4 transition hover:shadow-md"
+                  >
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gray-50">
+                      <img
+                        src={logoSrc}
+                        alt={cat.name}
+                        className="h-12 w-12 object-contain transition group-hover:scale-105"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement
+                          target.src = '/placeholder.svg'
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{cat.name}</span>
+                  </a>
+                )
+              })}
             </div>
           </div>
         </section>

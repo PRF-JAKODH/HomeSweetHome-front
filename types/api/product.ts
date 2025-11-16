@@ -98,12 +98,10 @@ export interface ProductPreviewResponse {
   sellerId: number
   name: string
   imageUrl: string
-  detailImageUrls?: string[] // 상세 이미지 URL 배열 추가
   brand: string
   basePrice: number
   discountRate: number
   discountedPrice?: number // 서버에서 계산된 할인된 가격 추가
-  description: string
   shippingPrice: number
   status: string
   averageRating: number
