@@ -1,112 +1,11 @@
 'use client';
 
 import { Button } from "@/components/ui/button"
-import { ProductCard } from "@/components/product-card"
 import { Heart, MessageCircle } from "lucide-react"
 import { useCommunityPosts } from '@/lib/hooks/use-community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useTopCategories } from "@/lib/hooks/use-categories"
 import { getCategoryLogo } from "@/lib/utils/category-logo"
-
-// Mock data for popular products
-const popularProducts = [
-  {
-    id: "1",
-    image: "/modern-minimalist-sofa.png",
-    brand: "모던하우스",
-    name: "클래식 3인용 패브릭 소파 / 5가지 컬러",
-    price: 389000,
-    originalPrice: 590000,
-    discountRate: 34,
-    rating: 4.8,
-    reviewCount: 1247,
-    isFreeShipping: true,
-  },
-  {
-    id: "2",
-    image: "/wooden-dining-table.png",
-    brand: "우드스토리",
-    name: "원목 식탁 4인용 / 북유럽 스타일",
-    price: 298000,
-    originalPrice: 450000,
-    discountRate: 34,
-    rating: 4.9,
-    reviewCount: 892,
-    isFreeShipping: true,
-  },
-  {
-    id: "3",
-    image: "/modern-pendant-lamp.jpg",
-    brand: "라이팅플러스",
-    name: "북유럽 펜던트 조명 / LED 전구 포함",
-    price: 89000,
-    originalPrice: 129000,
-    discountRate: 31,
-    rating: 4.7,
-    reviewCount: 634,
-    isFreeShipping: false,
-  },
-  {
-    id: "4",
-    image: "/storage-cabinet-white.jpg",
-    brand: "심플라이프",
-    name: "모던 수납장 / 화이트 3단 서랍장",
-    price: 159000,
-    originalPrice: 220000,
-    discountRate: 28,
-    rating: 4.6,
-    reviewCount: 521,
-    isFreeShipping: true,
-  },
-  {
-    id: "5",
-    image: "/cozy-throw-blanket.jpg",
-    brand: "코지홈",
-    name: "프리미엄 극세사 블랭킷 / 대형 사이즈",
-    price: 29900,
-    originalPrice: 49900,
-    discountRate: 40,
-    rating: 4.8,
-    reviewCount: 2134,
-    isFreeShipping: true,
-  },
-  {
-    id: "6",
-    image: "/modern-desk-lamp.png",
-    brand: "스터디룸",
-    name: "LED 스탠드 조명 / 무선충전 기능",
-    price: 79000,
-    originalPrice: 120000,
-    discountRate: 34,
-    rating: 4.7,
-    reviewCount: 445,
-    isFreeShipping: false,
-  },
-  {
-    id: "7",
-    image: "/decorative-plant-pot.jpg",
-    brand: "그린가든",
-    name: "세라믹 화분 세트 / 3종 구성",
-    price: 45000,
-    originalPrice: 68000,
-    discountRate: 34,
-    rating: 4.9,
-    reviewCount: 789,
-    isFreeShipping: true,
-  },
-  {
-    id: "8",
-    image: "/kitchen-organizer.png",
-    brand: "키친플러스",
-    name: "주방 수납 정리함 / 스테인리스",
-    price: 35000,
-    originalPrice: 52000,
-    discountRate: 33,
-    rating: 4.6,
-    reviewCount: 312,
-    isFreeShipping: false,
-  },
-]
 
 export default function HomePage() {
   // 🔄 인기순으로 정렬된 쇼핑수다 게시글 가져오기
@@ -182,29 +81,6 @@ export default function HomePage() {
                   </a>
                 )
               })}
-            </div>
-          </div>
-        </section>
-
-        {/* Popular Products */}
-        <section className="py-12">
-          <div className="mx-auto max-w-[1256px] px-4">
-            {/* Section Header */}
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">오늘의 인기 상품</h2>
-                <p className="text-sm text-text-secondary">지금 가장 많은 사람들이 선택한 상품</p>
-              </div>
-              <Button variant="ghost" className="text-primary hover:text-primary-dark">
-                전체보기 →
-              </Button>
-            </div>
-
-            {/* Product Grid */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
-              {popularProducts.map((product) => (
-                <ProductCard key={product.id} {...product} />
-              ))}
             </div>
           </div>
         </section>
