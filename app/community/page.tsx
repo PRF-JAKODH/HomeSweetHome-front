@@ -65,7 +65,7 @@ const sortOptions: SortOption[] = [
 ]
 
 const categories = [
-  { id: "shopping-talk", name: "쇼핑수다", image: "/assorted-home-goods.png" },
+  { id: "shopping-talk", name: "쇼핑수다", image: "/minimalist-living-room.png" },
   { id: "chat-rooms", name: "오늘의채팅방", image: "/nordic-style-chat.jpg" },
 ]
 
