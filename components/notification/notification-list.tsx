@@ -1,7 +1,7 @@
 "use client"
 
 import { Notification } from "@/types/notification"
-import { formatRelativeTime } from "@/lib/date-util"
+import { formatRelativeTime } from "@/lib/utils/date-util"
 import { getCategoryDisplayName } from "@/lib/notification-util"
 
 interface NotificationListProps {

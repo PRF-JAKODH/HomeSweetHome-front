@@ -14,7 +14,7 @@ import {
 } from "@/stores/messages-store"
 
 // 타입 정의 수정 - 옵셔널 필드 명시
-type IndividualRoomListResponseDto = {
+export type IndividualRoomListResponseDto = {
   roomId: number
   roomType: string
   memberCount: number
@@ -23,9 +23,10 @@ type IndividualRoomListResponseDto = {
   thumbnailUrl: string | null
   lastMessage: string | null
   lastMessageAt: string | null
+  isPartnerExit: boolean
 }
 
-type GroupRoomListResponse = {
+export type GroupRoomListResponse = {
   roomId: number
   roomName: string
   roomType: string
@@ -105,7 +106,7 @@ export default function MessagesPage() {
           }
         )
 
-        console.log("✅ 개인 채팅방 목록 API 응답:", res.data)
+        console.log("[개인 채팅방] API 응답 성공, 개수:", res.data.length)
         
         // 각 채팅방의 상세 정보 로깅
         res.data.forEach((room, index) => {
@@ -127,12 +128,12 @@ export default function MessagesPage() {
           opponentAvatar: room.thumbnailUrl || "/placeholder.svg",
           lastMessage: room.lastMessage || "대화를 시작해보세요",
           time: formatRelativeTime(room.lastMessageAt),
+          isPartnerExit: room.isPartnerExit,
         }))
 
-        console.log("✅ 변환된 개인 채팅방 목록:", mapped)
-        setDmList(mapped)
+          setDmList(mapped)
       } catch (error) {
-        console.error("❌ 개인 채팅방 목록 불러오기 실패:", error)
+        console.error("[개인 채팅방] API 호출 실패:", error)
       } finally {
         setLoadingDm(false)
       }
@@ -209,7 +210,7 @@ export default function MessagesPage() {
         }
       )
 
-      console.log("✅ 그룹 채팅방 목록 API 응답:", res.data)
+      console.log("[그룹 채팅방] API 응답 성공, 개수:", res.data.length)
       
       // 각 채팅방의 상세 정보 로깅
       res.data.forEach((room, index) => {
@@ -232,10 +233,9 @@ export default function MessagesPage() {
         memberCount: Number(room.memberCount) || 0,
       }))
 
-      console.log("✅ 변환된 그룹 채팅방 목록:", mapped)
-      setGroupList(mapped)
+        setGroupList(mapped)
     } catch (error) {
-      console.error("❌ 그룹 채팅방 목록 불러오기 실패:", error)
+      console.error("[그룹 채팅방] API 호출 실패:", error)
     } finally {
       setLoadingGroup(false)
     }
@@ -274,16 +274,13 @@ export default function MessagesPage() {
 
     const targetType = roomTypeParam ?? "INDIVIDUAL"
 
+
+    // resolvedName이 빈 문자열이면 아직 데이터가 로드 안 된 것
     const resolvedName =
-      targetType === "GROUP"
-        ? (() => {
-            const room = groupList.find((item) => item.id === numericRoomId)
-            return room ? room.roomName : selectedRoom?.name ?? ""
-          })()
-        : (() => {
-            const room = dmList.find((item) => item.id === numericRoomId)
-            return room ? room.opponentName : selectedRoom?.name ?? ""
-          })()
+    targetType === "GROUP"
+      ? groupList.find((item) => item.id === numericRoomId)?.roomName || ""
+      : dmList.find((item) => item.id === numericRoomId)?.opponentName || ""
+
 
     setSelectedRoom((prev) => {
       if (prev && prev.id === numericRoomId && prev.type === targetType && prev.name === resolvedName) {
@@ -300,7 +297,7 @@ export default function MessagesPage() {
     if (isMobile) {
       router.replace(`/messages/${numericRoomId}?type=${targetType}`)
     }
-  }, [searchParamsString, dmList, groupList, isMobile, router, selectedRoom])
+  }, [searchParamsString, dmList, groupList, isMobile, router])
 
   return (
     <div className="min-h-screen lg:h-screen bg-background lg:overflow-hidden">
@@ -363,6 +360,11 @@ export default function MessagesPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-foreground">{dm.opponentName}</span>
+                            {dm.isPartnerExit && (
+                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                나감
+                              </span>
+                            )}
                             <span className="text-xs text-text-tertiary">{dm.time}</span>
                           </div>
                           <p className="text-sm text-text-secondary truncate">{dm.lastMessage}</p>
