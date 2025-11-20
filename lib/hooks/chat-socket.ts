@@ -5,7 +5,7 @@ import SockJS from 'sockjs-client'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type ChatMessagePayload = {
-  roomId?: string | number
+  roomId?: number
   senderId?: string | number
   content: string
   type?: 'TEXT' | 'IMAGE' | 'FILE'
@@ -121,7 +121,7 @@ export function sendChatMessage(
   }
 
   client.publish({
-    destination: "/pub/chat.send",
+    destination: `/pub${destination}`, 
     body: JSON.stringify(payload), // JSON.stringify 필수!
   })
 }

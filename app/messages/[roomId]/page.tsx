@@ -23,6 +23,7 @@ export default function MessagesRoomPage({ params, searchParams }: PageProps) {
     )
   }
 
+  
   return (
     <div className="h-screen bg-background overflow-hidden">
       <div className="mx-auto flex h-full max-w-[1256px] px-4 py-6">

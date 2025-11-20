@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useRouter, useSearchParams } from "next/navigation"
 import apiClient from "@/lib/api"
@@ -85,6 +85,17 @@ export default function MessagesPage() {
   const groupList = useMessagesStore((state) => state.groupList)
   const setDmList = useMessagesStore((state) => state.setDmList)
   const setGroupList = useMessagesStore((state) => state.setGroupList)
+  const accessToken = useAuthStore((s) => s.accessToken)
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+
 
   /**
    * 내가 속한 개인 채팅방 목록 불러오기
@@ -143,6 +154,7 @@ export default function MessagesPage() {
   }, [])
 
   useEffect(() => {
+    if (!accessToken) return
     if (typeof window === "undefined") return
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024)
@@ -191,37 +203,16 @@ export default function MessagesPage() {
     }
   }
 
-  /**
-   * 내가 속한 그룹 채팅방 목록 불러오기
-   */
-  const fetchMyGroupRooms = async () => {
+  const fetchMyGroupRooms = useCallback(async () => {
+    if (!accessToken) return
+
     try {
       setLoadingGroup(true)
-
-      const { accessToken } = useAuthStore.getState()
-
-      const res = await apiClient.get<GroupRoomListResponse[]>(
-        "/api/v1/chat/rooms/my/group",
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          }
-        }
-      )
-
-      console.log("[그룹 채팅방] API 응답 성공, 개수:", res.data.length)
-      
-      // 각 채팅방의 상세 정보 로깅
-      res.data.forEach((room, index) => {
-        console.log(`📋 [그룹 채팅방 ${index + 1}]`, {
-          roomId: room.roomId,
-          roomName: room.roomName,
-          lastMessage: room.lastMessage,
-          lastMessageAt: room.lastMessageAt,
-          hasLastMessage: !!room.lastMessage,
-          hasLastMessageAt: !!room.lastMessageAt
-        })
+      const res = await apiClient.get<GroupRoomListResponse[]>("/api/v1/chat/rooms/my/group", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
       })
 
       const mapped: GroupMessageRoom[] = res.data.map((room) => ({
@@ -233,17 +224,26 @@ export default function MessagesPage() {
         memberCount: Number(room.memberCount) || 0,
       }))
 
-        setGroupList(mapped)
+      setGroupList(mapped)
     } catch (error) {
       console.error("[그룹 채팅방] API 호출 실패:", error)
     } finally {
       setLoadingGroup(false)
     }
-  }
+  }, [accessToken, setGroupList])
 
+  /**
+   * 내가 속한 그룹 채팅방 목록 불러오기
+   */
   useEffect(() => {
+    if (!accessToken) return
+
     fetchMyGroupRooms()
-  }, [])
+    const interval = setInterval(fetchMyGroupRooms, 5000)
+    return () => clearInterval(interval)
+  }, [accessToken, fetchMyGroupRooms])
+
+
 
   useEffect(() => {
     if (!searchParamsString) return
@@ -300,16 +300,16 @@ export default function MessagesPage() {
   }, [searchParamsString, dmList, groupList, isMobile, router])
 
   return (
-    <div className="min-h-screen lg:h-screen bg-background lg:overflow-hidden">
-      <div className="mx-auto flex h-full max-w-[1256px] flex-col px-4 py-8 lg:py-10 lg:pb-12 lg:pt-10">
-        <h1 className="text-3xl font-bold mb-6">메시지</h1>
+    <div className="h-screen bg-background overflow-hidden">
+      <div className="mx-auto flex h-full max-w-[1256px] flex-col px-4 py-4 lg:px-6 lg:py-6 overflow-hidden">
+        <h1 className="text-2xl font-semibold mb-4 text-foreground">메시지</h1>
 
-        <div className="grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          <div className="space-y-6">
-            <div className="flex gap-4 border-b border-divider">
+        <div className="grid gap-4 h-full min-h-0 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex gap-4 border-b border-divider pb-2 shrink-0">
               <button
                 onClick={() => setActiveTab("dm")}
-                className={`pb-3 px-4 font-medium transition-colors relative ${
+                className={`pb-2 px-3 text-sm font-medium transition-colors relative ${
                   activeTab === "dm" ? "text-primary" : "text-text-secondary hover:text-foreground"
                 }`}
               >
@@ -319,7 +319,7 @@ export default function MessagesPage() {
 
               <button
                 onClick={() => setActiveTab("chatroom")}
-                className={`pb-3 px-4 font-medium transition-colors relative ${
+                className={`pb-2 px-3 text-sm font-medium transition-colors relative ${
                   activeTab === "chatroom" ? "text-primary" : "text-text-secondary hover:text-foreground"
                 }`}
               >
@@ -328,109 +328,122 @@ export default function MessagesPage() {
               </button>
             </div>
 
-            <Input
-              type="search"
-              placeholder={activeTab === "dm" ? "사용자 검색" : "채팅방 검색"}
-              className="w-full"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
+            <div className="space-y-3 pt-3 pb-1 shrink-0">
+              <Input
+                type="search"
+                placeholder={activeTab === "dm" ? "사용자 검색" : "채팅방 검색"}
+                className="w-full text-sm"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </div>
 
-            <div className="space-y-2">
+            <div className="flex-1 overflow-y-auto pr-1">
               {activeTab === "dm" ? (
                 loadingDm ? (
                   <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
                 ) : filteredDmList.length > 0 ? (
-                  filteredDmList.map((dm) => {
-                    const isActive = selectedRoom?.id === dm.id && selectedRoom.type === "INDIVIDUAL"
-                    return (
-                      <div
-                        key={dm.id}
-                        onClick={() => handleSelectRoom(dm.id, "INDIVIDUAL", dm.opponentName)}
-                        className={`flex items-center gap-4 rounded-2xl border border-transparent p-4 transition-colors cursor-pointer ${
-                          isActive ? "border-primary/40 bg-primary/5" : "hover:bg-background-section"
-                        }`}
-                      >
-                        <img
-                          src={dm.opponentAvatar}
-                          alt={dm.opponentName}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
+                  <div className="space-y-2 pb-2">
+                    {filteredDmList.map((dm) => {
+                      const isActive = selectedRoom?.id === dm.id && selectedRoom.type === "INDIVIDUAL"
+                      return (
+                        <div
+                          key={dm.id}
+                          onClick={() => handleSelectRoom(dm.id, "INDIVIDUAL", dm.opponentName)}
+                          className={`flex items-center gap-3 rounded-2xl border border-transparent p-3 transition-all cursor-pointer ${
+                            isActive
+                              ? "border-primary/40 bg-primary/5 shadow-sm"
+                              : "hover:border-primary/20 hover:bg-background-section hover:shadow-sm"
+                          }`}
+                        >
+                          <img
+                            src={dm.opponentAvatar}
+                            alt={dm.opponentName}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-foreground">{dm.opponentName}</span>
-                            {dm.isPartnerExit && (
-                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-                                나감
-                              </span>
-                            )}
-                            <span className="text-xs text-text-tertiary">{dm.time}</span>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-foreground">{dm.opponentName}</span>
+                              <div className="flex items-center gap-2">
+                                {dm.isPartnerExit && (
+                                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                    나감
+                                  </span>
+                                )}
+                                <span className="text-xs text-text-tertiary whitespace-nowrap">{dm.time}</span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-text-secondary truncate">{dm.lastMessage}</p>
                           </div>
-                          <p className="text-sm text-text-secondary truncate">{dm.lastMessage}</p>
                         </div>
-                      </div>
-                    )
-                  })
+                      )
+                    })}
+                  </div>
                 ) : (
                   <p className="text-text-secondary">아직 참여 중인 1:1 대화가 없습니다.</p>
                 )
               ) : loadingGroup ? (
                 <p className="text-text-secondary">채팅방 목록을 불러오는 중...</p>
               ) : filteredGroupList.length > 0 ? (
-                filteredGroupList.map((room) => {
-                  const isActive = selectedRoom?.id === room.id && selectedRoom.type === "GROUP"
-                  return (
-                    <div
-                      key={room.id}
-                      onClick={() => handleSelectRoom(room.id, "GROUP", room.roomName)}
-                      className={`flex items-center gap-4 rounded-2xl border border-transparent p-4 transition-colors cursor-pointer ${
-                        isActive ? "border-primary/40 bg-primary/5" : "hover:bg-background-section"
-                      }`}
-                    >
-                      <img
-                        src={room.thumbnail}
-                        alt={room.roomName}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
+                <div className="space-y-2 pb-2">
+                  {filteredGroupList.map((room) => {
+                    const isActive = selectedRoom?.id === room.id && selectedRoom.type === "GROUP"
+                    return (
+                      <div
+                        key={room.id}
+                        onClick={() => handleSelectRoom(room.id, "GROUP", room.roomName)}
+                        className={`flex items-center gap-3 rounded-2xl border border-transparent p-3 transition-all cursor-pointer ${
+                          isActive
+                            ? "border-primary/40 bg-primary/5 shadow-sm"
+                            : "hover:border-primary/20 hover:bg-background-section hover:shadow-sm"
+                        }`}
+                      >
+                        <img
+                          src={room.thumbnail}
+                          alt={room.roomName}
+                          className="w-10 h-10 rounded-lg object-cover"
+                        />
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-foreground">{room.roomName}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-foreground">{room.roomName}</span>
+                            <div className="flex items-center gap-2">
+                              {room.unread && room.unread > 0 && (
+                                <span className="h-6 w-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
+                                  {room.unread}
+                                </span>
+                              )}
+                              <span className="text-xs text-text-tertiary whitespace-nowrap">{room.time}</span>
+                            </div>
+                          </div>
                           <div className="flex items-center gap-2">
-                            {room.unread && room.unread > 0 && (
-                              <span className="h-6 w-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">
-                                {room.unread}
-                              </span>
-                            )}
-                            <span className="text-xs text-text-tertiary">{room.time}</span>
+                            <p className="text-sm text-text-secondary truncate flex-1">{room.lastMessage}</p>
+                            <span className="text-xs text-text-tertiary whitespace-nowrap flex items-center gap-1">
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                />
+                              </svg>
+                              {room.memberCount}명
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-text-secondary truncate flex-1">{room.lastMessage}</p>
-                          <span className="text-xs text-text-tertiary whitespace-nowrap flex items-center gap-1">
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                              />
-                            </svg>
-                            {room.memberCount}명
-                          </span>
-                        </div>
                       </div>
-                    </div>
-                  )
-                })
+                    )
+                  })}
+                </div>
               ) : (
                 <p className="text-text-secondary">아직 참여 중인 그룹 채팅방이 없습니다.</p>
               )}
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-col h-full min-h-0 rounded-3xl border border-divider bg-background p-0 overflow-hidden">
+          <div className="hidden lg:flex flex-col h-full min-h-0 rounded-2xl border border-divider bg-background overflow-hidden">
             {selectedRoom ? (
               <ChatRoomDetail
                 key={`${selectedRoom.type}-${selectedRoom.id}`}

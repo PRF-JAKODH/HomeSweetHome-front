@@ -54,6 +54,7 @@ type Message = {
   isMe: boolean
   images?: string[]
   status?: "sending" | "sent" | "error"
+  messageType?: "user" | "system"
 }
 
 export type ChatMessageDto = {
@@ -148,7 +149,9 @@ export function ChatRoomDetail({
   const router = useRouter()
   const searchParamsType = initialRoomType
 
-  const rootClassName = ["flex flex-col h-full min-h-0 bg-background", className].filter(Boolean).join(" ")
+  const rootClassName = ["flex flex-col h-full min-h-0 bg-background overflow-hidden", className]
+    .filter(Boolean)
+    .join(" ")
 
   // 채팅방 타입 및 정보
   const [roomType, setRoomType] = useState<RoomType | null>(searchParamsType)
@@ -167,6 +170,7 @@ export function ChatRoomDetail({
   const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasShownEntryNotice, setHasShownEntryNotice] = useState(false)
 
   const [partnerId, setPartnerId] = useState<number | null>(null)
   const [partnerName, setPartnerName] = useState<string>("상대방")
@@ -183,6 +187,7 @@ export function ChatRoomDetail({
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
   const updateRoomSummary = useMessagesStore((state) => state.updateRoomSummary)
+  const formatTimestamp = formatMessageTime
 
   useEffect(() => {
     setRoomType(searchParamsType)
@@ -196,6 +201,7 @@ export function ChatRoomDetail({
     setShowUserInfo(false)
     setShowSettings(false)
     isSubscribedRef.current = false
+    setHasShownEntryNotice(false)
   }, [roomId])
 
   useEffect(() => {
@@ -238,6 +244,27 @@ export function ChatRoomDetail({
   }, [messages, roomType, partnerName, roomName, thumbnailUrl, roomId])
 
   useEffect(() => {
+    if (hasShownEntryNotice) return
+    if (roomType !== "GROUP") return
+    if (!user?.name) return
+
+    const nowIso = new Date().toISOString()
+    const entryMessage: Message = {
+      messageId: Number(`${Date.now()}999`),
+      senderId: user.id ?? 0,
+      content: `${user.name}님이 입장하셨습니다.`,
+      timestamp: formatTimestamp(nowIso),
+      sentAt: nowIso,
+      isMe: false,
+      status: "sent",
+      messageType: "system",
+    }
+
+    setMessages((prev) => mergeMessages(prev, [entryMessage]))
+    setHasShownEntryNotice(true)
+  }, [roomType, user?.name, hasShownEntryNotice, formatTimestamp])
+
+  useEffect(() => {
     if (!roomId || !accessToken) return
   
     let mounted = true
@@ -269,7 +296,7 @@ export function ChatRoomDetail({
       } catch (error) {
         console.error("[초기화] 실패:", error)
       }
-    }
+    } 
   
     init()
   
@@ -282,7 +309,51 @@ export function ChatRoomDetail({
         isSubscribedRef.current = false
       }
     }
-  }, [roomId, accessToken])
+  }, [roomId, accessToken ])
+
+
+  // ============================ 임시 실시간 업데이트용(3초) 시작 ============================
+// 2. 새로운 useEffect 추가 - 주기적 갱신
+useEffect(() => {
+  if (!roomId || !accessToken || roomType !== 'GROUP') return
+
+  console.log("[멤버 목록] 자동 갱신 시작")
+
+  const refreshMembers = async () => {
+    try {
+      const response = await apiClient.get<GroupChatDetailResponse>(
+        `/api/v1/chat/rooms/group/${roomId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      
+      const { participants, memberCount: newMemberCount } = response.data
+      
+      // 변경사항이 있을 때만 업데이트
+      if (newMemberCount !== memberCount) {
+        console.log("[멤버 목록] 업데이트:", memberCount, "→", newMemberCount)
+        setGroupMembers(participants)
+        setMemberCount(newMemberCount)
+      }
+    } catch (error) {
+      console.error("[멤버 목록] 갱신 실패:", error)
+    }
+  }
+
+  // 3초마다 갱신 (발표용이므로 짧게)
+  const interval = setInterval(refreshMembers, 30000)
+
+  return () => {
+    console.log("[멤버 목록] 자동 갱신 중지")
+    clearInterval(interval)
+  }
+}, [roomId, accessToken, roomType, memberCount])
+
+  // ============================ 임시 실시간 업데이트용(10초) 끝 ============================
 
   const fetchChatRoomInfo = async () => {
     const myUserId = useAuthStore.getState().user?.id
@@ -390,6 +461,7 @@ export function ChatRoomDetail({
         sentAt: msg.sentAt,
         isMe: msg.senderId === myUserId,
         status: "sent" as const,
+        messageType: "user" as const,
       }))
 
       setMessages(mergeMessages(parsedMessages))
@@ -420,6 +492,7 @@ export function ChatRoomDetail({
         sentAt: payload.sentAt,
         isMe: false,
         status: "sent",
+        messageType: "user",
       }
 
       setMessages((prev) => mergeMessages(prev, [newMessage]))
@@ -455,12 +528,13 @@ export function ChatRoomDetail({
       isMe: true,
       status: "sending",
       images: selectedImages.length > 0 ? selectedImages : undefined,
+      messageType: "user",
     }
 
     setMessages((prev) => mergeMessages(prev, [tempMessage]))
 
     try {
-      sendChatMessage("/pub/chat.send", {
+      sendChatMessage("/chat.send", {
         roomId: roomId,
         senderId: senderId,
         content: inputValue,
@@ -470,6 +544,7 @@ export function ChatRoomDetail({
       setMessages((prev) =>
         prev.map((msg) => (msg.messageId === tempMessage.messageId ? { ...msg, status: "sent" } : msg)),
       )
+
 
       setTimeout(() => scrollToBottom(), 100)
     } catch (error) {
@@ -532,6 +607,7 @@ export function ChatRoomDetail({
         sentAt: msg.sentAt,
         isMe: msg.senderId === myUserId,
         status: "sent" as const,
+        messageType: "user" as const,
       }))
 
       const container = chatContainerRef.current
@@ -574,8 +650,6 @@ export function ChatRoomDetail({
   const removeImage = (index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index))
   }
-
-  const formatTimestamp = formatMessageTime
 
   const formatRelativeTime = (isoString?: string): string => {
     if (!isoString) return "방금 전"
@@ -958,7 +1032,7 @@ useEffect(() => {
           </div>
         )}
        {/* 메시지 목록 */}
-       {messages.map((message, index) => {
+      {messages.map((message, index) => {
           // 이전 메시지와 날짜가 다르면 날짜 헤더 표시
           const showDateHeader = 
             index === 0 || 
@@ -974,7 +1048,15 @@ useEffect(() => {
                 />
               )}
 
-              {/* 메시지 */}
+              {/* 시스템 메시지 */}
+              {message.messageType === "system" ? (
+                <div className="flex justify-center">
+                  <span className="px-3 py-1 text-xs text-text-secondary bg-background-section rounded-full">
+                    {message.content}
+                  </span>
+                </div>
+              ) : (
+              /* 메시지 */
               <div className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}>
                 <div className={`flex gap-2 max-w-[70%] ${message.isMe ? "flex-row-reverse" : "flex-row"}`}>
                   {!message.isMe && (
@@ -1039,6 +1121,7 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
+              )}
             </React.Fragment>
           )
         })}
