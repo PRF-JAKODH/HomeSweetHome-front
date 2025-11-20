@@ -20,6 +20,7 @@ export function DateDivider({ date, variant = "default" }: DateDividerProps) {
       </div>
     )
   }
+  
 
   // 라인이 있는 스타일 (카카오톡)
   if (variant === "line") {

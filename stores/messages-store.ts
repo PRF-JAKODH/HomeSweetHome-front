@@ -6,6 +6,7 @@ import {IndividualRoomListResponseDto, GroupRoomListResponse} from "@/app/messag
 
 export type MessageRoomType = "INDIVIDUAL" | "GROUP"
 
+
 export type DirectMessageRoom = {
   id: number
   opponentId: number

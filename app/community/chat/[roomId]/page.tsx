@@ -86,6 +86,7 @@ export default function MessagesPage() {
 
   /**
    * 그룹 채팅방 목록 불러오기
+   * 
    */
   useEffect(() => {
     const fetchMyGroupRooms = async () => {
