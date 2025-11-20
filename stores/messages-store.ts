@@ -1,4 +1,8 @@
+import { AccessTokenResponse } from "@/types/auth"
 import { create } from "zustand"
+import { formatRelativeTime } from "@/lib/utils"
+import { apiClient } from "@/lib/api/client"
+import {IndividualRoomListResponseDto, GroupRoomListResponse} from "@/app/messages/page"
 
 export type MessageRoomType = "INDIVIDUAL" | "GROUP"
 
@@ -10,6 +14,7 @@ export type DirectMessageRoom = {
   lastMessage: string
   time: string
   unread?: number
+  isPartnerExit?: boolean
 }
 
 export type GroupMessageRoom = {
@@ -40,6 +45,9 @@ type MessagesStore = {
   setDmList: (rooms: DirectMessageRoom[]) => void
   setGroupList: (rooms: GroupMessageRoom[]) => void
   updateRoomSummary: (params: UpdateRoomParams) => void
+  removeRoom: (roomId: number) => void 
+  fetchIndividualRooms: (accessToken: string) => Promise<void>
+  fetchGroupRooms: (accessToken: string) => Promise<void>
   reset: () => void
 }
 
@@ -146,6 +154,63 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
         groupList: moveRoomToTop(state.groupList, index, updated),
       }
     }),
+  removeRoom: (roomId) =>
+    set((state) => ({
+      dmList: state.dmList.filter((room) => room.id !== roomId),
+      groupList: state.groupList.filter((room) => room.id !== roomId),
+    })),
+    // 개인 채팅방 목록 불러오기 함수 추가
+  fetchIndividualRooms: async (accessToken: string) => {
+    try {
+      const res = await apiClient.get<IndividualRoomListResponseDto[]>("/api/v1/chat/rooms/my/individual", {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        }
+      })
+
+      const mapped: DirectMessageRoom[] = res.map((room: any) => ({
+        id: room.roomId,
+        opponentId: room.partnerId,
+        opponentName: room.partnerName,
+        opponentAvatar: room.thumbnailUrl || "/placeholder.svg",
+        lastMessage: room.lastMessage || "대화를 시작해보세요",
+        time: formatRelativeTime(room.lastMessageAt),
+      }))
+
+      set({ dmList: mapped })
+      console.log("[Store] 개인 채팅방 목록 업데이트 완료")
+    } catch (error) {
+      console.error("[Store] 개인 채팅방 목록 불러오기 실패:", error)
+    }
+  },
+
+  // 그룹 채팅방 목록 불러오기 함수 추가
+  fetchGroupRooms: async (accessToken: string) => {
+    try {
+      const res = await apiClient.get<GroupRoomListResponse[]>("/api/v1/chat/rooms/my/group", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        }
+      })
+
+      const mapped: GroupMessageRoom[] = res.map((room: any) => ({
+        id: room.roomId,
+        roomName: room.roomName,
+        thumbnail: room.thumbnailUrl || "/placeholder.svg",
+        lastMessage: room.lastMessage || "방 멤버들과 인사를 나눠보세요.",
+        time: formatRelativeTime(room.lastMessageAt),
+        memberCount: Number(room.memberCount) || 0,
+      }))
+
+      set({ groupList: mapped })
+      console.log("[Store] 그룹 채팅방 목록 업데이트 완료")
+    } catch (error) {
+      console.error("[Store] 그룹 채팅방 목록 불러오기 실패:", error)
+    }
+  },
+
   reset: () => set({ dmList: [], groupList: [] }),
 }))
 

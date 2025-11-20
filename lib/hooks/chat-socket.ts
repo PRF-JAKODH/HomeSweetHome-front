@@ -54,7 +54,7 @@ export function connectStomp(options?: ConnectOptions): Promise<void> {
 
     client.onConnect = () => {
       options?.onConnected?.()
-      console.log("✅ WebSocket 연결 성공!")
+      console.log("[WebSocket] 연결 성공")
       resolve()
     }
 
@@ -77,27 +77,23 @@ export function subscribeToTopic(
   const client = getClient()
   
   if (!client.connected) {
-    console.error('❌ 연결되지 않음')
+    console.error("[WebSocket] 연결되지 않음, 구독 불가")
     return null
   }
 
-  console.log("🔍 현재 구독 목록:", Array.from(subscriptions.keys()))
-
   // 이미 구독 중이면 스킵
   if (subscriptions.has(topic)) {
-    console.warn('⚠️ 이미 구독 중:', topic)
+    console.log("[WebSocket] 이미 구독 중:", topic)
     return subscriptions.get(topic)!
   }
 
-  console.log('📡 새 구독 시작:', topic)
+  console.log("[WebSocket] 구독 시작:", topic)
   const sub = client.subscribe(topic, (message) => {
-    console.log('📩 [구독 콜백 실행]', topic)  // ✅ 추가
     onMessage(message)
   })
   
   subscriptions.set(topic, sub)
-  console.log('✅ 구독 완료:', topic)
-  console.log("📊 총 구독 수:", subscriptions.size)  // ✅ 추가
+  console.log("[WebSocket] 구독 완료, 총 구독 수:", subscriptions.size)
   return sub
 }
 
@@ -108,6 +104,7 @@ export function unsubscribeFromTopic(topic: string): void {
   if (sub) {
     sub.unsubscribe()
     subscriptions.delete(topic)
+    console.log("[WebSocket] 구독 해제:", topic)
   }
 }
 
@@ -119,13 +116,13 @@ export function sendChatMessage(
   const client = getClient()
   
   if (!client.connected) {
-    console.warn('⚠️ 연결 안 됨')
+    console.error("[WebSocket] 연결 안 됨, 메시지 전송 불가")
     return
   }
 
   client.publish({
     destination: "/pub/chat.send",
-    body: JSON.stringify(payload), // ✅ JSON.stringify 필수!
+    body: JSON.stringify(payload), // JSON.stringify 필수!
   })
 }
 
@@ -136,5 +133,6 @@ export function disconnectStomp(): void {
     subscriptions.clear()
     stompClient.deactivate()
     stompClient = null
+    console.log("[WebSocket] 연결 해제 완료")
   }
 }
