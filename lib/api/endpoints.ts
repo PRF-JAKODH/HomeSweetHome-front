@@ -24,6 +24,7 @@ export const PRODUCT_ENDPOINTS = {
   
   // 상품 검색 및 필터
   SEARCH_PRODUCTS: '/api/v1/products/search',
+  SEARCH_AUTOCOMPLETE: '/api/v1/products/search/autocomplete',
   GET_PRODUCTS_BY_CATEGORY: (categoryId: string) => `/api/v1/products/category/${categoryId}`,
   GET_PRODUCTS_BY_SUBCATEGORY: (subCategoryId: string) => `/api/v1/products/subcategory/${subCategoryId}`,
   
