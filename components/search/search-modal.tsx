@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { X } from "lucide-react"
+import { X, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete } from "@/lib/api/products"
 import { useAuthStore } from "@/stores/auth-store"
@@ -10,6 +10,7 @@ interface SearchModalProps {
   keyword: string
   onKeywordChange: (value: string) => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+  onSearchWithKeyword?: (keyword: string) => void
   onClose: () => void
 }
 
@@ -35,7 +36,7 @@ function HighlightedText({ text }: { text: string }) {
   )
 }
 
-export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: SearchModalProps) {
+export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKeyword, onClose }: SearchModalProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [autocompleteResults, setAutocompleteResults] = useState<string[]>([])
@@ -154,13 +155,18 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
     const cleanValue = selectedKeyword.replace(/<\/?b>/g, '')
     onKeywordChange(cleanValue)
     setShowAutocomplete(false)
-    // 검색 실행
-    const syntheticEvent = {
-      preventDefault: () => {},
-      currentTarget: inputRef.current?.closest('form') || null,
-    } as React.FormEvent<HTMLFormElement>
-    onSubmit(syntheticEvent)
-  }, [onKeywordChange, onSubmit])
+    // 검색 실행 - 선택한 검색어를 직접 사용
+    if (onSearchWithKeyword) {
+      onSearchWithKeyword(cleanValue)
+    } else {
+      // fallback: 기존 방식
+      const syntheticEvent = {
+        preventDefault: () => {},
+        currentTarget: inputRef.current?.closest('form') || null,
+      } as React.FormEvent<HTMLFormElement>
+      onSubmit(syntheticEvent)
+    }
+  }, [onKeywordChange, onSubmit, onSearchWithKeyword])
 
   const handleKeywordRemove = async (value: string) => {
     try {
@@ -266,10 +272,13 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onClose }: Sea
                             type="button"
                             onClick={() => handleAutocompleteSelect(result)}
                             onMouseEnter={() => setSelectedIndex(index)}
-                            className={`w-full px-4 py-3 text-left text-base hover:bg-gray-100 transition-colors ${
+                            className={`w-full px-4 py-3 text-left text-base hover:bg-gray-100 transition-colors flex items-center gap-3 ${
                               selectedIndex === index ? "bg-gray-100" : ""
                             }`}
                           >
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                              <Search className="w-4 h-4 text-gray-500" />
+                            </div>
                             <HighlightedText text={result} />
                           </button>
                         </li>

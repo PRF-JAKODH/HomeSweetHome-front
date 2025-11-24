@@ -104,6 +104,14 @@ export function Header() {
     }
   }
 
+  const handleSearchWithKeyword = (keyword: string) => {
+    if (keyword.trim()) {
+      setSearchKeyword(keyword.trim())
+      router.push(`/store?keyword=${encodeURIComponent(keyword.trim())}`)
+      setShowSearchModal(false)
+    }
+  }
+
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchKeyword(e.target.value)
   }
@@ -212,6 +220,7 @@ export function Header() {
           keyword={searchKeyword}
           onKeywordChange={setSearchKeyword}
           onSubmit={handleSearch}
+          onSearchWithKeyword={handleSearchWithKeyword}
           onClose={closeSearchModal}
         />
       )}
