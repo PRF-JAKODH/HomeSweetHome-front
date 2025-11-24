@@ -16,6 +16,20 @@ export const clearRecentSearches = async (): Promise<void> => {
   await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_CLEAR_ALL)
 }
 
+// 검색 자동 완성
+export const getSearchAutocomplete = async (keyword: string): Promise<string[]> => {
+  if (!keyword || keyword.trim().length < 2) {
+    return []
+  }
+  const response = await apiClient.get<string[]>(PRODUCT_ENDPOINTS.SEARCH_AUTOCOMPLETE, {
+    params: { keyword: keyword.trim() }
+  })
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
+
 export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => {
   const response = await apiClient.get<RecentViewPreviewResponse[]>(PRODUCT_ENDPOINTS.RECENT_VIEWS)
   if (Array.isArray(response)) {
