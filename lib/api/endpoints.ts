@@ -14,7 +14,7 @@ export const PRODUCT_ENDPOINTS = {
   // 상품 프리뷰 조회 (무한 스크롤)
   GET_PRODUCT_PREVIEWS: '/api/v1/products/previews',
   FILTER_PRODUCT_PREVIEWS: '/api/v1/products/previews/filter',
-  SEARCH_AUTHENTICATED: '/api/v1/search/authenticated',
+  SEARCH_AUTHENTICATED: '/api/v1/products/search',
   SEARCH_RECENT: '/api/v1/recent-keyword',
   SEARCH_RECENT_DELETE_KEYWORD: '/api/v1/recent-keyword',
   SEARCH_RECENT_CLEAR_ALL: '/api/v1/recent-keyword/all',
@@ -63,6 +63,7 @@ export const CATEGORY_ENDPOINTS = {
 export const CART_ENDPOINTS = {
   // 장바구니 CRUD
   GET_CART: '/api/v1/carts',
+  GET_CART_COUNT: '/api/v1/carts/count',
   ADD_TO_CART: '/api/v1/carts',
   UPDATE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,
   DELETE_CART_ITEM: (cartItemId: string) => `/api/v1/carts/${cartItemId}`,
