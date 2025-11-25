@@ -131,6 +131,7 @@ export interface GetProductPreviewsRequest {
   sortType?: ProductSortType
   minPrice?: number // 가격 필터 - 최소 가격
   maxPrice?: number // 가격 필터 - 최대 가격
+  optionFilters?: Record<string, string[]> // 옵션 필터 (인증된 사용자용)
 }
 
 export interface ProductFilterRequest {

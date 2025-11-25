@@ -163,16 +163,30 @@ export const searchProductPreviewsAuthenticated = async (
   params: GetProductPreviewsRequest = {}
 ): Promise<GetProductPreviewsResponse> => {
   // 인증된 사용자 API는 nextCursor(String) 사용, cursorId는 무시
-  const { cursorId, ...restParams } = params
+  const { cursorId, optionFilters, ...restParams } = params
+  
+  // optionFilters를 "키:값" 형식의 배열로 변환
+  const optionFiltersArray: string[] = []
+  if (optionFilters && Object.keys(optionFilters).length > 0) {
+    Object.entries(optionFilters).forEach(([key, values]) => {
+      values.forEach((value) => {
+        optionFiltersArray.push(`${key}:${value}`)
+      })
+    })
+  }
+  
   // nextCursor가 있으면 그대로 사용, 없으면 cursorId를 nextCursor로 변환
-  const apiParams = {
+  const apiParams: Record<string, any> = {
     ...restParams,
     ...(params.nextCursor !== undefined ? { nextCursor: params.nextCursor } : 
         (cursorId !== undefined && cursorId !== null ? { nextCursor: cursorId.toString() } : {})),
     // minPrice, maxPrice가 있으면 포함
     ...(params.minPrice !== undefined && params.minPrice !== null ? { minPrice: params.minPrice } : {}),
     ...(params.maxPrice !== undefined && params.maxPrice !== null ? { maxPrice: params.maxPrice } : {}),
+    // optionFilters가 있으면 배열로 포함
+    ...(optionFiltersArray.length > 0 ? { optionFilters: optionFiltersArray } : {}),
   }
+  
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params: apiParams })
 }
 

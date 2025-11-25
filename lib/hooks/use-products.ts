@@ -72,6 +72,23 @@ export const useInfiniteProductPreviews = (
   } = useInfiniteQuery({
     queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated, minPrice, maxPrice],
     queryFn: ({ pageParam }) => {
+      // 인증된 사용자는 search API 사용 (옵션 필터 포함)
+      if (isAuthenticated) {
+        // 인증된 사용자 API는 nextCursor(String) 사용
+        const authenticatedParams = {
+          categoryId,
+          limit,
+          sortType,
+          nextCursor: pageParam !== undefined && pageParam !== null ? (typeof pageParam === 'string' ? pageParam : pageParam.toString()) : undefined,
+          keyword: keyword || undefined,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          optionFilters: sanitizedOptionFilters, // 옵션 필터 추가
+        }
+        return searchProductPreviewsAuthenticated(authenticatedParams)
+      }
+
+      // 비인증 사용자: 옵션 필터나 범위 필터가 있으면 필터 API 사용
       if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
         // 필터가 있는 경우 cursorId는 number만 사용
         const filterCursorId = typeof pageParam === 'number' ? pageParam : undefined
@@ -86,21 +103,6 @@ export const useInfiniteProductPreviews = (
             rangeFilters: sanitizedRangeFilters,
           },
         })
-      }
-
-      // 인증된 사용자는 search API만 사용 (nextCursor 사용)
-      if (isAuthenticated) {
-        // 인증된 사용자 API는 nextCursor(String) 사용
-        const authenticatedParams = {
-          categoryId,
-          limit,
-          sortType,
-          nextCursor: pageParam !== undefined && pageParam !== null ? (typeof pageParam === 'string' ? pageParam : pageParam.toString()) : undefined,
-          keyword: keyword || undefined,
-          minPrice: minPrice,
-          maxPrice: maxPrice,
-        }
-        return searchProductPreviewsAuthenticated(authenticatedParams)
       }
 
       // 비인증 사용자는 previews API 사용 (cursorId 유지)
