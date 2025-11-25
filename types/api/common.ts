@@ -20,6 +20,7 @@ export interface ErrorResponse {
 // 무한 스크롤 응답 (커서 기반)
 export interface ScrollResponse<T> {
   contents: T[]
-  nextCursorId: number | null
+  nextCursorId?: number | null // 비인증 사용자용
+  nextCursor?: string | null // 인증된 사용자용
   hasNext: boolean
 }

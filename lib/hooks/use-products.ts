@@ -12,6 +12,7 @@ export const useInfiniteProductPreviews = (
   rangeFilters?: Record<string, RangeFilter>
 ) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isHydrated = useAuthStore((state) => state.isHydrated)
 
   const sanitizedOptionFilters = optionFilters
     ? Object.entries(optionFilters).reduce<Record<string, string[]>>((acc, [key, values]) => {
@@ -70,8 +71,10 @@ export const useInfiniteProductPreviews = (
     queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated],
     queryFn: ({ pageParam }) => {
       if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
+        // 필터가 있는 경우 cursorId는 number만 사용
+        const filterCursorId = typeof pageParam === 'number' ? pageParam : undefined
         return filterProductPreviews({
-          cursorId: pageParam,
+          cursorId: filterCursorId,
           limit,
           sortType,
           filters: {
@@ -83,27 +86,57 @@ export const useInfiniteProductPreviews = (
         })
       }
 
+      // 인증된 사용자는 search API만 사용 (nextCursor 사용)
+      if (isAuthenticated) {
+        // 인증된 사용자 API는 nextCursor(String) 사용
+        const authenticatedParams = {
+          categoryId,
+          limit,
+          sortType,
+          nextCursor: pageParam !== undefined && pageParam !== null ? (typeof pageParam === 'string' ? pageParam : pageParam.toString()) : undefined,
+          keyword: keyword || undefined,
+        }
+        return searchProductPreviewsAuthenticated(authenticatedParams)
+      }
+
+      // 비인증 사용자는 previews API 사용 (cursorId 유지)
       const baseParams = {
         categoryId,
         limit,
         sortType,
-        cursorId: pageParam,
+        cursorId: typeof pageParam === 'number' ? pageParam : undefined,
         keyword: keyword || undefined,
       }
-
-      if (isAuthenticated) {
-        return searchProductPreviewsAuthenticated(baseParams)
-      }
-
       return getProductPreviews(baseParams)
     },
-    initialPageParam: undefined as number | undefined,
+    initialPageParam: undefined as number | string | undefined,
     getNextPageParam: (lastPage) => {
-      return lastPage.hasNext ? lastPage.nextCursorId : undefined
+      // hasNext가 false이면 더 이상 페이지가 없음
+      if (!lastPage.hasNext) {
+        return undefined
+      }
+      
+      // 인증된 사용자는 nextCursor(String) 사용
+      if (isAuthenticated) {
+        if (lastPage.nextCursor !== null && lastPage.nextCursor !== undefined && lastPage.nextCursor !== '') {
+          return lastPage.nextCursor
+        }
+        // nextCursor가 없으면 undefined 반환
+        return undefined
+      }
+      
+      // 비인증 사용자는 nextCursorId(number) 사용
+      if (lastPage.nextCursorId !== null && lastPage.nextCursorId !== undefined) {
+        return lastPage.nextCursorId
+      }
+      
+      return undefined
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    // hydration이 완료된 후에만 쿼리 실행 (인증 상태가 안정화될 때까지 대기)
+    enabled: isHydrated,
   })
 
   // 모든 페이지의 상품을 평탄화하고 중복 제거
