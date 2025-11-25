@@ -89,7 +89,7 @@ export type UpdateProductResponse = ApiResponse<Product>
 export type DeleteProductResponse = ApiResponse<{ id: string }>
 
 // 상품 정렬 타입
-export type ProductSortType = 'LATEST' | 'PRICE_LOW' | 'PRICE_HIGH' | 'POPULAR'
+export type ProductSortType = 'LATEST' | 'PRICE_LOW' | 'PRICE_HIGH' | 'POPULAR' | 'RECOMMENDED'
 
 // 상품 프리뷰 응답 (무한 스크롤용)
 export interface ProductPreviewResponse {
