@@ -179,10 +179,12 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
 
   // 키보드 네비게이션 처리
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // 자동 완성이 표시되지 않거나 결과가 없으면 기본 동작 허용
     if (!showAutocomplete || autocompleteResults.length === 0) {
       if (e.key === "Escape") {
         onClose()
       }
+      // Enter 키는 form submit으로 처리되도록 허용
       return
     }
 
@@ -199,10 +201,13 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
         break
       case "Enter":
         e.preventDefault()
+        // 선택된 항목이 있을 때만 자동 완성 결과 사용
         if (selectedIndex >= 0 && selectedIndex < autocompleteResults.length) {
           handleAutocompleteSelect(autocompleteResults[selectedIndex])
-        } else if (autocompleteResults.length > 0) {
-          handleAutocompleteSelect(autocompleteResults[0])
+        } else {
+          // 선택된 항목이 없으면 입력한 검색어로 검색 (form submit)
+          setShowAutocomplete(false)
+          onSubmit(e as any)
         }
         break
       case "Escape":
