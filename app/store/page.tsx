@@ -32,7 +32,6 @@ export default function StorePage() {
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState<number | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const [isClient, setIsClient] = useState(false)
-  const [sortType, setSortType] = useState<ProductSortType>('LATEST')
   const [showSortOptions, setShowSortOptions] = useState(false)
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   const [recentViews, setRecentViews] = useState<RecentViewPreviewResponse[]>([])
@@ -45,6 +44,23 @@ export default function StorePage() {
   // URL에서 검색 키워드와 카테고리 ID 가져오기
   const searchKeyword = searchParams.get('keyword') || ''
   const categoryParam = searchParams.get('category')
+  
+  // 검색 시에는 RECOMMENDED를 기본값으로, 일반 조회 시에는 LATEST를 기본값으로 사용
+  const [sortType, setSortType] = useState<ProductSortType>(() => {
+    // 초기 마운트 시 검색어가 있으면 RECOMMENDED, 없으면 LATEST
+    return searchKeyword ? 'RECOMMENDED' : 'LATEST'
+  })
+  
+  // 검색어가 변경될 때 정렬 타입 업데이트
+  useEffect(() => {
+    if (searchKeyword) {
+      // 검색어가 있으면 RECOMMENDED로 설정
+      setSortType('RECOMMENDED')
+    } else {
+      // 검색어가 없으면 LATEST로 설정
+      setSortType('LATEST')
+    }
+  }, [searchKeyword])
   
   // 정렬 타입 변경 핸들러
   const handleSortTypeChange = (newSortType: ProductSortType) => {
@@ -64,6 +80,7 @@ export default function StorePage() {
       case 'LATEST': return '최신순'
       case 'PRICE_LOW': return '낮은가격순'
       case 'PRICE_HIGH': return '높은가격순'
+      case 'RECOMMENDED': return '추천순'
       default: return '최신순'
     }
   }
@@ -781,6 +798,17 @@ export default function StorePage() {
                     {showSortOptions && (
                       <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
                         <div className="py-1">
+                          <button
+                            onClick={() => handleSortTypeChange("RECOMMENDED")}
+                            className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                              sortType === "RECOMMENDED"
+                                ? "font-semibold text-gray-900"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            추천순
+                            {sortType === "RECOMMENDED" && <Check className="h-4 w-4" />}
+                          </button>
                           <button
                             onClick={() => handleSortTypeChange("POPULAR")}
                             className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
