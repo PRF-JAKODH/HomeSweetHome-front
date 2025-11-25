@@ -77,7 +77,9 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
       try {
         const recent = await getRecentSearches()
         if (active) {
-          setRecentSearches(recent ?? [])
+          // 중복 제거 (같은 검색어가 여러 번 저장된 경우)
+          const uniqueRecent = Array.from(new Set(recent ?? []))
+          setRecentSearches(uniqueRecent)
         }
       } catch (error) {
         console.error("최근 검색어를 불러오지 못했습니다.", error)
@@ -319,9 +321,9 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
                 </button>
               </div>
               <div className="flex flex-wrap gap-3">
-                {recentSearches.map((item) => (
+                {recentSearches.map((item, index) => (
                   <button
-                    key={item}
+                    key={`${item}-${index}`}
                     type="button"
                     onClick={() => handleKeywordClick(item)}
                     className="group/recent flex items-center gap-2 rounded-full border border-gray-200 bg-white/55 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all hover:border-gray-900 hover:bg-gray-900 hover:text-white"
