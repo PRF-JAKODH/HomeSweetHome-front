@@ -51,13 +51,16 @@ export default function StorePage() {
     return searchKeyword ? 'RECOMMENDED' : 'LATEST'
   })
   
-  // 검색어가 변경될 때 정렬 타입 업데이트 (현재 값과 다를 때만 업데이트)
+  // 검색어가 변경될 때만 정렬 타입 초기화 (사용자가 수동으로 변경한 경우는 유지)
+  const prevSearchKeywordRef = useRef(searchKeyword)
   useEffect(() => {
-    const expectedSortType = searchKeyword ? 'RECOMMENDED' : 'LATEST'
-    if (sortType !== expectedSortType) {
+    // 검색어가 실제로 변경된 경우에만 정렬 타입 초기화
+    if (prevSearchKeywordRef.current !== searchKeyword) {
+      const expectedSortType = searchKeyword ? 'RECOMMENDED' : 'LATEST'
       setSortType(expectedSortType)
+      prevSearchKeywordRef.current = searchKeyword
     }
-  }, [searchKeyword, sortType])
+  }, [searchKeyword])
   
   // 정렬 타입 변경 핸들러
   const handleSortTypeChange = (newSortType: ProductSortType) => {
