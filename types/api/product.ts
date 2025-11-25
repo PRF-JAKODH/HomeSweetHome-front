@@ -124,6 +124,7 @@ export interface RecentViewPreviewResponse {
 // 상품 프리뷰 조회 요청 파라미터
 export interface GetProductPreviewsRequest {
   cursorId?: number
+  nextCursor?: string // 인증된 사용자용 API에서 사용
   categoryId?: number
   limit?: number
   keyword?: string

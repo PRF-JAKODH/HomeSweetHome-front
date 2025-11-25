@@ -162,7 +162,15 @@ export const getProductPreviews = async (params: GetProductPreviewsRequest = {})
 export const searchProductPreviewsAuthenticated = async (
   params: GetProductPreviewsRequest = {}
 ): Promise<GetProductPreviewsResponse> => {
-  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params })
+  // 인증된 사용자 API는 nextCursor(String) 사용, cursorId는 무시
+  const { cursorId, ...restParams } = params
+  // nextCursor가 있으면 그대로 사용, 없으면 cursorId를 nextCursor로 변환
+  const apiParams = {
+    ...restParams,
+    ...(params.nextCursor !== undefined ? { nextCursor: params.nextCursor } : 
+        (cursorId !== undefined && cursorId !== null ? { nextCursor: cursorId.toString() } : {})),
+  }
+  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params: apiParams })
 }
 
 type FilterProductPreviewsParams = {
