@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ProductSortType, RangeFilter } from '@/types/api/product'
-import { getProductPreviews, filterProductPreviews, searchProductPreviewsAuthenticated } from '@/lib/api/products'
+import { ProductSortType, RangeFilter, GetProductPreviewsRequest } from '@/types/api/product'
+import { getProductPreviews, searchProductPreviewsAuthenticated } from '@/lib/api/products'
 import { useAuthStore } from '@/stores/auth-store'
 
 export const useInfiniteProductPreviews = (
@@ -88,30 +88,16 @@ export const useInfiniteProductPreviews = (
         return searchProductPreviewsAuthenticated(authenticatedParams)
       }
 
-      // 비인증 사용자: 옵션 필터나 범위 필터가 있으면 필터 API 사용
-      if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
-        // 필터가 있는 경우 cursorId는 number만 사용
-        const filterCursorId = typeof pageParam === 'number' ? pageParam : undefined
-        return filterProductPreviews({
-          cursorId: filterCursorId,
-          limit,
-          sortType,
-          filters: {
-            categoryId,
-            keyword: keyword || undefined,
-            optionFilters: sanitizedOptionFilters,
-            rangeFilters: sanitizedRangeFilters,
-          },
-        })
-      }
-
-      // 비인증 사용자는 previews API 사용 (cursorId 유지)
-      const baseParams = {
+      // 비인증 사용자는 previews API 사용 (옵션 필터 포함, nextCursor 사용)
+      const baseParams: GetProductPreviewsRequest = {
         categoryId,
         limit,
         sortType,
-        cursorId: typeof pageParam === 'number' ? pageParam : undefined,
+        nextCursor: pageParam !== undefined && pageParam !== null ? (typeof pageParam === 'string' ? pageParam : pageParam.toString()) : undefined,
         keyword: keyword || undefined,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        optionFilters: sanitizedOptionFilters, // 옵션 필터 추가
       }
       return getProductPreviews(baseParams)
     },
@@ -131,9 +117,9 @@ export const useInfiniteProductPreviews = (
         return undefined
       }
       
-      // 비인증 사용자는 nextCursorId(number) 사용
-      if (lastPage.nextCursorId !== null && lastPage.nextCursorId !== undefined) {
-        return lastPage.nextCursorId
+      // 비인증 사용자는 nextCursor(String) 사용
+      if (lastPage.nextCursor !== null && lastPage.nextCursor !== undefined && lastPage.nextCursor !== '') {
+        return lastPage.nextCursor
       }
       
       return undefined
