@@ -154,9 +154,31 @@ export const getProductsBySubCategory = async (subCategoryId: string, params?: O
   })
 }
 
-// 상품 프리뷰 조회 (무한 스크롤)
+// 상품 프리뷰 조회 (무한 스크롤) - 비인증 사용자용 (옵션 필터 포함)
 export const getProductPreviews = async (params: GetProductPreviewsRequest = {}): Promise<GetProductPreviewsResponse> => {
-  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params })
+  // optionFilters를 "키:값" 형식의 배열로 변환
+  const optionFiltersArray: string[] = []
+  if (params.optionFilters && Object.keys(params.optionFilters).length > 0) {
+    Object.entries(params.optionFilters).forEach(([key, values]) => {
+      values.forEach((value) => {
+        optionFiltersArray.push(`${key}:${value}`)
+      })
+    })
+  }
+  
+  // API 파라미터 구성
+  const apiParams: Record<string, any> = {
+    ...(params.nextCursor !== undefined && params.nextCursor !== null ? { nextCursor: params.nextCursor } : {}),
+    ...(params.categoryId !== undefined && params.categoryId !== null ? { categoryId: params.categoryId } : {}),
+    ...(params.keyword ? { keyword: params.keyword } : {}),
+    ...(params.sortType ? { sortType: params.sortType } : {}),
+    ...(params.minPrice !== undefined && params.minPrice !== null ? { minPrice: params.minPrice } : {}),
+    ...(params.maxPrice !== undefined && params.maxPrice !== null ? { maxPrice: params.maxPrice } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
+    ...(optionFiltersArray.length > 0 ? { optionFilters: optionFiltersArray } : {}),
+  }
+  
+  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params: apiParams })
 }
 
 export const searchProductPreviewsAuthenticated = async (
@@ -190,52 +212,7 @@ export const searchProductPreviewsAuthenticated = async (
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params: apiParams })
 }
 
-type FilterProductPreviewsParams = {
-  cursorId?: number
-  limit?: number
-  sortType?: ProductSortType
-  filters: ProductFilterRequest
-}
-
-// 옵션 필터 기반 상품 프리뷰 조회
-export const filterProductPreviews = async ({
-  cursorId,
-  limit,
-  sortType,
-  filters,
-}: FilterProductPreviewsParams): Promise<GetProductPreviewsResponse> => {
-  const payload: ProductFilterRequest = {}
-
-  if (typeof filters.categoryId === 'number') {
-    payload.categoryId = filters.categoryId
-  }
-
-  if (filters.keyword) {
-    payload.keyword = filters.keyword
-  }
-
-  if (filters.optionFilters && Object.keys(filters.optionFilters).length > 0) {
-    payload.optionFilters = filters.optionFilters
-  }
-
-  if (filters.rangeFilters && Object.keys(filters.rangeFilters).length > 0) {
-    payload.rangeFilters = filters.rangeFilters as Record<string, RangeFilter>
-  }
-
-  const response = await apiClient.post<GetProductPreviewsResponse>(
-    PRODUCT_ENDPOINTS.FILTER_PRODUCT_PREVIEWS,
-    payload,
-    {
-      params: {
-        cursorId,
-        limit,
-        sortType,
-      },
-    },
-  )
-
-  return response.data ?? (response as unknown as GetProductPreviewsResponse)
-}
+// filterProductPreviews 함수는 더 이상 사용하지 않음 (통합된 GET API 사용)
 
 // 상품 통계 조회
 export const getProductStats = async (): Promise<ApiResponse<ProductStats>> => {
