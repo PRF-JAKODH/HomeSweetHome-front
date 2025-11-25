@@ -169,6 +169,9 @@ export const searchProductPreviewsAuthenticated = async (
     ...restParams,
     ...(params.nextCursor !== undefined ? { nextCursor: params.nextCursor } : 
         (cursorId !== undefined && cursorId !== null ? { nextCursor: cursorId.toString() } : {})),
+    // minPrice, maxPrice가 있으면 포함
+    ...(params.minPrice !== undefined && params.minPrice !== null ? { minPrice: params.minPrice } : {}),
+    ...(params.maxPrice !== undefined && params.maxPrice !== null ? { maxPrice: params.maxPrice } : {}),
   }
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params: apiParams })
 }

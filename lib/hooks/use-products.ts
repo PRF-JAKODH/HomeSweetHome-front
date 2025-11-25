@@ -9,7 +9,9 @@ export const useInfiniteProductPreviews = (
   limit: number = 10,
   keyword?: string,
   optionFilters?: Record<string, string[]>,
-  rangeFilters?: Record<string, RangeFilter>
+  rangeFilters?: Record<string, RangeFilter>,
+  minPrice?: number,
+  maxPrice?: number
 ) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isHydrated = useAuthStore((state) => state.isHydrated)
@@ -68,7 +70,7 @@ export const useInfiniteProductPreviews = (
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated],
+    queryKey: ['product-previews', categoryId, sortType, limit, keyword, optionFiltersKey, rangeFiltersKey, isAuthenticated, minPrice, maxPrice],
     queryFn: ({ pageParam }) => {
       if ((hasOptionFilters && sanitizedOptionFilters) || (hasRangeFilters && sanitizedRangeFilters)) {
         // 필터가 있는 경우 cursorId는 number만 사용
@@ -95,6 +97,8 @@ export const useInfiniteProductPreviews = (
           sortType,
           nextCursor: pageParam !== undefined && pageParam !== null ? (typeof pageParam === 'string' ? pageParam : pageParam.toString()) : undefined,
           keyword: keyword || undefined,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
         }
         return searchProductPreviewsAuthenticated(authenticatedParams)
       }
