@@ -187,12 +187,23 @@ export default function StorePage() {
   const apiRangeFilters = useMemo(() => {
     if (!rangeFilters) return undefined
     return Object.entries(rangeFilters).reduce<Record<string, ApiRangeFilter>>((acc, [key, value]) => {
+      // 가격 필터는 별도로 처리하므로 제외
+      if (key === "가격") return acc
       acc[key] = {
         minValue: value.min,
         maxValue: value.max,
       }
       return acc
     }, {})
+  }, [rangeFilters])
+
+  // 가격 필터 추출 (minPrice, maxPrice)
+  const { minPrice, maxPrice } = useMemo(() => {
+    const priceRange = rangeFilters?.["가격"]
+    return {
+      minPrice: priceRange?.min !== undefined && priceRange.min !== null ? priceRange.min : undefined,
+      maxPrice: priceRange?.max !== undefined && priceRange.max !== null ? priceRange.max : undefined,
+    }
   }, [rangeFilters])
 
   const {
@@ -209,6 +220,8 @@ export default function StorePage() {
     searchKeyword,
     optionFilters,
     apiRangeFilters,
+    minPrice,
+    maxPrice,
   )
 
   useEffect(() => {

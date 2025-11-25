@@ -129,6 +129,8 @@ export interface GetProductPreviewsRequest {
   limit?: number
   keyword?: string
   sortType?: ProductSortType
+  minPrice?: number // 가격 필터 - 최소 가격
+  maxPrice?: number // 가격 필터 - 최대 가격
 }
 
 export interface ProductFilterRequest {

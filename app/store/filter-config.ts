@@ -98,6 +98,20 @@ export const storeFilterConfig: StoreFilterConfig = {
       options: COLOR_OPTIONS,
       swatchMap: COLOR_SWATCH_MAP,
     },
+    {
+      id: "price",
+      label: "가격",
+      type: "range-group",
+      ranges: [
+        {
+          id: "price-range",
+          label: "",
+          rangeKey: "가격",
+          unit: "원",
+          placeholders: { min: "최소 가격", max: "최대 가격" },
+        },
+      ],
+    },
   ],
   categoryFilters: [
     {

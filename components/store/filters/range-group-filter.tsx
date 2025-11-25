@@ -70,6 +70,13 @@ export function RangeGroupFilterDropdown({
     const { min, max } = inputs[rangeKey] ?? { min: "", max: "" }
     const minNumber = min.trim() === "" ? undefined : Number(min)
     const maxNumber = max.trim() === "" ? undefined : Number(max)
+    
+    // 유효성 검사: 최소 가격이 최대 가격보다 크면 적용 차단
+    if (minNumber !== undefined && maxNumber !== undefined && minNumber > maxNumber) {
+      alert("최소 가격은 최대 가격보다 작거나 같아야 합니다.")
+      return
+    }
+    
     onApplyRange(rangeKey, { min: minNumber, max: maxNumber })
   }
 
@@ -122,15 +129,7 @@ export function RangeGroupFilterDropdown({
       {open && (
         <div className="absolute right-0 top-full z-20 mt-2 w-[480px] rounded-2xl border border-gray-100 bg-white shadow-xl">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <span className="text-sm font-semibold text-gray-900">{config.label} 범위</span>
-            <Button
-              size="sm"
-              onClick={handleClearGroup}
-              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-              type="button"
-            >
-              전체 초기화
-            </Button>
+            <span className="text-sm font-semibold text-gray-900">{config.label}</span>
           </div>
 
           <div className="space-y-4 px-4 py-3">
@@ -139,7 +138,7 @@ export function RangeGroupFilterDropdown({
 
               return (
                 <div key={range.id} className="space-y-2">
-                  <p className="text-sm font-semibold text-foreground">{range.label}</p>
+                  {range.label && <p className="text-sm font-semibold text-foreground">{range.label}</p>}
                   <div className="flex items-center gap-3">
                     <input
                       type="number"
