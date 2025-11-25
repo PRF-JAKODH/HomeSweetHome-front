@@ -4,7 +4,7 @@
 
 import { apiClient } from './client'
 import { CART_ENDPOINTS } from './endpoints'
-import { CartRequest, Cart, CartResponse, DeleteCartItemsRequest } from '@/types/api/cart'
+import { CartRequest, Cart, CartResponse, DeleteCartItemsRequest, CartCountResponse } from '@/types/api/cart'
 import { ApiResponse, ScrollResponse } from '@/types/api/common'
 
 
@@ -14,6 +14,27 @@ import { ApiResponse, ScrollResponse } from '@/types/api/common'
 export const addToCart = async (cartRequest: CartRequest): Promise<Cart> => {
   const response = await apiClient.post(CART_ENDPOINTS.ADD_TO_CART, cartRequest)
   return response.data as Cart
+}
+
+/**
+ * 장바구니 개수 조회
+ */
+export const getCartItemCount = async (): Promise<CartCountResponse> => {
+  try {
+    const response = await apiClient.get<CartCountResponse>(CART_ENDPOINTS.GET_CART_COUNT)
+    
+    // apiClient.get은 이미 response.data를 반환하므로 response가 CartCountResponse 타입
+    if (response && typeof response === 'object' && 'cartCount' in response) {
+      return response as CartCountResponse
+    }
+    
+    // 응답 구조가 예상과 다른 경우 처리 (하위 호환성)
+    console.warn('[getCartItemCount] Unexpected response structure:', response)
+    return { cartCount: (response as any)?.cartCount ?? (response as any)?.count ?? 0 }
+  } catch (error) {
+    console.error('[getCartItemCount] Error fetching cart count:', error)
+    return { cartCount: 0 }
+  }
 }
 
 /**

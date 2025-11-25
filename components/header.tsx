@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
-import { useCart } from "@/lib/hooks/use-cart"
+import { useCartCount } from "@/lib/hooks/use-cart"
 import { useAuthStore } from "@/stores/auth-store"
 import { NotificationDropdown } from "@/components/notification/notification-dropdown"
 import { SearchModal } from "@/components/search/search-modal"
@@ -16,15 +16,28 @@ export function Header() {
   const router = useRouter()
   const pathname = usePathname()
   const { isLoading, logout, isAuthenticated, isHydrated } = useAuth()
-  const { data: cartData, isLoading: cartLoading } = useCart()
+  const { data: cartCountData, isLoading: cartLoading, error: cartError } = useCartCount()
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer")
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState("")
   const [showSearchModal, setShowSearchModal] = useState(false)
 
-  // 장바구니 개수 계산 (인증된 상태에서만)
-  const cartCount = isAuthenticated ? (cartData?.contents?.length || 0) : 0
+  // 장바구니 개수 (인증된 상태에서만)
+  const cartCount = isAuthenticated && cartCountData ? (cartCountData.cartCount ?? 0) : 0
+  
+  // 디버깅용 (개발 중에만)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      if (cartCountData) {
+        console.log('[Header] Cart count data:', cartCountData)
+        console.log('[Header] Cart count:', cartCount)
+      }
+      if (cartError) {
+        console.error('[Header] Cart count error:', cartError)
+      }
+    }
+  }, [cartCountData, cartCount, cartError])
 
   useEffect(() => {
     // 컴포넌트 마운트 시 즉시 hydration 완료로 설정
