@@ -6,6 +6,7 @@ import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
 import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
 import apiClient from '@/lib/api'
+import { useRouter, useSearchParams } from "next/navigation"
 
 // 정렬 옵션 타입 정의
 type SortOption = {
@@ -91,9 +92,35 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function CommunityPage() {
-  const [selectedTab, setSelectedTab] = useState("chat-rooms")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // URL에서 탭 정보 읽기 (없으면 기본값 "chat-rooms")
+  const tabFromUrl = searchParams?.get("tab") || "chat-rooms"
+  const [selectedTab, setSelectedTab] = useState(tabFromUrl)
   const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0])
   const observerTarget = useRef<HTMLDivElement>(null)
+  
+  // 초기 로드 시 URL에 탭 정보가 없으면 기본값 설정
+  useEffect(() => {
+    if (!searchParams?.get("tab")) {
+      router.replace("/community?tab=chat-rooms", { scroll: false })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // URL의 탭 정보가 변경되면 state 업데이트
+  useEffect(() => {
+    const tab = searchParams?.get("tab") || "chat-rooms"
+    if (tab !== selectedTab) {
+      setSelectedTab(tab)
+    }
+  }, [searchParams, selectedTab])
+  
+  // 탭 변경 핸들러 (URL 업데이트)
+  const handleTabChange = (tabId: string) => {
+    setSelectedTab(tabId)
+    router.push(`/community?tab=${tabId}`, { scroll: false })
+  }
   
   // 그룹 채팅방 목록 상태
   const [chatRooms, setChatRooms] = useState<any[]>([])
@@ -193,7 +220,7 @@ export default function CommunityPage() {
                   <button
                     type="button"
                     key={category.id}
-                    onClick={() => setSelectedTab(category.id)}
+                    onClick={() => handleTabChange(category.id)}
                     className={`group relative flex items-center gap-6 rounded-3xl p-6 text-left transition-all duration-200 ${
                       isSelected
                         ? "bg-white/90 border border-white/60 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] md:hover:-translate-y-1"

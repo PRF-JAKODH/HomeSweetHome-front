@@ -5,6 +5,7 @@ import { X, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete } from "@/lib/api/products"
 import { useAuthStore } from "@/stores/auth-store"
+import { usePathname, useSearchParams } from "next/navigation"
 
 interface SearchModalProps {
   keyword: string
@@ -45,6 +46,28 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const abortControllerRef = useRef<AbortController | null>(null)
+  
+  // 현재 경로 확인
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  
+  // 커뮤니티 페이지의 탭에 따라 placeholder 결정
+  const getPlaceholder = () => {
+    if (pathname === "/community") {
+      const tab = searchParams?.get("tab") || "chat-rooms" // 기본값은 chat-rooms
+      
+      if (tab === "chat-rooms") {
+        return "채팅방 검색"
+      } else if (tab === "shopping-talk") {
+        return "커뮤니티 검색"
+      }
+    }
+    
+    // 기본값 (스토어 등 다른 페이지)
+    return "브랜드, 상품 등을 검색하세요"
+  }
+  
+  const placeholder = getPlaceholder()
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -238,7 +261,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
                 inputMode="search"
                 enterKeyHint="search"
                 autoComplete="off"
-                placeholder="브랜드, 상품 등을 검색하세요"
+                placeholder={placeholder}
                 value={keyword}
                 onChange={(event) => onKeywordChange(event.target.value)}
                 onKeyDown={handleKeyDown}
