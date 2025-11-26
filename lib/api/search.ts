@@ -4,6 +4,8 @@
 
 import { apiClient } from './client'
 import { PRODUCT_ENDPOINTS, CHAT_SEARCH_ENDPOINTS } from './endpoints'
+import type { SearchChatRoomsRequest, SearchChatRoomsResponse } from '@/types/api/chat'
+import { ChatRoomSortType } from '@/types/api/chat'
 
 /**
  * 최근 검색어 조회
@@ -62,5 +64,23 @@ export const getChatRoomAutocomplete = async (keyword: string): Promise<string[]
     return response
   }
   return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
+
+/**
+ * 채팅방 검색 및 조회
+ */
+export const searchChatRooms = async (params: SearchChatRoomsRequest = {}): Promise<SearchChatRoomsResponse> => {
+  const apiParams: Record<string, any> = {
+    ...(params.nextCursor !== undefined && params.nextCursor !== null ? { nextCursor: params.nextCursor } : {}),
+    ...(params.keyword ? { keyword: params.keyword.trim() } : {}),
+    sortType: params.sortType || ChatRoomSortType.LATEST,
+    limit: params.limit !== undefined ? params.limit : 20,
+  }
+
+  const response = await apiClient.get<SearchChatRoomsResponse>(CHAT_SEARCH_ENDPOINTS.SEARCH_CHAT_ROOMS, {
+    params: apiParams,
+  })
+
+  return response
 }
 

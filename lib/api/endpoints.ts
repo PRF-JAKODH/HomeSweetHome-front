@@ -100,6 +100,7 @@ export const COMMUNITY_ENDPOINTS = {
 // 채팅방 검색 관련 엔드포인트
 export const CHAT_SEARCH_ENDPOINTS = {
   SEARCH_AUTOCOMPLETE: '/api/v1/search/chat/autocomplete',
+  SEARCH_CHAT_ROOMS: '/api/v1/search/chat',
 } as const
 
 // 공통 엔드포인트
