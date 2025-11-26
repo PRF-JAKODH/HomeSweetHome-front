@@ -268,6 +268,7 @@ export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => 
 // 최근 본 상품 단건 삭제
 export const deleteRecentViewItem = async (id: number): Promise<void> => {
   await apiClient.delete(PRODUCT_ENDPOINTS.RECENT_VIEWS_DELETE_ONE, {
-    params: { id },
+    // 백엔드에서 기대하는 파라미터 이름은 productId
+    params: { productId: id },
   })
 }
