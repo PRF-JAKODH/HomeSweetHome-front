@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import { useInfiniteChatRooms } from '@/lib/hooks/use-chat-rooms'
 import type { CommunityPost } from '@/types/api/community'
-import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChatRoomSortType } from '@/types/api/chat'
 
@@ -81,7 +80,6 @@ const mapPostToUI = (post: CommunityPost) => ({
   likes: post.likeCount,
   comments: post.commentCount,
   category: post.category,
-  keywords: extractKeywords(post.title, post.content, 3)
 })
 
 // 카테고리 배지 색상
@@ -344,14 +342,6 @@ export default function CommunityPage() {
                               <h2 className="text-lg font-semibold text-foreground hover:text-primary transition-colors">
                                 {uiPost.title}
                               </h2>
-                              {uiPost.keywords.map((keyword, idx) => (
-                                <span
-                                  key={idx}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getKeywordStyle(keyword)}`}
-                                >
-                                  #{keyword}
-                                </span>
-                              ))}
                             </div>
                             <p className="text-sm text-text-secondary line-clamp-2 mb-3">{uiPost.content}</p>
 
