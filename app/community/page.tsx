@@ -125,7 +125,23 @@ export default function CommunityPage() {
   
   // URL에서 검색 키워드 읽기
   const searchKeyword = searchParams?.get("keyword") || undefined
-  const [chatRoomSortType, setChatRoomSortType] = useState<ChatRoomSortType>(ChatRoomSortType.LATEST)
+  
+  // 검색 시에는 RECOMMENDED를 기본값으로, 일반 조회 시에는 LATEST를 기본값으로 사용
+  const [chatRoomSortType, setChatRoomSortType] = useState<ChatRoomSortType>(() => {
+    // 초기 마운트 시 검색어가 있으면 RECOMMENDED, 없으면 LATEST
+    return searchKeyword ? ChatRoomSortType.RECOMMENDED : ChatRoomSortType.LATEST
+  })
+  
+  // 검색어가 변경될 때만 정렬 타입 초기화 (사용자가 수동으로 변경한 경우는 유지)
+  const prevSearchKeywordRef = useRef(searchKeyword)
+  useEffect(() => {
+    // 검색어가 실제로 변경된 경우에만 정렬 타입 초기화
+    if (prevSearchKeywordRef.current !== searchKeyword) {
+      const expectedSortType = searchKeyword ? ChatRoomSortType.RECOMMENDED : ChatRoomSortType.LATEST
+      setChatRoomSortType(expectedSortType)
+      prevSearchKeywordRef.current = searchKeyword
+    }
+  }, [searchKeyword])
 
   // 채팅방 목록 조회 (무한 스크롤)
   const {
