@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { X, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete } from "@/lib/api/products"
+import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete, getChatRoomAutocomplete } from "@/lib/api/search"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePathname, useSearchParams } from "next/navigation"
 
@@ -117,6 +117,19 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
     }
   }, [isAuthenticated])
 
+  // 경로와 탭에 따라 적절한 자동완성 API 함수 선택
+  const getAutocompleteFunction = () => {
+    // 커뮤니티 페이지의 오늘의 채팅방 탭인 경우 채팅방 자동완성 사용
+    if (pathname === "/community") {
+      const tab = searchParams?.get("tab") || "chat-rooms"
+      if (tab === "chat-rooms") {
+        return getChatRoomAutocomplete
+      }
+    }
+    // 기본값: 상품 자동완성
+    return getSearchAutocomplete
+  }
+
   // 자동 완성 API 호출 (Debounce)
   useEffect(() => {
     // 이전 요청 취소
@@ -134,6 +147,9 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
       return
     }
 
+    // 적절한 자동완성 API 함수 선택
+    const autocompleteFn = getAutocompleteFunction()
+
     // Debounce: 300ms 후 API 호출
     const timer = setTimeout(async () => {
       const controller = new AbortController()
@@ -143,7 +159,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
       setShowAutocomplete(true)
 
       try {
-        const results = await getSearchAutocomplete(trimmedKeyword)
+        const results = await autocompleteFn(trimmedKeyword)
         if (!controller.signal.aborted) {
           setAutocompleteResults(results)
           setSelectedIndex(-1)
@@ -166,7 +182,7 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
         abortControllerRef.current.abort()
       }
     }
-  }, [keyword])
+  }, [keyword, pathname, searchParams])
 
   const handleKeywordClick = (value: string) => {
     // <b> 태그 제거하여 실제 검색어만 사용
