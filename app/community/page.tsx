@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
+import { useInfiniteQuery } from "@tanstack/react-query"
 import { useInfiniteChatRooms } from '@/lib/hooks/use-chat-rooms'
-import type { CommunityPost } from '@/types/api/community'
+import type { CommunityPost, CommunityPostSearchResponse } from '@/types/api/community'
+import { CommunitySortType } from '@/types/api/community'
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChatRoomSortType } from '@/types/api/chat'
+import { searchCommunityPosts } from "@/lib/api/search"
 
 // 정렬 옵션 타입 정의
 type SortOption = {
   label: string
-  sort: 'createdAt' | 'viewCount' | 'likeCount'
-  direction: 'asc' | 'desc'
+  sortType: CommunitySortType
 }
 export enum ChatRoomType {
   INDIVIDUAL = "INDIVIDUAL",
@@ -60,9 +61,9 @@ function formatRelativeTime(isoString: string | null): string {
 
 // 정렬 옵션들
 const sortOptions: SortOption[] = [
-  { label: "최신순", sort: "createdAt", direction: "desc" },
-  { label: "조회수순", sort: "viewCount", direction: "desc" },
-  { label: "인기순", sort: "likeCount", direction: "desc" },
+  { label: "최신순", sortType: CommunitySortType.LATEST },
+  { label: "조회수순", sortType: CommunitySortType.VIEW_COUNT },
+  { label: "인기순", sortType: CommunitySortType.LIKE_COUNT },
 ]
 
 const categories = [
@@ -70,11 +71,13 @@ const categories = [
   { id: "chat-rooms", name: "오늘의채팅방", image: "/nordic-style-chat.jpg" },
 ]
 
-const mapPostToUI = (post: CommunityPost) => ({
+const mapPostToUI = (post: CommunityPost | CommunityPostSearchResponse) => ({
   id: post.postId,
   title: post.title,
-  content: post.content,
-  author: post.authorName,
+  // 검색 응답에는 snippet만 있으므로 content/요약 우선순위 적용
+  content: "content" in post ? post.content : (post as CommunityPostSearchResponse).snippet,
+  // 검색 응답에는 authorName 이 없을 수 있음
+  author: "authorName" in post ? (post as CommunityPost).authorName : "",
   createdAt: formatRelativeTime(post.createdAt),
   views: post.viewCount,
   likes: post.likeCount,
@@ -157,17 +160,29 @@ export default function CommunityPage() {
   // 채팅방 데이터 평탄화
   const allChatRooms = chatRoomsData?.pages.flatMap((page) => page.contents) ?? []
 
-  //  API에서 게시글 데이터 가져오기 (무한 스크롤)
+  // 쇼핑수다 게시글 검색/조회 (무한 스크롤, 커뮤니티 검색 API 사용)
   const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteCommunityPosts({
-    size: 10,
-    sort: selectedSort.sort,
-    direction: selectedSort.direction
+    data: postsData,
+    fetchNextPage: fetchNextPostsPage,
+    hasNextPage: hasNextPostsPage,
+    isFetchingNextPage: isFetchingNextPostsPage,
+    isLoading: isLoadingPosts,
+  } = useInfiniteQuery({
+    queryKey: ['community-posts-search', selectedSort.sortType],
+    queryFn: ({ pageParam }) =>
+      searchCommunityPosts({
+        nextCursor: pageParam as string | null | undefined,
+        keyword: undefined, // 현재는 키워드 없이 전체 조회
+        sortType: selectedSort.sortType,
+        limit: 10,
+      }),
+    initialPageParam: undefined as string | null | undefined,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.hasNext) return undefined
+      const nextCursor = lastPage.nextCursor
+      if (nextCursor === null || nextCursor === undefined) return undefined
+      return nextCursor
+    },
   })
 
   // Intersection Observer를 사용한 무한 스크롤 구현 (쇼핑수다)
@@ -176,9 +191,9 @@ export default function CommunityPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        if (entries[0].isIntersecting && hasNextPostsPage && !isFetchingNextPostsPage) {
           console.log('[무한스크롤] 다음 페이지 로딩 시작')
-          fetchNextPage()
+          fetchNextPostsPage()
         }
       },
       {
@@ -190,7 +205,7 @@ export default function CommunityPage() {
     const currentTarget = observerTarget.current
     if (currentTarget) {
       observer.observe(currentTarget)
-      console.log('[무한스크롤] Observer 설정 완료', { hasNextPage, isFetchingNextPage })
+      console.log('[무한스크롤] Observer 설정 완료', { hasNextPostsPage, isFetchingNextPostsPage })
     }
 
     return () => {
@@ -198,7 +213,7 @@ export default function CommunityPage() {
         observer.unobserve(currentTarget)
       }
     }
-  }, [selectedTab, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [selectedTab, hasNextPostsPage, isFetchingNextPostsPage, fetchNextPostsPage])
 
   // Intersection Observer를 사용한 무한 스크롤 구현 (채팅방)
   const chatRoomObserverTarget = useRef<HTMLDivElement>(null)
@@ -231,7 +246,7 @@ export default function CommunityPage() {
   }, [selectedTab, hasNextChatRoomsPage, isFetchingNextChatRoomsPage, fetchNextChatRoomsPage])
 
   // 모든 페이지의 게시글을 하나의 배열로 합치기
-  const allPosts = data?.pages.flatMap((page) => page.content) ?? []
+  const allPosts = postsData?.pages.flatMap((page) => page.contents) ?? []
 
   return (
     <div className="min-h-screen bg-background">
@@ -310,14 +325,14 @@ export default function CommunityPage() {
 
                 {/* Posts List */}
                 <div className="space-y-4">
-                  {isLoading && (
+                  {isLoadingPosts && (
                     <div className="text-center py-8 text-text-secondary">
                       로딩 중...
                     </div>
                   )}
-                  {allPosts.map((post: CommunityPost) => {
+                  {allPosts.map((post: CommunityPost | CommunityPostSearchResponse) => {
                     const uiPost = mapPostToUI(post)
-                    const thumbnail = post.imagesUrl?.[0]
+                    const thumbnail = (post as CommunityPost).imagesUrl?.[0]
                     const cleanThumbnail = thumbnail ?
                       thumbnail.split('/').slice(0, 4).join('/') + '/' + thumbnail.split('/').pop() :
                       null
@@ -415,18 +430,18 @@ export default function CommunityPage() {
                   })}
 
                   <div ref={observerTarget} className="py-8">
-                    {isFetchingNextPage && (
+                    {isFetchingNextPostsPage && (
                       <div className="text-center text-sm text-text-secondary flex items-center justify-center gap-2">
                         <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
                         더 불러오는 중...
                       </div>
                     )}
-                    {!isFetchingNextPage && !hasNextPage && allPosts.length > 0 && (
+                    {!isFetchingNextPostsPage && !hasNextPostsPage && allPosts.length > 0 && (
                       <div className="text-center text-text-secondary text-sm">
                         모든 게시글을 불러왔습니다
                       </div>
                     )}
-                    {!isLoading && allPosts.length === 0 && (
+                    {!isLoadingPosts && allPosts.length === 0 && (
                       <div className="text-center py-12 text-text-secondary">
                         게시글이 없습니다
                       </div>
