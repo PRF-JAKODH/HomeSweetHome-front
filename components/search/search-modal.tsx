@@ -51,8 +51,14 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
-  // 커뮤니티 페이지의 탭에 따라 placeholder 결정
+  // 현재 경로 / 탭에 따라 placeholder 결정
   const getPlaceholder = () => {
+    // 홈 화면: 통합 검색
+    if (pathname === "/") {
+      return "통합 검색"
+    }
+
+    // 커뮤니티 페이지: 탭별 플레이스홀더
     if (pathname === "/community") {
       const tab = searchParams?.get("tab") || "chat-rooms" // 기본값은 chat-rooms
       
