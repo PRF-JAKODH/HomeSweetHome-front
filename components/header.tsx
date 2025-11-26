@@ -113,12 +113,15 @@ export function Header() {
     e.preventDefault()
     if (searchKeyword.trim()) {
       const keyword = searchKeyword.trim()
-      // 현재 경로가 커뮤니티 페이지인 경우
+      // 커뮤니티 페이지인 경우: 탭별 검색
       if (pathname === "/community") {
         const currentTab = new URLSearchParams(window.location.search).get("tab") || "chat-rooms"
         router.push(`/community?tab=${currentTab}&keyword=${encodeURIComponent(keyword)}`)
+      } else if (pathname === "/") {
+        // 홈 화면: 통합 검색 페이지로 이동
+        router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
       } else {
-        // 그 외의 경우 스토어로 이동
+        // 그 외의 경우 스토어 검색
         router.push(`/store?keyword=${encodeURIComponent(keyword)}`)
       }
       setShowSearchModal(false)
@@ -129,12 +132,15 @@ export function Header() {
     if (keyword.trim()) {
       const trimmedKeyword = keyword.trim()
       setSearchKeyword(trimmedKeyword)
-      // 현재 경로가 커뮤니티 페이지인 경우
+      // 커뮤니티 페이지인 경우: 탭별 검색
       if (pathname === "/community") {
         const currentTab = new URLSearchParams(window.location.search).get("tab") || "chat-rooms"
         router.push(`/community?tab=${currentTab}&keyword=${encodeURIComponent(trimmedKeyword)}`)
+      } else if (pathname === "/") {
+        // 홈 화면: 통합 검색 페이지로 이동
+        router.push(`/search?keyword=${encodeURIComponent(trimmedKeyword)}`)
       } else {
-        // 그 외의 경우 스토어로 이동
+        // 그 외의 경우 스토어 검색
         router.push(`/store?keyword=${encodeURIComponent(trimmedKeyword)}`)
       }
       setShowSearchModal(false)

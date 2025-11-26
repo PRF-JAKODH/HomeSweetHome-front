@@ -252,3 +252,22 @@ export const updateProductImages = async (
     },
   })
 }
+
+// 최근 본 상품 목록 조회
+export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => {
+  const response = await apiClient.get<RecentViewPreviewResponse[]>(PRODUCT_ENDPOINTS.RECENT_VIEWS)
+
+  // apiClient가 배열 자체를 반환하거나 { data } 형태로 감싸는 경우 모두 대응
+  if (Array.isArray(response)) {
+    return response
+  }
+  const data = (response as any)?.data
+  return Array.isArray(data) ? data : []
+}
+
+// 최근 본 상품 단건 삭제
+export const deleteRecentViewItem = async (id: number): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.RECENT_VIEWS_DELETE_ONE, {
+    params: { id },
+  })
+}
