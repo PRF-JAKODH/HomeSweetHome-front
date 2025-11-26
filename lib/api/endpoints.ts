@@ -97,6 +97,11 @@ export const COMMUNITY_ENDPOINTS = {
   GET_COMMENT_LIKE_STATUS: (postId: number, commentId: number) => `/api/v1/community/posts/${postId}/comments/${commentId}/likes/status`,
 } as const
 
+// 커뮤니티 검색 관련 엔드포인트 (쇼핑수다 자동완성 등)
+export const COMMUNITY_SEARCH_ENDPOINTS = {
+  SEARCH_AUTOCOMPLETE: '/api/v1/search/community/autocomplete',
+} as const
+
 // 채팅방 검색 관련 엔드포인트
 export const CHAT_SEARCH_ENDPOINTS = {
   SEARCH_AUTOCOMPLETE: '/api/v1/search/chat/autocomplete',
