@@ -112,15 +112,31 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchKeyword.trim()) {
-      router.push(`/store?keyword=${encodeURIComponent(searchKeyword.trim())}`)
+      const keyword = searchKeyword.trim()
+      // 현재 경로가 커뮤니티 페이지인 경우
+      if (pathname === "/community") {
+        const currentTab = new URLSearchParams(window.location.search).get("tab") || "chat-rooms"
+        router.push(`/community?tab=${currentTab}&keyword=${encodeURIComponent(keyword)}`)
+      } else {
+        // 그 외의 경우 스토어로 이동
+        router.push(`/store?keyword=${encodeURIComponent(keyword)}`)
+      }
       setShowSearchModal(false)
     }
   }
 
   const handleSearchWithKeyword = (keyword: string) => {
     if (keyword.trim()) {
-      setSearchKeyword(keyword.trim())
-      router.push(`/store?keyword=${encodeURIComponent(keyword.trim())}`)
+      const trimmedKeyword = keyword.trim()
+      setSearchKeyword(trimmedKeyword)
+      // 현재 경로가 커뮤니티 페이지인 경우
+      if (pathname === "/community") {
+        const currentTab = new URLSearchParams(window.location.search).get("tab") || "chat-rooms"
+        router.push(`/community?tab=${currentTab}&keyword=${encodeURIComponent(trimmedKeyword)}`)
+      } else {
+        // 그 외의 경우 스토어로 이동
+        router.push(`/store?keyword=${encodeURIComponent(trimmedKeyword)}`)
+      }
       setShowSearchModal(false)
     }
   }

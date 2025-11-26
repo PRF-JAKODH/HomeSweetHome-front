@@ -432,7 +432,25 @@ export default function CommunityPage() {
 
             {selectedTab === "chat-rooms" && (
               <div>
-                <div className="mb-6 flex justify-end">
+                <div className="mb-6 flex items-center justify-between">
+                  {searchKeyword ? (
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-semibold text-foreground">
+                        "{searchKeyword}" 검색 결과
+                      </h2>
+                      <button
+                        onClick={() => {
+                          const currentTab = searchParams?.get("tab") || "chat-rooms"
+                          router.push(`/community?tab=${currentTab}`)
+                        }}
+                        className="text-sm text-text-secondary hover:text-foreground transition-colors"
+                      >
+                        ✕ 검색 초기화
+                      </button>
+                    </div>
+                  ) : (
+                    <div></div>
+                  )}
                   <a href="/community/chat/create">
                     <Button className="bg-primary hover:bg-primary/90">채팅방 만들기</Button>
                   </a>
@@ -465,8 +483,8 @@ export default function CommunityPage() {
                             />
                           </div>
                           <div className="p-4">
-                            <h3 className="mb-2 text-lg font-semibold text-foreground">{room.name}</h3>
-                            <div className="flex items-center justify-between text-sm text-text-secondary">
+                            <h3 className="mb-2 text-base font-semibold text-foreground text-center">{room.name}</h3>
+                            <div className="flex items-center justify-center text-sm text-text-secondary">
                               <span className="text-xs">
                                 {formatRelativeTime(room.createdAt)}
                               </span>
