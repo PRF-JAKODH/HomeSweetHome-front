@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { ArrowDown, ArrowUp, Check } from "lucide-react"
 import { useInfiniteQuery } from "@tanstack/react-query"
 import { useInfiniteChatRooms } from '@/lib/hooks/use-chat-rooms'
 import type { CommunityPost, CommunityPostSearchResponse } from '@/types/api/community'
@@ -69,7 +70,22 @@ const sortOptions: SortOption[] = [
 const categories = [
   { id: "shopping-talk", name: "쇼핑수다", image: "/assorted-home-goods.png" },
   { id: "chat-rooms", name: "오늘의채팅방", image: "/nordic-style-chat.jpg" },
-]
+] as const
+
+const getCommunitySortLabel = (type: CommunitySortType) => {
+  switch (type) {
+    case CommunitySortType.LATEST:
+      return "최신순"
+    case CommunitySortType.VIEW_COUNT:
+      return "조회수순"
+    case CommunitySortType.LIKE_COUNT:
+      return "인기순"
+    case CommunitySortType.RECOMMENDED:
+      return "추천순"
+    default:
+      return "최신순"
+  }
+}
 
 const mapPostToUI = (post: CommunityPost | CommunityPostSearchResponse) => ({
   id: post.postId,
@@ -101,6 +117,7 @@ export default function CommunityPage() {
   const tabFromUrl = searchParams?.get("tab") || "chat-rooms"
   const [selectedTab, setSelectedTab] = useState(tabFromUrl)
   const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0])
+  const [showSortOptions, setShowSortOptions] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
   
   // 초기 로드 시 URL에 탭 정보가 없으면 기본값 설정
@@ -126,6 +143,28 @@ export default function CommunityPage() {
   
   // URL에서 검색 키워드 읽기
   const searchKeyword = searchParams?.get("keyword") || undefined
+
+  // 쇼핑수다 정렬 옵션 드롭다운 토글
+  const toggleSortOptions = () => {
+    setShowSortOptions((prev) => !prev)
+  }
+
+  // 정렬 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!showSortOptions) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.sort-dropdown')) {
+        setShowSortOptions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSortOptions])
   
   // 검색 시에는 RECOMMENDED를 기본값으로, 일반 조회 시에는 LATEST를 기본값으로 사용
   const [chatRoomSortType, setChatRoomSortType] = useState<ChatRoomSortType>(() => {
@@ -323,24 +362,81 @@ export default function CommunityPage() {
                   ) : (
                     <div></div>
                   )}
-                  <a href="/community/shopping-talk/create">
-                    <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
-                  </a>
                 </div>
 
-                {/* Sort Options */}
-                <div className="flex gap-2 mb-6">
-                  {sortOptions.map((option) => (
-                    <Button
-                      key={option.label}
-                      variant={selectedSort.label === option.label ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedSort(option)}
-                      className="text-sm"
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
+                {/* Sort Options - 상품 정렬 UI와 동일한 드롭다운 + 글쓰기 버튼 */}
+                <div className="flex justify-between items-center mb-6">
+                  <div></div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative sort-dropdown">
+                      <Button
+                        variant="ghost"
+                        size="default"
+                        className={`flex items-center gap-2 rounded-full bg-transparent px-2 py-1 text-sm font-medium transition-colors ${
+                          showSortOptions ? "text-gray-900" : "text-gray-700 hover:text-gray-900"
+                        }`}
+                        onClick={toggleSortOptions}
+                      >
+                        {getCommunitySortLabel(selectedSort.sortType)}
+                        <span className="flex flex-col leading-none">
+                          <ArrowUp className="h-4 w-4 -mb-1 text-gray-800" />
+                          <ArrowDown className="h-4 w-4 text-gray-400" />
+                        </span>
+                      </Button>
+
+                      {showSortOptions && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setSelectedSort({ label: "최신순", sortType: CommunitySortType.LATEST })
+                                setShowSortOptions(false)
+                              }}
+                              className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                                selectedSort.sortType === CommunitySortType.LATEST
+                                  ? "font-semibold text-gray-900"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              }`}
+                            >
+                              최신순
+                              {selectedSort.sortType === CommunitySortType.LATEST && <Check className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedSort({ label: "조회수순", sortType: CommunitySortType.VIEW_COUNT })
+                                setShowSortOptions(false)
+                              }}
+                              className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                                selectedSort.sortType === CommunitySortType.VIEW_COUNT
+                                  ? "font-semibold text-gray-900"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              }`}
+                            >
+                              조회수순
+                              {selectedSort.sortType === CommunitySortType.VIEW_COUNT && <Check className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedSort({ label: "인기순", sortType: CommunitySortType.LIKE_COUNT })
+                                setShowSortOptions(false)
+                              }}
+                              className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                                selectedSort.sortType === CommunitySortType.LIKE_COUNT
+                                  ? "font-semibold text-gray-900"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              }`}
+                            >
+                              인기순
+                              {selectedSort.sortType === CommunitySortType.LIKE_COUNT && <Check className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <a href="/community/shopping-talk/create">
+                      <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
+                    </a>
+                  </div>
                 </div>
 
                 {/* Posts List */}
