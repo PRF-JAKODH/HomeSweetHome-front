@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
+import { useInfiniteChatRooms } from '@/lib/hooks/use-chat-rooms'
 import type { CommunityPost } from '@/types/api/community'
 import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
-import apiClient from '@/lib/api'
 import { useRouter, useSearchParams } from "next/navigation"
+import { ChatRoomSortType } from '@/types/api/chat'
 
 // 정렬 옵션 타입 정의
 type SortOption = {
@@ -122,9 +123,25 @@ export default function CommunityPage() {
     router.push(`/community?tab=${tabId}`, { scroll: false })
   }
   
-  // 그룹 채팅방 목록 상태
-  const [chatRooms, setChatRooms] = useState<any[]>([])
-  const [loadingChatRooms, setLoadingChatRooms] = useState(false)
+  // URL에서 검색 키워드 읽기
+  const searchKeyword = searchParams?.get("keyword") || undefined
+  const [chatRoomSortType, setChatRoomSortType] = useState<ChatRoomSortType>(ChatRoomSortType.LATEST)
+
+  // 채팅방 목록 조회 (무한 스크롤)
+  const {
+    data: chatRoomsData,
+    fetchNextPage: fetchNextChatRoomsPage,
+    hasNextPage: hasNextChatRoomsPage,
+    isFetchingNextPage: isFetchingNextChatRoomsPage,
+    isLoading: isLoadingChatRooms,
+  } = useInfiniteChatRooms(
+    searchKeyword,
+    chatRoomSortType,
+    20
+  )
+
+  // 채팅방 데이터 평탄화
+  const allChatRooms = chatRoomsData?.pages.flatMap((page) => page.contents) ?? []
 
   //  API에서 게시글 데이터 가져오기 (무한 스크롤)
   const {
@@ -139,40 +156,7 @@ export default function CommunityPage() {
     direction: selectedSort.direction
   })
 
-  // 그룹 채팅방 목록 불러오기
-  useEffect(() => {
-    const fetchChatRooms = async () => {
-      try {
-        setLoadingChatRooms(true)
-        const res = await apiClient.get<RoomListCommonResponseDto[]>("/api/v1/chat/rooms/group/all")
-        console.log("그룹 채팅방 목록 불러오기 성공:", res)
-
-        // API 응답을 UI에 맞게 변환
-        const mapped = res.data.map((room) => ({
-          id: room.roomId,
-          name: room.roomName,
-          category: "채팅방", // 기본 카테고리 (필요시 수정)
-          participants: Number(room.memberCount) || 0,
-          lastMessage: room.lastMessage || "대화를 시작해보세요",
-          lastMessageTime: formatRelativeTime(room.lastMessageAt || ""),
-          thumbnail: room.thumbnailUrl || "/placeholder.svg",
-        }))
-
-        setChatRooms(mapped)
-      } catch (error) {
-        console.error("그룹 채팅방 목록 불러오기 실패:", error)
-      } finally {
-        setLoadingChatRooms(false)
-      }
-    }
-
-    // chat-rooms 탭일 때만 불러오기
-    if (selectedTab === "chat-rooms") {
-      fetchChatRooms()
-    }
-  }, [selectedTab])
-
-  // Intersection Observer를 사용한 무한 스크롤 구현
+  // Intersection Observer를 사용한 무한 스크롤 구현 (쇼핑수다)
   useEffect(() => {
     if (selectedTab !== "shopping-talk") return
 
@@ -201,6 +185,36 @@ export default function CommunityPage() {
       }
     }
   }, [selectedTab, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Intersection Observer를 사용한 무한 스크롤 구현 (채팅방)
+  const chatRoomObserverTarget = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (selectedTab !== "chat-rooms") return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextChatRoomsPage && !isFetchingNextChatRoomsPage) {
+          console.log('[채팅방 무한스크롤] 다음 페이지 로딩 시작')
+          fetchNextChatRoomsPage()
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px'
+      }
+    )
+
+    const currentTarget = chatRoomObserverTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [selectedTab, hasNextChatRoomsPage, isFetchingNextChatRoomsPage, fetchNextChatRoomsPage])
 
   // 모든 페이지의 게시글을 하나의 배열로 합치기
   const allPosts = data?.pages.flatMap((page) => page.content) ?? []
@@ -425,54 +439,58 @@ export default function CommunityPage() {
                 </div>
 
                 {/* 로딩 상태 */}
-                {loadingChatRooms ? (
+                {isLoadingChatRooms ? (
                   <div className="text-center py-12 text-text-secondary">
                     <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
                     채팅방 목록을 불러오는 중...
                   </div>
-                ) : chatRooms.length === 0 ? (
+                ) : allChatRooms.length === 0 ? (
                   <div className="text-center py-12 text-text-secondary">
-                    아직 생성된 채팅방이 없습니다
+                    {searchKeyword ? "검색 결과가 없습니다" : "아직 생성된 채팅방이 없습니다"}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {chatRooms.map((room) => (
-                      <a
-                        key={room.id}
-                        href={`/messages?roomId=${room.id}&type=GROUP`}
-                        className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
-                      >
-                        <div className="aspect-video overflow-hidden bg-background-section">
-                          <img
-                            src={room.thumbnail || "/placeholder.svg?height=200&width=400"}
-                            alt={room.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div className="p-4">
-                          <div className="mb-2 flex items-center gap-2">
-                            <span className="text-sm font-medium text-primary">{room.category}</span>
-                            <span className="text-xs text-text-secondary">
-                              <svg className="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                                />
-                              </svg>
-                              {room.participants}명
-                            </span>
+                  <>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {allChatRooms.map((room) => (
+                        <a
+                          key={room.chatRoomId}
+                          href={`/messages?roomId=${room.chatRoomId}&type=GROUP`}
+                          className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
+                        >
+                          <div className="aspect-video overflow-hidden bg-background-section">
+                            <img
+                              src={room.thumbnailUrl || "/placeholder.svg?height=200&width=400"}
+                              alt={room.name}
+                              className="h-full w-full object-cover"
+                            />
                           </div>
-                          <h3 className="mb-2 text-lg font-semibold text-foreground">{room.name}</h3>
-                          <div className="flex items-center justify-between text-sm text-text-secondary">
-                            <p className="line-clamp-1 flex-1">{room.lastMessage}</p>
-                            <span className="ml-2 flex-shrink-0">{room.lastMessageTime}</span>
+                          <div className="p-4">
+                            <h3 className="mb-2 text-lg font-semibold text-foreground">{room.name}</h3>
+                            <div className="flex items-center justify-between text-sm text-text-secondary">
+                              <span className="text-xs">
+                                {formatRelativeTime(room.createdAt)}
+                              </span>
+                            </div>
                           </div>
+                        </a>
+                      ))}
+                    </div>
+                    
+                    {/* 무한 스크롤 감지 영역 */}
+                    <div ref={chatRoomObserverTarget} className="py-8">
+                      {isFetchingNextChatRoomsPage && (
+                        <div className="text-center text-sm text-text-secondary flex items-center justify-center gap-2">
+                          <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                          더 불러오는 중...
                         </div>
-                      </a>
-                    ))}
-                  </div>
+                      )}
+                      {!isFetchingNextChatRoomsPage && !hasNextChatRoomsPage && allChatRooms.length > 0 && (
+                        <div className="text-center text-text-secondary text-sm">
+                          모든 채팅방을 불러왔습니다
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
