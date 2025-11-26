@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { X, Search } from "lucide-react"
+import { X, Search, MessageCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete, getChatRoomAutocomplete } from "@/lib/api/search"
 import { useAuthStore } from "@/stores/auth-store"
@@ -128,6 +128,19 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
     }
     // 기본값: 상품 자동완성
     return getSearchAutocomplete
+  }
+
+  // 경로와 탭에 따라 적절한 아이콘 선택
+  const getAutocompleteIcon = () => {
+    // 커뮤니티 페이지의 오늘의 채팅방 탭인 경우 채팅방 아이콘 사용
+    if (pathname === "/community") {
+      const tab = searchParams?.get("tab") || "chat-rooms"
+      if (tab === "chat-rooms") {
+        return MessageCircle
+      }
+    }
+    // 기본값: 검색 아이콘
+    return Search
   }
 
   // 자동 완성 API 호출 (Debounce)
@@ -323,7 +336,10 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
                             }`}
                           >
                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                              <Search className="w-4 h-4 text-gray-500" />
+                              {(() => {
+                                const Icon = getAutocompleteIcon()
+                                return <Icon className="w-4 h-4 text-gray-500" />
+                              })()}
                             </div>
                             <HighlightedText text={result} />
                           </button>
