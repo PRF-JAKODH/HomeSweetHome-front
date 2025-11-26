@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client'
-import { PRODUCT_ENDPOINTS, CHAT_SEARCH_ENDPOINTS } from './endpoints'
+import { PRODUCT_ENDPOINTS, CHAT_SEARCH_ENDPOINTS, COMMUNITY_SEARCH_ENDPOINTS } from './endpoints'
 import type { SearchChatRoomsRequest, SearchChatRoomsResponse } from '@/types/api/chat'
 import { ChatRoomSortType } from '@/types/api/chat'
 
@@ -58,6 +58,22 @@ export const getChatRoomAutocomplete = async (keyword: string): Promise<string[]
     return []
   }
   const response = await apiClient.get<string[]>(CHAT_SEARCH_ENDPOINTS.SEARCH_AUTOCOMPLETE, {
+    params: { keyword: keyword.trim() }
+  })
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
+
+/**
+ * 커뮤니티(쇼핑수다) 검색 자동 완성
+ */
+export const getCommunityAutocomplete = async (keyword: string): Promise<string[]> => {
+  if (!keyword || keyword.trim().length < 2) {
+    return []
+  }
+  const response = await apiClient.get<string[]>(COMMUNITY_SEARCH_ENDPOINTS.SEARCH_AUTOCOMPLETE, {
     params: { keyword: keyword.trim() }
   })
   if (Array.isArray(response)) {

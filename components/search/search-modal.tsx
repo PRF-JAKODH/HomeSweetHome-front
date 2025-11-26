@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { X, Search, MessageCircle } from "lucide-react"
+import { X, Search, MessageCircle, Tag } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete, getChatRoomAutocomplete } from "@/lib/api/search"
+import { clearRecentSearches, deleteRecentSearchKeyword, getRecentSearches, getSearchAutocomplete, getChatRoomAutocomplete, getCommunityAutocomplete } from "@/lib/api/search"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePathname, useSearchParams } from "next/navigation"
 
@@ -119,11 +119,15 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
 
   // 경로와 탭에 따라 적절한 자동완성 API 함수 선택
   const getAutocompleteFunction = () => {
-    // 커뮤니티 페이지의 오늘의 채팅방 탭인 경우 채팅방 자동완성 사용
     if (pathname === "/community") {
       const tab = searchParams?.get("tab") || "chat-rooms"
+      // 오늘의 채팅방 탭: 채팅방 자동완성
       if (tab === "chat-rooms") {
         return getChatRoomAutocomplete
+      }
+      // 쇼핑수다 탭: 커뮤니티(쇼핑수다) 자동완성
+      if (tab === "shopping-talk") {
+        return getCommunityAutocomplete
       }
     }
     // 기본값: 상품 자동완성
@@ -132,11 +136,15 @@ export function SearchModal({ keyword, onKeywordChange, onSubmit, onSearchWithKe
 
   // 경로와 탭에 따라 적절한 아이콘 선택
   const getAutocompleteIcon = () => {
-    // 커뮤니티 페이지의 오늘의 채팅방 탭인 경우 채팅방 아이콘 사용
     if (pathname === "/community") {
       const tab = searchParams?.get("tab") || "chat-rooms"
+      // 오늘의 채팅방 탭: 채팅 아이콘
       if (tab === "chat-rooms") {
         return MessageCircle
+      }
+      // 쇼핑수다 탭: 커뮤니티용 다른 이모지(아이콘) 사용
+      if (tab === "shopping-talk") {
+        return Tag
       }
     }
     // 기본값: 검색 아이콘
