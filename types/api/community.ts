@@ -2,6 +2,8 @@
  * 커뮤니티 API 타입 정의
  */
 
+import type { ScrollResponse } from './common'
+
 // 커뮤니티 게시글 응답 타입
 export interface CommunityPost {
   postId: number
@@ -97,3 +99,35 @@ export interface PostsPageResponse {
   numberOfElements: number
   empty: boolean
 }
+
+// 커뮤니티 검색 정렬 타입
+export enum CommunitySortType {
+  RECOMMENDED = 'RECOMMENDED',
+  LATEST = 'LATEST',
+  VIEW_COUNT = 'VIEW_COUNT',
+  LIKE_COUNT = 'LIKE_COUNT',
+}
+
+// 커뮤니티 게시글 검색 응답 (Search API용)
+export interface CommunityPostSearchResponse {
+  postId: number
+  title: string
+  snippet: string
+  category: string
+  authorId: number
+  viewCount: number
+  likeCount: number
+  commentCount: number
+  createdAt: string
+}
+
+// 커뮤니티 게시글 검색 요청 파라미터
+export interface SearchCommunityPostsRequest {
+  nextCursor?: string | null
+  keyword?: string
+  sortType?: CommunitySortType
+  limit?: number
+}
+
+// 커뮤니티 게시글 검색 응답 (무한 스크롤)
+export type SearchCommunityPostsResponse = ScrollResponse<CommunityPostSearchResponse>

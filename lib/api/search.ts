@@ -6,6 +6,8 @@ import { apiClient } from './client'
 import { PRODUCT_ENDPOINTS, CHAT_SEARCH_ENDPOINTS, COMMUNITY_SEARCH_ENDPOINTS } from './endpoints'
 import type { SearchChatRoomsRequest, SearchChatRoomsResponse } from '@/types/api/chat'
 import { ChatRoomSortType } from '@/types/api/chat'
+import type { SearchCommunityPostsRequest, SearchCommunityPostsResponse } from '@/types/api/community'
+import { CommunitySortType } from '@/types/api/community'
 
 /**
  * 최근 검색어 조회
@@ -94,6 +96,26 @@ export const searchChatRooms = async (params: SearchChatRoomsRequest = {}): Prom
   }
 
   const response = await apiClient.get<SearchChatRoomsResponse>(CHAT_SEARCH_ENDPOINTS.SEARCH_CHAT_ROOMS, {
+    params: apiParams,
+  })
+
+  return response
+}
+
+/**
+ * 커뮤니티(쇼핑수다) 게시글 검색 및 조회
+ */
+export const searchCommunityPosts = async (
+  params: SearchCommunityPostsRequest = {},
+): Promise<SearchCommunityPostsResponse> => {
+  const apiParams: Record<string, any> = {
+    ...(params.nextCursor !== undefined && params.nextCursor !== null ? { nextCursor: params.nextCursor } : {}),
+    ...(params.keyword ? { keyword: params.keyword.trim() } : {}),
+    sortType: params.sortType || CommunitySortType.LATEST,
+    limit: params.limit !== undefined ? params.limit : 20,
+  }
+
+  const response = await apiClient.get<SearchCommunityPostsResponse>(COMMUNITY_SEARCH_ENDPOINTS.SEARCH_POSTS, {
     params: apiParams,
   })
 
