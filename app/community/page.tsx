@@ -168,12 +168,14 @@ export default function CommunityPage() {
     isFetchingNextPage: isFetchingNextPostsPage,
     isLoading: isLoadingPosts,
   } = useInfiniteQuery({
-    queryKey: ['community-posts-search', selectedSort.sortType],
+    queryKey: ['community-posts-search', selectedSort.sortType, searchKeyword],
     queryFn: ({ pageParam }) =>
       searchCommunityPosts({
         nextCursor: pageParam as string | null | undefined,
-        keyword: undefined, // 현재는 키워드 없이 전체 조회
-        sortType: selectedSort.sortType,
+        // 검색 키워드가 있으면 해당 키워드로 검색, 없으면 전체 조회
+        keyword: searchKeyword,
+        // 검색 시에는 RECOMMENDED, 그 외에는 선택된 정렬 조건 사용
+        sortType: searchKeyword ? CommunitySortType.RECOMMENDED : selectedSort.sortType,
         limit: 10,
       }),
     initialPageParam: undefined as string | null | undefined,
