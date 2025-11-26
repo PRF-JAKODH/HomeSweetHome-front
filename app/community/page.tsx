@@ -304,7 +304,25 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             {selectedTab === "shopping-talk" && (
               <div>
-                <div className="mb-6 flex justify-end">
+                <div className="mb-6 flex items-center justify-between">
+                  {searchKeyword ? (
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-semibold text-foreground">
+                        "{searchKeyword}" 검색 결과
+                      </h2>
+                      <button
+                        onClick={() => {
+                          const currentTab = searchParams?.get("tab") || "shopping-talk"
+                          router.push(`/community?tab=${currentTab}`)
+                        }}
+                        className="text-sm text-text-secondary hover:text-foreground transition-colors"
+                      >
+                        ✕ 검색 초기화
+                      </button>
+                    </div>
+                  ) : (
+                    <div></div>
+                  )}
                   <a href="/community/shopping-talk/create">
                     <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
                   </a>
