@@ -12,10 +12,10 @@ interface ProductCardProps {
   price: number
   originalPrice?: number
   discountRate?: number
-  rating: number
-  reviewCount: number
+  rating?: number | null
+  reviewCount?: number | null
   isFreeShipping?: boolean
-  shippingPrice?: number
+  shippingPrice?: number | null
 }
 
 export function ProductCard({
@@ -82,9 +82,9 @@ export function ProductCard({
           <div className="flex items-center gap-2 text-sm">
             <div className="flex items-center gap-1">
               <span className="text-sky-400">★</span>
-              <span className="font-medium text-foreground">{rating}</span>
+              <span className="font-medium text-foreground">{rating ?? 0}</span>
             </div>
-            <span className="text-text-secondary">리뷰 {reviewCount.toLocaleString()}</span>
+            <span className="text-text-secondary">리뷰 {(reviewCount ?? 0).toLocaleString()}</span>
           </div>
 
           {/* Shipping Info */}
@@ -94,7 +94,7 @@ export function ProductCard({
                 무료배송
               </div>
             ) : (
-              <span className="text-sm text-text-secondary">배송비 {shippingPrice.toLocaleString()}원</span>
+              <span className="text-sm text-text-secondary">배송비 {(shippingPrice ?? 0).toLocaleString()}원</span>
             )}
           </div>
         </div>
