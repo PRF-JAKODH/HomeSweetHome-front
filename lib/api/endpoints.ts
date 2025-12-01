@@ -43,7 +43,7 @@ export const PRODUCT_ENDPOINTS = {
   UPDATE_PRODUCT_IMAGES: (productId: string) => `/api/v1/products/${productId}/images`,
   
   // 판매자 상품 관리
-  GET_SELLER_PRODUCTS: '/api/v1/products/seller',
+  GET_SELLER_PRODUCTS: '/api/v1/seller',
 } as const
 
 // 카테고리 관련 엔드포인트
