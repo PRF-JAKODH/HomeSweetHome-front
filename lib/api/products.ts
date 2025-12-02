@@ -47,7 +47,7 @@ export const getProduct = async (id: string): Promise<GetProductResponse> => {
 }
 
 export const getProductDetailAuthenticated = async (id: string): Promise<GetProductResponse> => {
-  return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.SEARCH_PRODUCT_DETAIL(id))
+  return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT(id))
 }
 
 // 상품 생성

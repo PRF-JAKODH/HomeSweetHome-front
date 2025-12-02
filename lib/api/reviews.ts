@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import { ProductReviewCreateRequest, ProductReviewUpdateRequest, ProductReviewResponse, ProductReviewStatisticsResponse } from '@/types/api/review'
 import { ScrollResponse } from '@/types/api/common'
+import { REVIEW_ENDPOINTS } from './endpoints'
 
 /**
  * 상품 리뷰 목록 조회 (스크롤 페이징)
@@ -16,7 +17,7 @@ export const getProductReviews = async (
   }
   params.append('limit', limit.toString())
 
-  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`/api/v1/product/reviews/${productId}?${params}`)
+  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`${REVIEW_ENDPOINTS.GET_PRODUCT_REVIEWS(productId)}?${params}`)
   return response
 }
 
@@ -33,7 +34,7 @@ export const createProductReview = async (
   formData.append('image', reviewData.image)
 
   const response = await apiClient.post<ProductReviewResponse>(
-    `/api/v1/product/reviews/${productId}`,
+    REVIEW_ENDPOINTS.CREATE_PRODUCT_REVIEW(productId),
     formData,
     {
       headers: {
@@ -48,14 +49,14 @@ export const createProductReview = async (
  * 리뷰 삭제
  */
 export const deleteProductReview = async (reviewId: number): Promise<void> => {
-  await apiClient.delete(`/api/v1/product/reviews/${reviewId}`)
+  await apiClient.delete(REVIEW_ENDPOINTS.DELETE_PRODUCT_REVIEW(reviewId))
 }
 
 /**
  * 상품 리뷰 통계 조회
  */
 export const getProductReviewStatistics = async (productId: string): Promise<ProductReviewStatisticsResponse> => {
-  const response = await apiClient.get<ProductReviewStatisticsResponse>(`/api/v1/product/reviews/${productId}/statistics`)
+  const response = await apiClient.get<ProductReviewStatisticsResponse>(REVIEW_ENDPOINTS.GET_PRODUCT_REVIEW_STATISTICS(productId))
   return response
 }
 
@@ -72,7 +73,7 @@ export const getMyReviews = async (
   }
   params.append('limit', limit.toString())
 
-  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`/api/v1/product/reviews/me?${params}`)
+  const response = await apiClient.get<ScrollResponse<ProductReviewResponse>>(`${REVIEW_ENDPOINTS.GET_MY_REVIEWS}?${params}`)
   return response
 }
 
@@ -89,7 +90,7 @@ export const updateProductReview = async (
   formData.append('image', reviewData.image)
 
   const response = await apiClient.patch<ProductReviewResponse>(
-    `/api/v1/product/reviews/${reviewId}`,
+    REVIEW_ENDPOINTS.UPDATE_PRODUCT_REVIEW(reviewId),
     formData,
     {
       headers: {

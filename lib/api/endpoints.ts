@@ -12,7 +12,7 @@ export const PRODUCT_ENDPOINTS = {
   DELETE_PRODUCT: (id: string) => `/api/v1/products/${id}`,
   
   // 상품 프리뷰 조회 (무한 스크롤)
-  GET_PRODUCT_PREVIEWS: '/api/v1/products/previews',
+  GET_PRODUCT_PREVIEWS: '/api/v1/search/products/previews',
   SEARCH_AUTHENTICATED: '/api/v1/search/products',
   SEARCH_RECENT: '/api/v1/recent-keyword',
   SEARCH_RECENT_DELETE_KEYWORD: '/api/v1/recent-keyword',
@@ -107,6 +107,22 @@ export const COMMUNITY_SEARCH_ENDPOINTS = {
 export const CHAT_SEARCH_ENDPOINTS = {
   SEARCH_AUTOCOMPLETE: '/api/v1/search/chat/autocomplete',
   SEARCH_CHAT_ROOMS: '/api/v1/search/chat',
+} as const
+
+// 상품 리뷰 관련 엔드포인트
+export const REVIEW_ENDPOINTS = {
+  // 상품 리뷰 목록 조회
+  GET_PRODUCT_REVIEWS: (productId: string) => `/api/v1/reviews/products/${productId}`,
+  // 상품 리뷰 등록
+  CREATE_PRODUCT_REVIEW: (productId: string) => `/api/v1/reviews/products/${productId}`,
+  // 리뷰 삭제
+  DELETE_PRODUCT_REVIEW: (reviewId: number) => `/api/v1/reviews/products/${reviewId}`,
+  // 상품 리뷰 통계 조회
+  GET_PRODUCT_REVIEW_STATISTICS: (productId: string) => `/api/v1/reviews/products/${productId}/statistics`,
+  // 내가 작성한 리뷰 목록 조회
+  GET_MY_REVIEWS: '/api/v1/reviews/products/me',
+  // 상품 리뷰 수정
+  UPDATE_PRODUCT_REVIEW: (reviewId: number) => `/api/v1/reviews/products/${reviewId}`,
 } as const
 
 // 공통 엔드포인트

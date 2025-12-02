@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { ProductReviewResponse, ProductReviewUpdateRequest } from '@/types/api/review'
 import { getMyReviews, updateProductReview } from '@/lib/api/reviews'
+import { getProduct } from '@/lib/api/products'
 
 interface ReviewsSectionProps {
   // 기존 props는 제거하고 내부에서 관리
@@ -38,7 +39,32 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = () => {
     setReviewsError(null)
     try {
       const response = await getMyReviews()
-      setMyReviews(response.contents)
+      
+      // imageUrl이 없는 경우 상품 정보를 조회해서 이미지 가져오기
+      const reviewsWithImages = await Promise.all(
+        response.contents.map(async (review) => {
+          // imageUrl이 이미 있으면 그대로 사용
+          if ((review as any).imageUrl) {
+            return review
+          }
+          
+          // imageUrl이 없으면 상품 정보 조회
+          try {
+            const productData = await getProduct(review.productId.toString())
+            const product = (productData as any).data || productData
+            return {
+              ...review,
+              imageUrl: product.imageUrl || "/placeholder.svg"
+            }
+          } catch (error) {
+            console.error(`상품 ${review.productId} 조회 실패:`, error)
+            // 조회 실패 시 원본 리뷰 반환 (이미지는 placeholder로 표시됨)
+            return review
+          }
+        })
+      )
+      
+      setMyReviews(reviewsWithImages)
     } catch (error) {
       console.error('리뷰 조회 실패:', error)
       setReviewsError('리뷰를 불러오는데 실패했습니다.')
@@ -215,23 +241,49 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = () => {
               <div className="text-center py-12 text-text-secondary">작성한 리뷰가 없습니다.</div>
             ) : (
               myReviews.map((review) => (
-                <div key={review.reviewId} className="border border-divider rounded-lg p-4">
+                <div 
+                  key={review.reviewId} 
+                  className="border border-divider rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={(e) => {
+                    // 수정 버튼 클릭 시에는 상세 페이지로 이동하지 않음
+                    if ((e.target as HTMLElement).closest('button')) {
+                      return
+                    }
+                    handleProductClick(review.productId)
+                  }}
+                >
                   {/* 헤더: 제품 정보와 수정 버튼 */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       {/* 제품 사진 */}
-                      <div className="w-16 h-16 flex-shrink-0">
+                      <div 
+                        className="w-16 h-16 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleProductClick(review.productId)
+                        }}
+                      >
                         <img
-                          src={review.productImageUrl || "/placeholder.svg"}
+                          src={(review as any).imageUrl || "/placeholder.svg"}
                           alt={review.productName}
                           className="w-full h-full object-cover rounded-lg"
+                          onError={(e) => {
+                            // 이미지 로드 실패 시 placeholder로 대체
+                            const target = e.target as HTMLImageElement
+                            if (target.src !== "/placeholder.svg") {
+                              target.src = "/placeholder.svg"
+                            }
+                          }}
                         />
                       </div>
                       {/* 제품명과 별점 */}
                       <div className="flex-1 min-w-0">
                         <h3 
                           className="font-semibold text-foreground mb-2 cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => handleProductClick(review.productId)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleProductClick(review.productId)
+                          }}
                         >
                           {review.productName}
                         </h3>
