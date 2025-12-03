@@ -51,6 +51,8 @@ export default function ShoppingTalkDetailPage() {
   const [commentText, setCommentText] = useState("")
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentText, setEditingCommentText] = useState("")
+  const [replyingToCommentId, setReplyingToCommentId] = useState<number | null>(null)
+  const [replyText, setReplyText] = useState("")
 
   // ✅ 게시글 조회 API
   const { data: post, isLoading: postLoading } = useQuery({
@@ -96,6 +98,21 @@ export default function ShoppingTalkDetailPage() {
     onError: (error) => {
       console.error('댓글 작성 실패:', error)
       alert('댓글 작성에 실패했습니다.')
+    }
+  })
+
+  // ✅ 대댓글 작성 API
+  const createReplyMutation = useMutation({
+    mutationFn: ({ content, parentCommentId }: { content: string; parentCommentId: number }) =>
+      createComment(postId, { content, parentCommentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      setReplyText("")
+      setReplyingToCommentId(null)
+    },
+    onError: (error) => {
+      console.error('답글 작성 실패:', error)
+      alert('답글 작성에 실패했습니다.')
     }
   })
 
@@ -190,15 +207,45 @@ export default function ShoppingTalkDetailPage() {
     comments: post.commentCount,
   } : null
 
-  const mockComments = comments.map(comment => ({
-    id: comment.commentId,
-    author: comment.authorName,
-    authorId: comment.authorId,
-    avatar: getProfileImage(comment.authorId),
-    content: comment.content,
-    createdAt: formatRelativeTime(comment.createdAt),
-    likes: comment.likeCount,
-  }))
+  // ✅ 댓글을 계층 구조로 변환
+  const organizeComments = () => {
+    const commentMap = new Map()
+    const rootComments: any[] = []
+
+    // 모든 댓글을 맵에 저장
+    comments.forEach(comment => {
+      const commentData = {
+        id: comment.commentId,
+        author: comment.authorName,
+        authorId: comment.authorId,
+        avatar: getProfileImage(comment.authorId),
+        content: comment.content,
+        createdAt: formatRelativeTime(comment.createdAt),
+        likes: comment.likeCount,
+        parentCommentId: comment.parentCommentId,
+        replies: []
+      }
+      commentMap.set(comment.commentId, commentData)
+    })
+
+    // 댓글을 부모-자식 관계로 연결
+    commentMap.forEach(comment => {
+      if (comment.parentCommentId === null) {
+        // 최상위 댓글
+        rootComments.push(comment)
+      } else {
+        // 대댓글
+        const parentComment = commentMap.get(comment.parentCommentId)
+        if (parentComment) {
+          parentComment.replies.push(comment)
+        }
+      }
+    })
+
+    return rootComments
+  }
+
+  const mockComments = organizeComments()
 
   if (postLoading || !postData) {
     return (
@@ -316,6 +363,25 @@ export default function ShoppingTalkDetailPage() {
   const handleDeleteComment = (commentId: number) => {
     if (confirm('정말 삭제하시겠습니까?')) {
       deleteCommentMutation.mutate(commentId)
+    }
+  }
+
+  // ✅ 답글 달기 시작
+  const handleReply = (commentId: number) => {
+    setReplyingToCommentId(commentId)
+    setReplyText("")
+  }
+
+  // ✅ 답글 달기 취소
+  const handleCancelReply = () => {
+    setReplyingToCommentId(null)
+    setReplyText("")
+  }
+
+  // ✅ 답글 제출
+  const handleSubmitReply = (parentCommentId: number) => {
+    if (replyText.trim()) {
+      createReplyMutation.mutate({ content: replyText, parentCommentId })
     }
   }
 
@@ -487,6 +553,7 @@ export default function ShoppingTalkDetailPage() {
             {mockComments.map((comment) => {
               const isMyComment = currentUserId === comment.authorId
               const isEditing = editingCommentId === comment.id
+              const isReplying = replyingToCommentId === comment.id
 
               return (
                 <div key={comment.id} className="border-b border-divider pb-4 last:border-0">
@@ -552,6 +619,16 @@ export default function ShoppingTalkDetailPage() {
                               <span>{comment.likes}</span>
                             </button>
 
+                            {/* ✅ 답글 달기 버튼 */}
+                            {accessToken && (
+                              <button
+                                onClick={() => handleReply(comment.id)}
+                                className="text-xs text-text-secondary hover:text-foreground transition-colors"
+                              >
+                                답글
+                              </button>
+                            )}
+
                             {/* ✅ 본인 댓글에만 수정/삭제 버튼 표시 */}
                             {isMyComment && (
                               <>
@@ -572,6 +649,135 @@ export default function ShoppingTalkDetailPage() {
                             )}
                           </div>
                         </>
+                      )}
+
+                      {/* ✅ 답글 작성 폼 */}
+                      {isReplying && (
+                        <div className="mt-3 space-y-2">
+                          <textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="답글을 입력하세요..."
+                            className="w-full rounded-lg border border-divider bg-background p-2 text-sm text-foreground placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSubmitReply(comment.id)}
+                              disabled={!replyText.trim() || createReplyMutation.isPending}
+                              className="text-xs"
+                            >
+                              {createReplyMutation.isPending ? '작성 중...' : '답글 작성'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelReply}
+                              className="text-xs"
+                            >
+                              취소
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ✅ 대댓글 목록 */}
+                      {comment.replies && comment.replies.length > 0 && (
+                        <div className="mt-3 ml-6 space-y-3 border-l-2 border-divider pl-4">
+                          {comment.replies.map((reply: any) => {
+                            const isMyReply = currentUserId === reply.authorId
+                            const isEditingReply = editingCommentId === reply.id
+
+                            return (
+                              <div key={reply.id} className="flex items-start gap-3">
+                                <img
+                                  src={reply.avatar || placeholderProfile}
+                                  alt={reply.author}
+                                  className="h-8 w-8 rounded-full object-cover"
+                                />
+                                <div className="flex-1">
+                                  <div className="mb-1 flex items-center gap-2">
+                                    <span className="font-medium text-foreground text-sm">{reply.author}</span>
+                                    <span className="text-xs text-text-secondary">{reply.createdAt}</span>
+                                  </div>
+
+                                  {/* ✅ 대댓글 수정 모드 */}
+                                  {isEditingReply ? (
+                                    <div className="space-y-2">
+                                      <textarea
+                                        value={editingCommentText}
+                                        onChange={(e) => setEditingCommentText(e.target.value)}
+                                        className="w-full rounded-lg border border-divider bg-background p-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                                        rows={2}
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleSubmitEditComment(reply.id)}
+                                          disabled={!editingCommentText.trim() || updateCommentMutation.isPending}
+                                          className="text-xs"
+                                        >
+                                          {updateCommentMutation.isPending ? '수정 중...' : '수정 완료'}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={handleCancelEditComment}
+                                          className="text-xs"
+                                        >
+                                          취소
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm text-foreground leading-relaxed">{reply.content}</p>
+
+                                      <div className="mt-2 flex items-center gap-3">
+                                        <button
+                                          onClick={() => toggleCommentLikeMutation.mutate(reply.id)}
+                                          disabled={toggleCommentLikeMutation.isPending || !accessToken}
+                                          className={`flex items-center gap-1 text-xs transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                                            }`}
+                                        >
+                                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                            />
+                                          </svg>
+                                          <span>{reply.likes}</span>
+                                        </button>
+
+                                        {/* ✅ 본인 대댓글에만 수정/삭제 버튼 표시 */}
+                                        {isMyReply && (
+                                          <>
+                                            <button
+                                              onClick={() => handleEditComment(reply.id, reply.content)}
+                                              className="text-xs text-text-secondary hover:text-foreground transition-colors"
+                                            >
+                                              수정
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteComment(reply.id)}
+                                              disabled={deleteCommentMutation.isPending}
+                                              className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                                            >
+                                              삭제
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>
