@@ -516,16 +516,15 @@ export default function ShoppingTalkDetailPage() {
           >
             DM
           </button>
-
-          <div className="rounded-full border border-divider px-4 py-2 text-sm font-medium text-text-secondary">
-            댓글 {postData.comments}
-          </div>
+          
+          {/* ❌ 여기에 있던 상단 댓글 수 표시 div를 삭제했습니다. */}
         </div>
 
         {/* Comments Section */}
         <div>
+          {/* ✅ 대댓글도 포함하기 위해 mockComments.length 대신 전체 comments.length 사용 */}
           <h2 className="mb-4 text-lg font-bold text-foreground">
-            댓글 <span className="text-primary">{mockComments.length}</span>
+            댓글 <span className="text-primary">{comments.length}</span>
           </h2>
 
           {/* Comment Input */}
