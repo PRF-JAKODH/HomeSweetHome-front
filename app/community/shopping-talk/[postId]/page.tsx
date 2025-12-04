@@ -53,6 +53,7 @@ export default function ShoppingTalkDetailPage() {
   const [editingCommentText, setEditingCommentText] = useState("")
   const [replyingToCommentId, setReplyingToCommentId] = useState<number | null>(null)
   const [replyText, setReplyText] = useState("")
+  const [likedCommentIds, setLikedCommentIds] = useState<Set<number>>(new Set())
 
   // ✅ 게시글 조회 API
   const { data: post, isLoading: postLoading } = useQuery({
@@ -87,6 +88,29 @@ export default function ShoppingTalkDetailPage() {
         .catch(err => console.error('조회수 증가 실패:', err))
     }
   }, [postId, queryClient])
+
+  // ✅ 댓글 좋아요 상태 초기화 (댓글 목록 로드 후 각 댓글의 좋아요 상태 조회)
+  useEffect(() => {
+    if (comments.length > 0 && accessToken) {
+      const fetchLikeStatuses = async () => {
+        const likedIds = new Set<number>()
+        await Promise.all(
+          comments.map(async (comment) => {
+            try {
+              const isLiked = await getCommentLikeStatus(postId, comment.commentId)
+              if (isLiked) {
+                likedIds.add(comment.commentId)
+              }
+            } catch (error) {
+              // 에러 무시 (로그인 안 된 경우 등)
+            }
+          })
+        )
+        setLikedCommentIds(likedIds)
+      }
+      fetchLikeStatuses()
+    }
+  }, [comments, postId, accessToken])
 
   // ✅ 댓글 작성 API
   const createCommentMutation = useMutation({
@@ -173,8 +197,18 @@ export default function ShoppingTalkDetailPage() {
   // ✅ 댓글 좋아요 토글 API
   const toggleCommentLikeMutation = useMutation({
     mutationFn: (commentId: number) => toggleCommentLike(postId, commentId),
-    onSuccess: () => {
+    onSuccess: (_, commentId) => {
       queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      // 좋아요 상태 토글
+      setLikedCommentIds(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(commentId)) {
+          newSet.delete(commentId)
+        } else {
+          newSet.add(commentId)
+        }
+        return newSet
+      })
     },
     onError: (error) => {
       console.error('댓글 좋아요 처리 실패:', error)
@@ -494,9 +528,8 @@ export default function ShoppingTalkDetailPage() {
           <button
             onClick={() => togglePostLikeMutation.mutate()}
             disabled={togglePostLikeMutation.isPending || !accessToken}
-            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-              isPostLiked ? "border-red-300 bg-red-50 text-red-500" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"
-            } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${isPostLiked ? "border-red-300 bg-red-50 text-red-500" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"
+              } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <svg className="h-5 w-5" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -516,7 +549,7 @@ export default function ShoppingTalkDetailPage() {
           >
             DM
           </button>
-          
+
           {/* ❌ 여기에 있던 상단 댓글 수 표시 div를 삭제했습니다. */}
         </div>
 
@@ -604,10 +637,14 @@ export default function ShoppingTalkDetailPage() {
                             <button
                               onClick={() => toggleCommentLikeMutation.mutate(comment.id)}
                               disabled={toggleCommentLikeMutation.isPending || !accessToken}
-                              className={`flex items-center gap-1 text-xs transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                              className={`flex items-center gap-1 text-xs transition-colors ${likedCommentIds.has(comment.id)
+                                ? "text-red-500"
+                                : !accessToken
+                                  ? "opacity-50 cursor-not-allowed text-text-secondary"
+                                  : "text-text-secondary hover:text-foreground"
                                 }`}
                             >
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="h-4 w-4" fill={likedCommentIds.has(comment.id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -737,10 +774,14 @@ export default function ShoppingTalkDetailPage() {
                                         <button
                                           onClick={() => toggleCommentLikeMutation.mutate(reply.id)}
                                           disabled={toggleCommentLikeMutation.isPending || !accessToken}
-                                          className={`flex items-center gap-1 text-xs transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                                          className={`flex items-center gap-1 text-xs transition-colors ${likedCommentIds.has(reply.id)
+                                            ? "text-red-500"
+                                            : !accessToken
+                                              ? "opacity-50 cursor-not-allowed text-text-secondary"
+                                              : "text-text-secondary hover:text-foreground"
                                             }`}
                                         >
-                                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <svg className="h-4 w-4" fill={likedCommentIds.has(reply.id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                                             <path
                                               strokeLinecap="round"
                                               strokeLinejoin="round"
