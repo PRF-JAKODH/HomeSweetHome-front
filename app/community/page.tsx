@@ -6,6 +6,7 @@ import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
 import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
 import apiClient from '@/lib/api'
+import { Flame, Eye } from "lucide-react" // 아이콘 추가
 
 // 정렬 옵션 타입 정의
 type SortOption = {
@@ -99,6 +100,10 @@ export default function CommunityPage() {
   const [chatRooms, setChatRooms] = useState<any[]>([])
   const [loadingChatRooms, setLoadingChatRooms] = useState(false)
 
+  // 실시간 인기 게시물 상태
+  const [popularPosts, setPopularPosts] = useState<CommunityPost[]>([])
+  const [loadingPopular, setLoadingPopular] = useState(false)
+
   //  API에서 게시글 데이터 가져오기 (무한 스크롤)
   const {
     data,
@@ -118,13 +123,11 @@ export default function CommunityPage() {
       try {
         setLoadingChatRooms(true)
         const res = await apiClient.get<RoomListCommonResponseDto[]>("/api/v1/chat/rooms/group/all")
-        console.log("그룹 채팅방 목록 불러오기 성공:", res)
-
-        // API 응답을 UI에 맞게 변환
+        
         const mapped = res.data.map((room) => ({
           id: room.roomId,
           name: room.roomName,
-          category: "채팅방", // 기본 카테고리 (필요시 수정)
+          category: "채팅방",
           participants: Number(room.memberCount) || 0,
           lastMessage: room.lastMessage || "대화를 시작해보세요",
           lastMessageTime: formatRelativeTime(room.lastMessageAt || ""),
@@ -139,9 +142,36 @@ export default function CommunityPage() {
       }
     }
 
-    // chat-rooms 탭일 때만 불러오기
     if (selectedTab === "chat-rooms") {
       fetchChatRooms()
+    }
+  }, [selectedTab])
+
+  // 실시간 인기 게시물 불러오기 (쇼핑수다 탭일 때)
+  useEffect(() => {
+    const fetchPopularPosts = async () => {
+      try {
+        setLoadingPopular(true)
+        // API 요청: 조회수 순으로 5개만 가져오기
+        // (실제 백엔드 API 스펙에 따라 24시간 필터 파라미터가 필요할 수 있습니다. 예: &period=day)
+        const res = await apiClient.get("/api/v1/community/posts", {
+            params: {
+                page: 0,
+                size: 5,
+                sort: "viewCount",
+                direction: "desc"
+            }
+        })
+        setPopularPosts(res.data.content)
+      } catch (error) {
+        console.error("인기 게시물 불러오기 실패:", error)
+      } finally {
+        setLoadingPopular(false)
+      }
+    }
+
+    if (selectedTab === "shopping-talk") {
+      fetchPopularPosts()
     }
   }, [selectedTab])
 
@@ -152,20 +182,15 @@ export default function CommunityPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          console.log('[무한스크롤] 다음 페이지 로딩 시작')
           fetchNextPage()
         }
       },
-      {
-        threshold: 0.1,
-        rootMargin: '100px'
-      }
+      { threshold: 0.1, rootMargin: '100px' }
     )
 
     const currentTarget = observerTarget.current
     if (currentTarget) {
       observer.observe(currentTarget)
-      console.log('[무한스크롤] Observer 설정 완료', { hasNextPage, isFetchingNextPage })
     }
 
     return () => {
@@ -175,7 +200,6 @@ export default function CommunityPage() {
     }
   }, [selectedTab, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  // 모든 페이지의 게시글을 하나의 배열로 합치기
   const allPosts = data?.pages.flatMap((page) => page.content) ?? []
 
   return (
@@ -232,6 +256,83 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             {selectedTab === "shopping-talk" && (
               <div>
+                {/* ----------------- [새로 추가된 부분] 실시간 인기 게시물 섹션 ----------------- */}
+                <div className="mb-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Flame className="w-6 h-6 text-orange-500 fill-orange-500" />
+                    <h3 className="text-xl font-bold text-foreground">실시간 인기 게시물</h3>
+                    <span className="text-xs text-text-secondary bg-gray-100 px-2 py-1 rounded-full">
+                      최근 24시간 조회수 기준
+                    </span>
+                  </div>
+
+                  {loadingPopular ? (
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                       {[...Array(5)].map((_, i) => (
+                         <div key={i} className="h-48 rounded-lg bg-gray-100 animate-pulse" />
+                       ))}
+                     </div>
+                  ) : popularPosts.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {popularPosts.map((post, idx) => {
+                         const thumbnail = post.imagesUrl?.[0]
+                         // 이미지 URL 정리 (기존 로직 활용)
+                         const cleanThumbnail = thumbnail ?
+                           thumbnail.split('/').slice(0, 4).join('/') + '/' + thumbnail.split('/').pop() : null
+
+                         return (
+                           <a 
+                             key={post.postId} 
+                             href={`/community/shopping-talk/${post.postId}`}
+                             className="group relative flex flex-col overflow-hidden rounded-xl border border-divider bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+                           >
+                              {/* 랭킹 뱃지 */}
+                              <div className="absolute top-0 left-0 z-10 bg-black/50 px-3 py-1 rounded-br-lg text-white font-bold text-sm backdrop-blur-sm">
+                                {idx + 1}
+                              </div>
+
+                              {/* 썸네일 영역 */}
+                              <div className="aspect-[4/3] w-full bg-gray-50 overflow-hidden">
+                                {cleanThumbnail ? (
+                                  <img 
+                                    src={cleanThumbnail} 
+                                    alt={post.title} 
+                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-gray-300">
+                                    <span className="text-xs">No Image</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 텍스트 영역 */}
+                              <div className="flex flex-1 flex-col p-3">
+                                <h4 className="mb-1 text-sm font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-primary">
+                                  {post.title}
+                                </h4>
+                                <div className="mt-auto flex items-center justify-between pt-2">
+                                  <span className="text-xs text-muted-foreground truncate max-w-[60%]">
+                                    {post.authorName}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-xs font-medium text-orange-600">
+                                    <Eye className="w-3 h-3" />
+                                    {post.viewCount}
+                                  </span>
+                                </div>
+                              </div>
+                           </a>
+                         )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg text-text-secondary text-sm">
+                      집계된 인기 게시물이 없습니다.
+                    </div>
+                  )}
+                </div>
+                {/* ------------------------------------------------------------------------- */}
+
                 <div className="mb-6 flex justify-end">
                   <a href="/community/shopping-talk/create">
                     <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
@@ -302,6 +403,7 @@ export default function CommunityPage() {
                               <span className="font-medium text-foreground">{uiPost.author}</span>
                               <span>{uiPost.createdAt}</span>
                               <div className="flex items-center gap-3">
+                                {/* ... 기존 아이콘들 ... */}
                                 <span className="flex items-center gap-1">
                                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path
@@ -368,6 +470,7 @@ export default function CommunityPage() {
                   })}
 
                   <div ref={observerTarget} className="py-8">
+                    {/* ... 기존 로딩/빈 상태 메시지 ... */}
                     {isFetchingNextPage && (
                       <div className="text-center text-sm text-text-secondary flex items-center justify-center gap-2">
                         <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -390,6 +493,7 @@ export default function CommunityPage() {
             )}
 
             {selectedTab === "chat-rooms" && (
+              // ... 기존 채팅방 리스트 코드 ...
               <div>
                 <div className="mb-6 flex justify-end">
                   <a href="/community/chat/create">
@@ -397,7 +501,6 @@ export default function CommunityPage() {
                   </a>
                 </div>
 
-                {/* 로딩 상태 */}
                 {loadingChatRooms ? (
                   <div className="text-center py-12 text-text-secondary">
                     <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
