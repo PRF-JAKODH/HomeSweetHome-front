@@ -6,6 +6,7 @@ import {IndividualRoomListResponseDto, GroupRoomListResponse} from "@/app/messag
 
 export type MessageRoomType = "INDIVIDUAL" | "GROUP"
 
+
 export type DirectMessageRoom = {
   id: number
   opponentId: number
@@ -37,6 +38,8 @@ type UpdateRoomParams = {
   roomName?: string
   thumbnail?: string
   unreadDelta?: number
+  memberCount?: number 
+
 }
 
 type MessagesStore = {
@@ -64,7 +67,7 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
   groupList: [],
   setDmList: (rooms) => set({ dmList: rooms }),
   setGroupList: (rooms) => set({ groupList: rooms }),
-  updateRoomSummary: ({ id, type, lastMessage, time, opponentName, opponentAvatar, roomName, thumbnail, unreadDelta }) =>
+  updateRoomSummary: ({ id, type, lastMessage, time, opponentName, opponentAvatar, roomName, thumbnail, unreadDelta, memberCount }) =>
     set((state) => {
       if (type === "INDIVIDUAL") {
         const index = state.dmList.findIndex((room) => room.id === id)
@@ -120,7 +123,7 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
           thumbnail: thumbnail || "/placeholder.svg",
           lastMessage: lastMessage || "",
           time: time || "",
-          memberCount: 0,
+          memberCount: memberCount ?? 0,  
           unread: unreadDelta ?? 0,
         }
         return { ...state, groupList: [newRoom, ...state.groupList] }
@@ -133,6 +136,7 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
         thumbnail: thumbnail ?? current.thumbnail,
         lastMessage: lastMessage ?? current.lastMessage,
         time: time ?? current.time,
+        memberCount: memberCount ?? current.memberCount,  
         unread:
           unreadDelta !== undefined
             ? Math.max(0, (current.unread ?? 0) + unreadDelta)
@@ -144,6 +148,7 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
         updated.thumbnail === current.thumbnail &&
         updated.lastMessage === current.lastMessage &&
         updated.time === current.time &&
+        updated.memberCount === current.memberCount && 
         updated.unread === current.unread
       ) {
         return state
@@ -194,6 +199,14 @@ export const useMessagesStore = create<MessagesStore>((set) => ({
           'Content-Type': 'application/json',
         }
       })
+
+      console.log("📡 [fetchGroupRooms] API 응답:")
+      console.log("   전체 방 개수:", res.length)
+      console.log("   각 방의 memberCount:", res.map((r: any) => ({
+        id: r.id || r.roomId,
+        name: r.roomName,
+        memberCount: r.memberCount
+      })))
 
       const mapped: GroupMessageRoom[] = res.map((room: any) => ({
         id: room.roomId,
