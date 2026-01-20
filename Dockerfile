@@ -24,8 +24,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js 프로덕션 빌드
-ENV NODE_ENV=production
 RUN if [ -f pnpm-lock.yaml ]; then \
       corepack enable && corepack prepare pnpm@latest --activate && pnpm run build; \
     elif [ -f yarn.lock ]; then \
@@ -42,20 +40,16 @@ ENV NODE_ENV=production
 # 비루트 유저
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 
-# Next.js 실행에 필요한 산출물만 복사
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
+# Next.js standalone 빌드 산출물만 복사 (production dependencies 포함)
+COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 
 # 기본 포트
 EXPOSE 3000
 
-# 헬스체크(옵션)
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://127.0.0.1:3000 || exit 1
-
 USER nextjs
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]
 
 

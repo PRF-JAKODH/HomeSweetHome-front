@@ -6,7 +6,7 @@ import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useNotification } from "@/hooks/use-notification"
-import { formatRelativeTime } from "@/lib/date-util"
+import { formatRelativeTime } from "@/lib/utils/date-util"
 import { getCategoryDisplayName } from "@/lib/notification-util"
 
 export function NotificationDropdown () {

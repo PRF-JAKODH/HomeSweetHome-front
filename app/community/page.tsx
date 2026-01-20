@@ -4,14 +4,57 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useInfiniteCommunityPosts } from '@/lib/hooks/use-community'
 import type { CommunityPost } from '@/types/api/community'
-import { formatRelativeTime } from '@/lib/utils'
 import { extractKeywords, getKeywordStyle } from '@/lib/utils/keyword-extractor'
+import apiClient from '@/lib/api'
 
 // 정렬 옵션 타입 정의
 type SortOption = {
   label: string
   sort: 'createdAt' | 'viewCount' | 'likeCount'
   direction: 'asc' | 'desc'
+}
+export enum ChatRoomType {
+  INDIVIDUAL = "INDIVIDUAL",
+  GROUP = "GROUP",
+}
+
+export interface RoomListCommonResponseDto {
+  roomId: number
+  roomName: string
+  roomType: ChatRoomType
+  memberCount: number
+
+  // 상대방 정보 (개인 채팅방용)
+  partnerId: number | null
+  partnerName: string | null
+  thumbnailUrl: string | null
+
+  // 마지막 메시지 관련
+  lastMessage: string | null
+  lastMessageAt: string | null 
+  lastMessageId: number | null
+  lastMessageIsRead: boolean | null
+}
+
+/**
+ * 시간을 상대적 표현으로 변환하는 유틸 함수
+ */
+function formatRelativeTime(isoString: string | null): string {
+  if (!isoString) return "최근 활동 없음"
+
+  const now = new Date()
+  const messageTime = new Date(isoString)
+  const diffMs = now.getTime() - messageTime.getTime()
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMinutes < 1) return "방금 전"
+  if (diffMinutes < 60) return `${diffMinutes}분 전`
+  if (diffHours < 24) return `${diffHours}시간 전`
+  if (diffDays < 7) return `${diffDays}일 전`
+  
+  return messageTime.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })
 }
 
 // 정렬 옵션들
@@ -22,8 +65,8 @@ const sortOptions: SortOption[] = [
 ]
 
 const categories = [
-  { id: "shopping-talk", name: "쇼핑수다", image: "/shopping-talk-icon-new.png" },
-  { id: "chat-rooms", name: "오늘의채팅방", image: "/chat-room-icon-new.png" },
+  { id: "shopping-talk", name: "쇼핑수다", image: "/assorted-home-goods.png" },
+  { id: "chat-rooms", name: "오늘의채팅방", image: "/nordic-style-chat.jpg" },
 ]
 
 const mapPostToUI = (post: CommunityPost) => ({
@@ -35,66 +78,9 @@ const mapPostToUI = (post: CommunityPost) => ({
   views: post.viewCount,
   likes: post.likeCount,
   comments: post.commentCount,
-  category: post.category,  // 카테고리 (백엔드에서 받아옴)
-  keywords: extractKeywords(post.title, post.content, 3)  // 제목과 내용에서 자동으로 키워드 추출
+  category: post.category,
+  keywords: extractKeywords(post.title, post.content, 3)
 })
-
-const chatRooms = [
-  {
-    id: 1,
-    name: "거실 인테리어 고민방",
-    category: "🛋️ 거실",
-    participants: 234,
-    lastMessage: "소파 배치 어떻게 하셨나요?",
-    lastMessageTime: "방금 전",
-    thumbnail: "/living-room-chat.jpg",
-  },
-  {
-    id: 2,
-    name: "주방 꾸미기 모임",
-    category: "🍳 주방",
-    participants: 189,
-    lastMessage: "수납 아이디어 공유해요!",
-    lastMessageTime: "5분 전",
-    thumbnail: "/kitchen-chat.jpg",
-  },
-  {
-    id: 3,
-    name: "북유럽 스타일 러버",
-    category: "🌲 북유럽",
-    participants: 456,
-    lastMessage: "이케아 신상 나왔어요",
-    lastMessageTime: "10분 전",
-    thumbnail: "/nordic-style-chat.jpg",
-  },
-  {
-    id: 4,
-    name: "미니멀 인테리어",
-    category: "⚪ 미니멀",
-    participants: 312,
-    lastMessage: "화이트 톤 추천 부탁드려요",
-    lastMessageTime: "30분 전",
-    thumbnail: "/minimal-chat.jpg",
-  },
-  {
-    id: 5,
-    name: "DIY 프로젝트 공유",
-    category: "🔨 DIY",
-    participants: 567,
-    lastMessage: "선반 만들기 성공했어요!",
-    lastMessageTime: "1시간 전",
-    thumbnail: "/diy-chat.jpg",
-  },
-  {
-    id: 6,
-    name: "식물 키우기 초보방",
-    category: "🌿 식물",
-    participants: 423,
-    lastMessage: "몬스테라 물주기 주기가...",
-    lastMessageTime: "2시간 전",
-    thumbnail: "/plant-chat.jpg",
-  },
-]
 
 // 카테고리 배지 색상
 const categoryColors: Record<string, string> = {
@@ -106,10 +92,14 @@ const categoryColors: Record<string, string> = {
 
 export default function CommunityPage() {
   const [selectedTab, setSelectedTab] = useState("chat-rooms")
-  const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0]) // 기본값: 최신순
+  const [selectedSort, setSelectedSort] = useState<SortOption>(sortOptions[0])
   const observerTarget = useRef<HTMLDivElement>(null)
+  
+  // 그룹 채팅방 목록 상태
+  const [chatRooms, setChatRooms] = useState<any[]>([])
+  const [loadingChatRooms, setLoadingChatRooms] = useState(false)
 
-  // 🔄 API에서 게시글 데이터 가져오기 (무한 스크롤)
+  //  API에서 게시글 데이터 가져오기 (무한 스크롤)
   const {
     data,
     fetchNextPage,
@@ -122,9 +112,41 @@ export default function CommunityPage() {
     direction: selectedSort.direction
   })
 
+  // 그룹 채팅방 목록 불러오기
+  useEffect(() => {
+    const fetchChatRooms = async () => {
+      try {
+        setLoadingChatRooms(true)
+        const res = await apiClient.get<RoomListCommonResponseDto[]>("/api/v1/chat/rooms/group/all")
+        console.log("그룹 채팅방 목록 불러오기 성공:", res)
+
+        // API 응답을 UI에 맞게 변환
+        const mapped = res.data.map((room) => ({
+          id: room.roomId,
+          name: room.roomName,
+          category: "채팅방", // 기본 카테고리 (필요시 수정)
+          participants: Number(room.memberCount) || 0,
+          lastMessage: room.lastMessage || "대화를 시작해보세요",
+          lastMessageTime: formatRelativeTime(room.lastMessageAt || ""),
+          thumbnail: room.thumbnailUrl || "/placeholder.svg",
+        }))
+
+        setChatRooms(mapped)
+      } catch (error) {
+        console.error("그룹 채팅방 목록 불러오기 실패:", error)
+      } finally {
+        setLoadingChatRooms(false)
+      }
+    }
+
+    // chat-rooms 탭일 때만 불러오기
+    if (selectedTab === "chat-rooms") {
+      fetchChatRooms()
+    }
+  }, [selectedTab])
+
   // Intersection Observer를 사용한 무한 스크롤 구현
   useEffect(() => {
-    // 쇼핑수다 탭이 아니면 observer 설정 안 함
     if (selectedTab !== "shopping-talk") return
 
     const observer = new IntersectionObserver(
@@ -136,7 +158,7 @@ export default function CommunityPage() {
       },
       {
         threshold: 0.1,
-        rootMargin: '100px' // 하단 100px 전부터 로딩 시작
+        rootMargin: '100px'
       }
     )
 
@@ -163,37 +185,44 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             <h2 className="mb-6 text-2xl font-bold text-foreground">커뮤니티</h2>
 
-            {/* Horizontal Scrollable Categories - Same style as Store */}
-            <div className="relative">
-              <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
-                {categories.map((category) => {
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedTab(category.id)}
-                      className={`group flex flex-col items-center gap-3 flex-shrink-0 transition-all ${selectedTab === category.id ? "opacity-100" : "opacity-60 hover:opacity-80"
-                        }`}
-                    >
-                      <div
-                        className={`flex h-24 w-24 items-center justify-center rounded-full bg-background-section transition-all ${selectedTab === category.id ? "ring-2 ring-primary" : ""
-                          }`}
-                      >
+            <div className="grid gap-4 md:grid-cols-2">
+              {categories.map((category) => {
+                const isSelected = selectedTab === category.id
+
+                return (
+                  <button
+                    type="button"
+                    key={category.id}
+                    onClick={() => setSelectedTab(category.id)}
+                    className={`group relative flex items-center gap-6 rounded-3xl p-6 text-left transition-all duration-200 ${
+                      isSelected
+                        ? "bg-white/90 border border-white/60 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] md:hover:-translate-y-1"
+                        : "bg-white/60 border border-black/5 hover:bg-white/80 hover:shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] md:hover:-translate-y-1"
+                    } backdrop-blur-sm`}
+                  >
+                    <div className="relative h-20 w-20 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-300 shadow-inner">
                         <img
                           src={category.image || "/placeholder.svg"}
-                          alt={category.name}
-                          className="h-16 w-16 object-contain transition-transform group-hover:scale-110"
-                        />
-                      </div>
-                      <span
-                        className={`text-sm font-medium transition-colors ${selectedTab === category.id ? "text-primary" : "text-foreground"
-                          }`}
-                      >
+                        alt={category.name}
+                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                        Homesweethome Community
+                      </span>
+                      <span className="text-xl font-bold text-foreground">
                         {category.name}
                       </span>
-                    </button>
-                  )
-                })}
-              </div>
+                      <p className="text-sm text-muted-foreground">
+                        {category.id === "shopping-talk"
+                          ? "가구·인테리어 쇼핑 정보를 나누고 이야기하는 공간"
+                          : "주제별 채팅방에 참여해 실시간으로 소통해보세요"}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -203,12 +232,7 @@ export default function CommunityPage() {
           <div className="mx-auto max-w-[1256px] px-4">
             {selectedTab === "shopping-talk" && (
               <div>
-                {/* Header with write button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">쇼핑수다</h3>
-                    <p className="mt-1 text-sm text-text-secondary">가구, 인테리어 쇼핑 정보를 나누는 공간</p>
-                  </div>
+                <div className="mb-6 flex justify-end">
                   <a href="/community/shopping-talk/create">
                     <Button className="bg-primary hover:bg-primary/90">글쓰기</Button>
                   </a>
@@ -238,9 +262,7 @@ export default function CommunityPage() {
                   )}
                   {allPosts.map((post: CommunityPost) => {
                     const uiPost = mapPostToUI(post)
-                    // 첫 번째 이미지를 썸네일로 사용
                     const thumbnail = post.imagesUrl?.[0]
-                    // S3 URL 정리
                     const cleanThumbnail = thumbnail ?
                       thumbnail.split('/').slice(0, 4).join('/') + '/' + thumbnail.split('/').pop() :
                       null
@@ -252,7 +274,6 @@ export default function CommunityPage() {
                         className="block bg-background border border-divider rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
                       >
                         <div className="flex items-start gap-4">
-                          {/* Category Badge */}
                           {uiPost.category && (
                             <span
                               className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap self-start ${categoryColors[uiPost.category] || "bg-gray-100 text-gray-600"}`}
@@ -261,13 +282,11 @@ export default function CommunityPage() {
                             </span>
                           )}
 
-                          {/* Post Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <h2 className="text-lg font-semibold text-foreground hover:text-primary transition-colors">
                                 {uiPost.title}
                               </h2>
-                              {/* Auto Keywords - 제목 옆에 표시 */}
                               {uiPost.keywords.map((keyword, idx) => (
                                 <span
                                   key={idx}
@@ -279,7 +298,6 @@ export default function CommunityPage() {
                             </div>
                             <p className="text-sm text-text-secondary line-clamp-2 mb-3">{uiPost.content}</p>
 
-                            {/* Post Meta */}
                             <div className="flex items-center gap-4 text-xs text-text-secondary">
                               <span className="font-medium text-foreground">{uiPost.author}</span>
                               <span>{uiPost.createdAt}</span>
@@ -327,7 +345,6 @@ export default function CommunityPage() {
                             </div>
                           </div>
 
-                          {/* Thumbnail Image */}
                           {cleanThumbnail && (
                             <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-surface">
                               <img
@@ -350,7 +367,6 @@ export default function CommunityPage() {
                     )
                   })}
 
-                  {/* 무한 스크롤 트리거 - observer target은 항상 렌더링 */}
                   <div ref={observerTarget} className="py-8">
                     {isFetchingNextPage && (
                       <div className="text-center text-sm text-text-secondary flex items-center justify-center gap-2">
@@ -375,55 +391,62 @@ export default function CommunityPage() {
 
             {selectedTab === "chat-rooms" && (
               <div>
-                {/* Header with create button */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">오늘의채팅방</h3>
-                    <p className="mt-1 text-sm text-text-secondary">관심사가 같은 사람들과 실시간으로 소통하세요</p>
-                  </div>
-                  <a href="/community/chat-rooms/create">
+                <div className="mb-6 flex justify-end">
+                  <a href="/community/chat/create">
                     <Button className="bg-primary hover:bg-primary/90">채팅방 만들기</Button>
                   </a>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {chatRooms.map((room) => (
-                    <a
-                      key={room.id}
-                      href={`/community/chat-rooms/${room.id}`}
-                      className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
-                    >
-                      <div className="aspect-video overflow-hidden bg-background-section">
-                        <img
-                          src={room.thumbnail || "/placeholder.svg?height=200&width=400"}
-                          alt={room.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className="text-sm font-medium text-primary">{room.category}</span>
-                          <span className="text-xs text-text-secondary">
-                            <svg className="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                              />
-                            </svg>
-                            {room.participants}명
-                          </span>
+                {/* 로딩 상태 */}
+                {loadingChatRooms ? (
+                  <div className="text-center py-12 text-text-secondary">
+                    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                    채팅방 목록을 불러오는 중...
+                  </div>
+                ) : chatRooms.length === 0 ? (
+                  <div className="text-center py-12 text-text-secondary">
+                    아직 생성된 채팅방이 없습니다
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {chatRooms.map((room) => (
+                      <a
+                        key={room.id}
+                        href={`/messages?roomId=${room.id}&type=GROUP`}
+                        className="block rounded-lg border border-divider bg-background overflow-hidden transition-all hover:border-primary hover:shadow-md"
+                      >
+                        <div className="aspect-video overflow-hidden bg-background-section">
+                          <img
+                            src={room.thumbnail || "/placeholder.svg?height=200&width=400"}
+                            alt={room.name}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
-                        <h3 className="mb-2 text-lg font-semibold text-foreground">{room.name}</h3>
-                        <div className="flex items-center justify-between text-sm text-text-secondary">
-                          <p className="line-clamp-1 flex-1">{room.lastMessage}</p>
-                          <span className="ml-2 flex-shrink-0">{room.lastMessageTime}</span>
+                        <div className="p-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-sm font-medium text-primary">{room.category}</span>
+                            <span className="text-xs text-text-secondary">
+                              <svg className="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                />
+                              </svg>
+                              {room.participants}명
+                            </span>
+                          </div>
+                          <h3 className="mb-2 text-lg font-semibold text-foreground">{room.name}</h3>
+                          <div className="flex items-center justify-between text-sm text-text-secondary">
+                            <p className="line-clamp-1 flex-1">{room.lastMessage}</p>
+                            <span className="ml-2 flex-shrink-0">{room.lastMessageTime}</span>
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

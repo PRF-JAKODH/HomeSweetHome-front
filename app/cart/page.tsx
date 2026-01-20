@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useCart, useAddToCart, useDeleteCartItem, useDeleteCartItems } from "@/lib/hooks/use-cart"
+import { useCart, useAddToCart, useDeleteCartItem, useDeleteCartItems, useUpdateCartQuantity } from "@/lib/hooks/use-cart"
 import { CartResponse } from "@/types/api/cart"
+import { useCheckoutStore } from '@/stores/checkout-store';
 
 interface CartItem {
   id: string
@@ -21,6 +22,7 @@ interface CartItem {
   selected: boolean
   shippingPrice: number // 배송료 필드 추가
   basePrice: number // 원가 필드 추가
+  priceAdjustment: number
 }
 
 export default function CartPage() {
@@ -28,14 +30,13 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [allSelected, setAllSelected] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
-  const [showScrollToTop, setShowScrollToTop] = useState(false)
-  
-  
+  const [showScrollToTop, setShowScrollToTop] = useState(false)  
   // API 훅들
   const { data: cartData, isLoading, error } = useCart()
   const addToCartMutation = useAddToCart()
   const deleteCartItemMutation = useDeleteCartItem()
   const deleteCartItemsMutation = useDeleteCartItems()
+  const updateCartQuantityMutation = useUpdateCartQuantity();
 
   // 스크롤 위치 감지
   useEffect(() => {
@@ -62,8 +63,8 @@ export default function CartPage() {
   useEffect(() => {
     if (cartData?.contents) {
       const transformedItems: CartItem[] = cartData.contents.map((item: CartResponse) => ({
-        id: item.id.toString(),
-        productId: item.id.toString(), // 실제 API에서는 productId가 별도로 없으므로 id 사용
+        id: item.id.toString(), 
+        productId: (item.productId != null ? item.productId.toString() : item.id.toString()),
         skuId: item.skuId || item.id, // skuId가 null이면 id를 사용
         name: item.productName,
         brand: item.brand,
@@ -83,6 +84,7 @@ export default function CartPage() {
         selected: true,
         shippingPrice: item.shippingPrice, // API에서 배송료 가져오기
         basePrice: item.basePrice, // API에서 원가 가져오기
+        priceAdjustment: item.priceAdjustment || 0,
       }))
       
       setCartItems(transformedItems)
@@ -119,35 +121,28 @@ export default function CartPage() {
     }
 
     try {
-      // 기존 아이템 삭제
-      await deleteCartItemMutation.mutateAsync(id)
+      // (기존 'delete' + 'add' 로직 삭제)
       
-      // 새로운 수량으로 아이템 추가 (전체 수량을 다시 추가)
-      const skuId = item.skuId || parseInt(item.id) // skuId가 null이면 id를 사용
-      
-      await addToCartMutation.mutateAsync({
-        skuId: skuId, // null 체크된 skuId 사용
-        quantity: newQuantity // 새로운 전체 수량
-      })
+      // ★ 'updateCartQuantityMutation' 훅 호출
+      await updateCartQuantityMutation.mutateAsync({
+        cartId: id,
+        quantity: newQuantity
+      });
+
     } catch (error: any) {
-      console.error('수량 변경 실패:', error)
+      console.error('수량 변경 실패:', error);
       
-      // 백엔드에서 보내는 에러 메시지에 따라 적절한 알림 표시
       let errorMessage = "수량 변경에 실패했습니다. 다시 시도해주세요."
-      
       if (error?.response?.data?.message) {
         const backendMessage = error.response.data.message
         
         if (backendMessage.includes('CART_LIMIT_EXCEEDED_ERROR')) {
           errorMessage = "장바구니에 담을 수 있는 최대 수량은 10개입니다."
-        } else if (backendMessage.includes('CART_ITEM_TYPE_LIMIT_EXCEEDED_ERROR')) {
-          errorMessage = "장바구니에 담을 수 있는 최대 상품 종류는 10개입니다."
         } else {
           errorMessage = backendMessage
         }
       }
-      
-      alert(errorMessage)
+      alert(errorMessage);
     }
   }
 
@@ -194,21 +189,73 @@ export default function CartPage() {
   const selectedItems = cartItems.filter((item) => item.selected)
   
   // 상품금액 (원가의 합계)
-  const totalPrice = selectedItems.reduce((sum, item) => sum + item.basePrice * item.quantity, 0)
-  
+  const totalPrice = selectedItems.reduce((sum, item) => {
+    const originalPricePerItem = item.basePrice + item.priceAdjustment;
+    return sum + (originalPricePerItem * item.quantity);
+  }, 0)
+
   // 배송비 합계
-  const totalShippingFee = selectedItems.reduce((sum, item) => sum + item.shippingPrice * item.quantity, 0)
-  
+  const totalShippingFee = selectedItems.reduce((acc, item) => {
+    // 1. 이미 이 상품(productId)의 배송비를 더했는지 확인
+    const alreadyAdded = acc.processedProductIds.has(item.productId);
+    
+    // 2. 더한 적이 없다면
+    if (!alreadyAdded) {
+      acc.processedProductIds.add(item.productId); // 이 상품 ID는 처리했다고 기록
+      acc.total += item.shippingPrice; // 총 배송비에 더하기
+    }
+
+    return acc; // 다음 아이템으로 acc 객체를 넘김
+  },  
+  { total: 0, processedProductIds: new Set<string>() } // 초기값: 총액 0, 처리된 ID Set
+  ).total; // 3. 최종적으로 .total 값만 가져왔다능
+
   // 할인 금액 계산 (원가 - 할인가)
   const totalDiscountAmount = selectedItems.reduce((sum, item) => {
-    const originalPrice = item.basePrice
-    const discountedPrice = item.price
-    const discountAmount = (originalPrice - discountedPrice) * item.quantity
+    const originalPricePerItem = item.basePrice + item.priceAdjustment;
+    const discountedPricePerItem = item.price; // item.price는 이미 최종가(finalPrice)임
+    const discountAmount = (originalPricePerItem - discountedPricePerItem) * item.quantity
     return sum + discountAmount
   }, 0)
   
   // 총 결제금액 = 할인된 가격의 합 + 배송비
   const finalPrice = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0) + totalShippingFee
+
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      alert("주문할 상품을 선택해주세요.");
+      return;
+    }
+
+    // 1. (수정) CartItem[] -> CartResponse[] 타입으로 다시 변환
+    const itemsToCheckout: CartResponse[] = selectedItems.map((item: CartItem) => {
+      // API에서 받아온 원본 데이터(cartData)를 찾아 누락된 값(discountRate 등)을 복원
+      const originalCartResponse = cartData?.contents.find(c => c.id.toString() === item.id);
+
+      return {
+        id: parseInt(item.id), // CartResponse는 number 타입
+        skuId: item.skuId,
+        productId: parseInt(item.productId),
+        brand: item.brand,
+        productName: item.name, // 'name' -> 'productName'
+        optionSummary: item.option, // 'option' -> 'optionSummary'
+        basePrice: item.basePrice,
+        discountRate: originalCartResponse?.discountRate || 0, // 원본 데이터에서 복원
+        finalPrice: item.price, // 'price' -> 'finalPrice'
+        shippingPrice: item.shippingPrice,
+        quantity: item.quantity,
+        totalPrice: item.price * item.quantity, // totalPrice 재계산
+        imageUrl: item.image, // 'image' -> 'imageUrl'
+        createdAt: originalCartResponse?.createdAt || new Date().toISOString(), // 원본 데이터에서 복원
+        updatedAt: originalCartResponse?.updatedAt || new Date().toISOString(), // 원본 데이터에서 복원
+        priceAdjustment: item.priceAdjustment
+      };
+    });
+
+    // 2. Zustand 스토어에 저장
+    useCheckoutStore.getState().setItems(itemsToCheckout);
+    router.push("/checkout");
+  };
   
 
   // 로딩 상태 처리
@@ -433,23 +480,25 @@ export default function CartPage() {
                             {/* 수량 조절 및 총 가격 */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center border border-divider rounded-lg bg-white">
-                                <button
-                                  onClick={() => handleQuantityChange(item.id, -1)}
-                                  disabled={addToCartMutation.isPending || deleteCartItemMutation.isPending}
-                                  className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {deleteCartItemMutation.isPending ? "..." : "-"}
-                                </button>
-                                <span className="w-16 text-center font-medium text-foreground border-x border-divider flex items-center justify-center h-12">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  onClick={() => handleQuantityChange(item.id, 1)}
-                                  disabled={addToCartMutation.isPending || deleteCartItemMutation.isPending}
-                                  className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {addToCartMutation.isPending ? "..." : "+"}
-                                </button>
+                              <button
+                                onClick={() => handleQuantityChange(item.id, -1)}
+                                disabled={updateCartQuantityMutation.isPending || deleteCartItemMutation.isPending}
+                                className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {(updateCartQuantityMutation.isPending && updateCartQuantityMutation.variables?.cartId === item.id) ? "..." : "-"}
+                              </button>
+
+                              <span className="w-16 text-center font-medium text-foreground border-x border-divider flex items-center justify-center h-12">
+                                {item.quantity}
+                              </span>
+                              
+                              <button
+                                onClick={() => handleQuantityChange(item.id, 1)}
+                                disabled={updateCartQuantityMutation.isPending || deleteCartItemMutation.isPending}
+                                className="flex h-12 w-12 items-center justify-center text-foreground hover:bg-background-section transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {(updateCartQuantityMutation.isPending && updateCartQuantityMutation.variables?.cartId === item.id) ? "..." : "+"}
+                              </button>
                               </div>
                               <div className="text-right">
                                 <div className="text-lg font-bold text-foreground">
@@ -501,7 +550,7 @@ export default function CartPage() {
                 size="lg"
                 className="w-full bg-primary hover:bg-primary-dark text-white"
                 disabled={selectedItems.length === 0}
-                onClick={() => router.push("/checkout")}
+                onClick={handleCheckout}
               >
                 {selectedItems.length}개 상품 주문하기
               </Button>

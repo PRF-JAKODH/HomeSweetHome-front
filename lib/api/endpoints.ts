@@ -13,6 +13,14 @@ export const PRODUCT_ENDPOINTS = {
   
   // 상품 프리뷰 조회 (무한 스크롤)
   GET_PRODUCT_PREVIEWS: '/api/v1/products/previews',
+  FILTER_PRODUCT_PREVIEWS: '/api/v1/products/previews/filter',
+  SEARCH_AUTHENTICATED: '/api/v1/search/authenticated',
+  SEARCH_RECENT: '/api/v1/recent-keyword',
+  SEARCH_RECENT_DELETE_KEYWORD: '/api/v1/recent-keyword',
+  SEARCH_RECENT_CLEAR_ALL: '/api/v1/recent-keyword/all',
+  SEARCH_PRODUCT_DETAIL: (productId: string | number) => `/api/v1/search/${productId}`,
+  RECENT_VIEWS: '/api/v1/recent-view',
+  RECENT_VIEWS_DELETE_ONE: '/api/v1/recent-view',
   
   // 상품 검색 및 필터
   SEARCH_PRODUCTS: '/api/v1/products/search',

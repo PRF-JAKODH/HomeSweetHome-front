@@ -35,7 +35,7 @@ export interface AccessTokenResponse {
 
 export interface RefreshTokenResponse {
   accessToken: string;
-  user: User;
+  userResponse: UserResponse;
 }
 
 export interface LogoutResponse {

@@ -1,116 +1,322 @@
 "use client"
 
-import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
-import { PostHeader } from '@/components/community/post-detail/post-header'
-import { PostContent } from '@/components/community/post-detail/post-content'
-import { PostActions } from '@/components/community/post-detail/post-actions'
-import { CommentSection } from '@/components/community/comment/comment-section'
-import { usePostDetail } from '@/lib/hooks/use-post-detail'
-import { useCurrentUser } from '@/lib/hooks/use-current-user'
-import { useIsAuthor } from '@/lib/hooks/use-current-user'
-import {
-  useDeletePost,
-  useCreateComment,
-  useUpdateComment,
-  useDeleteComment,
-  useToggleCommentLike,
-} from '@/lib/hooks/use-post-mutations'
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getPost, getComments, createComment, deletePost, updateComment, deleteComment, togglePostLike, getPostLikeStatus, toggleCommentLike, getCommentLikeStatus, increaseViewCount } from '@/lib/api/community'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { toast } from "@/hooks/use-toast"
+import apiClient from "@/lib/api"
+
+
+const categoryColors: Record<string, string> = {
+  추천: "bg-blue-600/15 text-blue-700 border border-blue-600/30",
+  질문: "bg-orange-500/15 text-orange-700 border border-orange-500/30",
+  정보: "bg-emerald-600/15 text-emerald-700 border border-emerald-600/30",
+  후기: "bg-violet-600/15 text-violet-700 border border-violet-600/30",
+}
+
+
+
+// ✅ JWT 디코딩 함수
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+    return JSON.parse(jsonPayload)
+  } catch (error) {
+    return null
+  }
+}
 
 export default function ShoppingTalkDetailPage() {
   const router = useRouter()
   const params = useParams()
   const postId = Number(params.postId)
+  const queryClient = useQueryClient()
 
-  // 현재 사용자 정보
-  const { userId, isAuthenticated } = useCurrentUser()
+  // ✅ 현재 로그인한 사용자 (JWT에서 추출)
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const currentUser = useAuthStore((state) => state.user)
+  const currentUserId = accessToken ? Number(parseJwt(accessToken)?.sub) : null
 
-  // 게시글 데이터
-  const {
-    post,
-    comments,
-    isPostLiked,
-    isLoading,
-    toggleLike,
-    isTogglingLike,
-  } = usePostDetail(postId)
+  const [commentText, setCommentText] = useState("")
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
+  const [editingCommentText, setEditingCommentText] = useState("")
 
-  // 게시글 작성자 확인
-  const { isAuthor } = useIsAuthor(post?.authorId)
+  // ✅ 게시글 조회 API
+  const { data: post, isLoading: postLoading } = useQuery({
+    queryKey: ['community-post', postId],
+    queryFn: () => getPost(postId),
+    enabled: !isNaN(postId)
+  })
 
-  // Mutations
-  const deletePostMutation = useDeletePost(postId)
-  const createCommentMutation = useCreateComment(postId)
-  const updateCommentMutation = useUpdateComment(postId)
-  const deleteCommentMutation = useDeleteComment(postId)
-  const toggleCommentLikeMutation = useToggleCommentLike(postId)
+  // ✅ 댓글 목록 조회 API
+  const { data: comments = [] } = useQuery({
+    queryKey: ['community-comments', postId],
+    queryFn: () => getComments(postId),
+    enabled: !isNaN(postId)
+  })
 
-  // Handlers
-  const handleEdit = () => {
-    router.push(`/community/shopping-talk/${postId}/edit`)
+  // ✅ 게시글 좋아요 상태 조회
+  const { data: isPostLiked = false } = useQuery({
+    queryKey: ['post-like-status', postId],
+    queryFn: () => getPostLikeStatus(postId),
+    enabled: !isNaN(postId) && !!accessToken
+  })
+
+  // ✅ 조회수 증가 (페이지 로드 시 한 번만 실행)
+  useEffect(() => {
+    if (!isNaN(postId)) {
+      increaseViewCount(postId)
+        .then(() => {
+          // 조회수 증가 후 게시글 데이터 다시 불러오기
+          queryClient.invalidateQueries({ queryKey: ['community-post', postId] })
+          queryClient.invalidateQueries({ queryKey: ['community-posts'], refetchType: 'all' })
+        })
+        .catch(err => console.error('조회수 증가 실패:', err))
+    }
+  }, [postId, queryClient])
+
+  // ✅ 댓글 작성 API
+  const createCommentMutation = useMutation({
+    mutationFn: (content: string) => createComment(postId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      setCommentText("")
+    },
+    onError: (error) => {
+      console.error('댓글 작성 실패:', error)
+      alert('댓글 작성에 실패했습니다.')
+    }
+  })
+
+  // ✅ 게시글 삭제 API
+  const deletePostMutation = useMutation({
+    mutationFn: () => deletePost(postId),
+    onSuccess: () => {
+      alert('게시글이 삭제되었습니다.')
+      router.push('/community/shopping-talk')
+    },
+    onError: (error) => {
+      console.error('게시글 삭제 실패:', error)
+      alert('게시글 삭제에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 수정 API
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
+      updateComment(postId, commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      setEditingCommentId(null)
+      setEditingCommentText("")
+    },
+    onError: (error) => {
+      console.error('댓글 수정 실패:', error)
+      alert('댓글 수정에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 삭제 API
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: number) => deleteComment(postId, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+      alert('댓글이 삭제되었습니다.')
+    },
+    onError: (error) => {
+      console.error('댓글 삭제 실패:', error)
+      alert('댓글 삭제에 실패했습니다.')
+    }
+  })
+
+  // ✅ 게시글 좋아요 토글 API
+  const togglePostLikeMutation = useMutation({
+    mutationFn: () => togglePostLike(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-like-status', postId] })
+      queryClient.invalidateQueries({ queryKey: ['community-post', postId] })
+    },
+    onError: (error) => {
+      console.error('좋아요 처리 실패:', error)
+      alert('좋아요 처리에 실패했습니다.')
+    }
+  })
+
+  // ✅ 댓글 좋아요 토글 API
+  const toggleCommentLikeMutation = useMutation({
+    mutationFn: (commentId: number) => toggleCommentLike(postId, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] })
+    },
+    onError: (error) => {
+      console.error('댓글 좋아요 처리 실패:', error)
+      alert('댓글 좋아요 처리에 실패했습니다.')
+    }
+  })
+
+  // ✅ API 데이터를 기존 UI 형식으로 변환
+  const placeholderProfile = "/placeholder-user.jpg"
+
+  const getProfileImage = (authorId: number | null | undefined) => {
+    if (currentUser && authorId === currentUser.id) {
+      return currentUser.profileImageUrl || placeholderProfile
+    }
+    return placeholderProfile
   }
 
+  const postData = post ? {
+    id: String(post.postId),
+    category: "일반",
+    title: post.title,
+    content: post.content,
+    author: post.authorName,
+    authorId: String(post.authorId),
+    authorAvatar: getProfileImage(post.authorId),
+    createdAt: formatRelativeTime(post.createdAt),
+    views: post.viewCount,
+    likes: post.likeCount,
+    bookmarks: 0,
+    comments: post.commentCount,
+  } : null
+
+  const mockComments = comments.map(comment => ({
+    id: comment.commentId,
+    author: comment.authorName,
+    authorId: comment.authorId,
+    avatar: getProfileImage(comment.authorId),
+    content: comment.content,
+    createdAt: formatRelativeTime(comment.createdAt),
+    likes: comment.likeCount,
+  }))
+
+  if (postLoading || !postData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-text-secondary">게시글을 불러오는 중...</p>
+      </div>
+    )
+  }
+
+  if (!post) {
+    return null
+  }
+
+  const resolvedPost = post
+
+  // ✅ 본인 게시글 확인
+  const isMyPost = currentUserId === post?.authorId
+
+  // 디버깅용 로그
+  console.log('accessToken:', accessToken)
+  console.log('currentUserId:', currentUserId, typeof currentUserId)
+  console.log('post?.authorId:', post?.authorId, typeof post?.authorId)
+  console.log('isMyPost:', isMyPost)
+
+
+  //============================= 1:1 채팅방 ================================
+  // DM 버튼 클릭 핸들러
+  const handleDM = async () => {
+    // try {
+    //   // const accessToken = useAuthStore.getState().accessToken
+    //   const myId = useAuthStore.getState().user?.id
+    //   const targetId = post?.authorId  // 게시글 작성자 ID
+    //   const targetName = post?.authorName  // 게시글 작성자 이름
+
+    // 1:1 채팅방 생성 또는 재사용
+    try {
+      const response = await apiClient.post(`/api/v1/chat/rooms/individual`, {
+
+        targetId: Number(postData.authorId)
+        // productId: product.id,  // 필요시 상품 ID도 같이 전달
+      })
+
+      console.log("채팅방 생성 응답:", response.data)
+
+      // 서버 응답에서 roomId, alreadyExists 추출
+      const { roomId, alreadyExists } = response.data
+
+      if (alreadyExists) {
+        console.log(`📎 기존 채팅방 재사용 (roomId: ${roomId})`)
+        toast({
+          title: "기존 채팅방으로 이동",
+          description: "이 판매자와의 대화방이 이미 존재합니다.",
+        })
+      } else {
+        console.log(`🆕 새 채팅방 생성 (roomId: ${roomId})`)
+        toast({
+          title: "새 채팅방 생성 완료",
+          description: "판매자와의 대화방이 열렸습니다.",
+        })
+      }
+
+      // 채팅방 페이지로 이동
+      router.push(`/messages?roomId=${roomId}&type=INDIVIDUAL`)
+
+    } catch (error: any) {
+      console.error("❌ 채팅방 생성 실패:", error)
+      toast({
+        title: "채팅방 생성 실패",
+        description: "채팅방을 생성하는데 실패했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+  //============================= 1:1 채팅방 ================================
+
+
+  const handleSubmitComment = () => {
+    if (commentText.trim()) {
+      createCommentMutation.mutate(commentText)
+    }
+  }
+
+  // ✅ 삭제 핸들러
   const handleDelete = () => {
     if (confirm('정말 삭제하시겠습니까?')) {
       deletePostMutation.mutate()
     }
   }
 
-  const handleDM = async () => {
-    try {
-      const accessToken = useAuthStore.getState().accessToken
-      const myId = useAuthStore.getState().user?.id
+  // ✅ 수정 핸들러
+  const handleEdit = () => {
+    router.push(`/community/shopping-talk/${postId}/edit`)
+  }
 
-      if (!myId || !accessToken) {
-        alert("로그인이 필요합니다.")
-        router.push("/login")
-        return
-      }
+  // ✅ 댓글 수정 시작
+  const handleEditComment = (commentId: number, content: string) => {
+    setEditingCommentId(commentId)
+    setEditingCommentText(content)
+  }
 
-      const res = await fetch("/api/chat/rooms/individual", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ targetId: post?.authorId }),
-      })
+  // ✅ 댓글 수정 취소
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditingCommentText("")
+  }
 
-      if (!res.ok) throw new Error(`채팅방 생성 실패 (${res.status})`)
-
-      const data = await res.json()
-      router.push(`/messages/${data.roomId}?username=${post?.authorName}`)
-    } catch (err) {
-      console.error("❌ DM 생성 실패:", err)
-      alert("채팅방 생성 중 오류가 발생했습니다.")
+  // ✅ 댓글 수정 제출
+  const handleSubmitEditComment = (commentId: number) => {
+    if (editingCommentText.trim()) {
+      updateCommentMutation.mutate({ commentId, content: editingCommentText })
     }
   }
 
-  const handleCreateComment = (content: string) => {
-    createCommentMutation.mutate({ content })
-  }
-
-  const handleUpdateComment = (commentId: number, content: string) => {
-    updateCommentMutation.mutate({ commentId, content })
-  }
-
+  // ✅ 댓글 삭제
   const handleDeleteComment = (commentId: number) => {
-    deleteCommentMutation.mutate(commentId)
-  }
-
-  const handleLikeComment = (commentId: number) => {
-    toggleCommentLikeMutation.mutate(commentId)
-  }
-
-  // Loading state
-  if (isLoading || !post) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-text-secondary">게시글을 불러오는 중...</p>
-      </div>
-    )
+    if (confirm('정말 삭제하시겠습니까?')) {
+      deleteCommentMutation.mutate(commentId)
+    }
   }
 
   return (
@@ -121,51 +327,259 @@ export default function ShoppingTalkDetailPage() {
           onClick={() => router.back()}
           className="mb-6 flex items-center gap-2 text-text-secondary hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
           <span className="text-sm">목록으로</span>
         </button>
 
         {/* Post Header */}
-        <PostHeader
-          category={post.category}
-          title={post.title}
-          authorName={post.authorName}
-          createdAt={formatRelativeTime(post.createdAt)}
-          viewCount={post.viewCount}
-          isAuthor={isAuthor}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onDM={handleDM}
-          isDeleting={deletePostMutation.isPending}
-        />
+        <div className="mb-6">
+          <div className="mb-4 flex items-center gap-3">
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${categoryColors[resolvedPost.category ?? "일반"] || "bg-gray-100 text-gray-600"
+                }`}
+            >
+              {resolvedPost.category ?? "일반"}
+            </span>
+            <span className="text-sm text-text-secondary">{postData.createdAt}</span>
+            <span className="text-sm text-text-secondary">조회 {postData.views}</span>
+          </div>
+
+          <h1 className="text-2xl font-bold text-foreground mb-6">{resolvedPost.title}</h1>
+
+          {/* Author Info */}
+          <div className="flex items-center justify-between border-y border-divider py-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={postData.authorAvatar || placeholderProfile}
+                alt={postData.author}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+              <p className="font-medium text-foreground">{postData.author}</p>
+            </div>
+            <div className="flex gap-2">
+              {/* ✅ 수정/삭제 버튼 */}
+              {isMyPost && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="text-sm"
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={deletePostMutation.isPending}
+                    className="text-sm text-red-500 hover:text-red-600"
+                  >
+                    {deletePostMutation.isPending ? '삭제 중...' : '삭제'}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Post Content */}
-        <PostContent content={post.content} images={post.imagesUrl} />
+        <div className="mb-8">
+          <div className="prose prose-slate max-w-none">
+            <p className="whitespace-pre-wrap text-foreground leading-relaxed">{resolvedPost.content}</p>
+          </div>
+
+          {/* Images */}
+          {resolvedPost.imagesUrl && resolvedPost.imagesUrl.length > 0 && (
+            <div className="mt-6 grid gap-4 grid-cols-1 sm:grid-cols-2">
+              {resolvedPost.imagesUrl.map((imageUrl: string, index: number) => {
+                // S3 URL에서 이중 경로 문제 해결
+                // 예: "https://.../path1/path2" → "https://.../path2" 사용
+                const cleanUrl = imageUrl.split('/').slice(0, 4).join('/') + '/' + imageUrl.split('/').pop()
+
+                return (
+                  <div key={index} className="relative aspect-square overflow-hidden rounded-lg bg-surface">
+                    <img
+                      src={cleanUrl}
+                      alt={`게시글 이미지 ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // 첫 번째 방식 실패시 원본 URL 시도
+                        const target = e.target as HTMLImageElement
+                        if (target.src !== imageUrl) {
+                          target.src = imageUrl
+                        } else {
+                          // 그래도 실패하면 플레이스홀더 표시
+                          target.src = '/placeholder.svg'
+                        }
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Post Actions */}
-        <PostActions
-          likes={post.likeCount}
-          comments={post.commentCount}
-          isLiked={isPostLiked}
-          isAuthenticated={isAuthenticated}
-          onLikeToggle={toggleLike}
-          isTogglingLike={isTogglingLike}
-        />
+        <div className="mb-8 flex items-center gap-3 border-y border-divider py-4">
+          <button
+            onClick={() => togglePostLikeMutation.mutate()}
+            disabled={togglePostLikeMutation.isPending || !accessToken}
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              isPostLiked ? "border-red-300 bg-red-50 text-red-500" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"
+            } ${!accessToken ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <svg className="h-5 w-5" fill={isPostLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            <span>{postData.likes}</span>
+          </button>
 
-        {/* Comment Section */}
-        <CommentSection
-          comments={comments.map(comment => ({
-            ...comment,
-            createdAt: formatRelativeTime(comment.createdAt),
-          }))}
-          currentUserId={userId}
-          isAuthenticated={isAuthenticated}
-          onCreateComment={handleCreateComment}
-          onUpdateComment={handleUpdateComment}
-          onDeleteComment={handleDeleteComment}
-          onLikeComment={handleLikeComment}
-          isCreating={createCommentMutation.isPending}
-        />
+          <button
+            onClick={handleDM}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed border-divider text-text-secondary" : "border-divider text-text-secondary hover:text-foreground hover:border-foreground"}`}
+            disabled={!accessToken}
+          >
+            DM
+          </button>
+
+          <div className="rounded-full border border-divider px-4 py-2 text-sm font-medium text-text-secondary">
+            댓글 {postData.comments}
+          </div>
+        </div>
+
+        {/* Comments Section */}
+        <div>
+          <h2 className="mb-4 text-lg font-bold text-foreground">
+            댓글 <span className="text-primary">{mockComments.length}</span>
+          </h2>
+
+          {/* Comment Input */}
+          <div className="mb-6">
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="댓글을 입력하세요..."
+              className="w-full rounded-lg border border-divider bg-background p-4 text-sm text-foreground placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              rows={3}
+            />
+            <div className="mt-2 flex justify-end">
+              <Button
+                onClick={handleSubmitComment}
+                disabled={!commentText.trim()}
+                className="bg-primary hover:bg-primary/90"
+              >
+                댓글 작성
+              </Button>
+            </div>
+          </div>
+
+          {/* Comments List */}
+          <div className="space-y-4">
+            {mockComments.map((comment) => {
+              const isMyComment = currentUserId === comment.authorId
+              const isEditing = editingCommentId === comment.id
+
+              return (
+                <div key={comment.id} className="border-b border-divider pb-4 last:border-0">
+                  <div className="mb-2 flex items-start gap-3">
+                    <img
+                      src={comment.avatar || placeholderProfile}
+                      alt={comment.author}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-medium text-foreground">{comment.author}</span>
+                        <span className="text-xs text-text-secondary">{comment.createdAt}</span>
+                      </div>
+
+                      {/* ✅ 수정 모드 */}
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            className="w-full rounded-lg border border-divider bg-background p-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSubmitEditComment(comment.id)}
+                              disabled={!editingCommentText.trim() || updateCommentMutation.isPending}
+                              className="text-xs"
+                            >
+                              {updateCommentMutation.isPending ? '수정 중...' : '수정 완료'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelEditComment}
+                              className="text-xs"
+                            >
+                              취소
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-foreground leading-relaxed">{comment.content}</p>
+
+                          <div className="mt-2 flex items-center gap-3">
+                            <button
+                              onClick={() => toggleCommentLikeMutation.mutate(comment.id)}
+                              disabled={toggleCommentLikeMutation.isPending || !accessToken}
+                              className={`flex items-center gap-1 text-xs transition-colors ${!accessToken ? "opacity-50 cursor-not-allowed text-text-secondary" : "text-text-secondary hover:text-foreground"
+                                }`}
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                />
+                              </svg>
+                              <span>{comment.likes}</span>
+                            </button>
+
+                            {/* ✅ 본인 댓글에만 수정/삭제 버튼 표시 */}
+                            {isMyComment && (
+                              <>
+                                <button
+                                  onClick={() => handleEditComment(comment.id, comment.content)}
+                                  className="text-xs text-text-secondary hover:text-foreground transition-colors"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  disabled={deleteCommentMutation.isPending}
+                                  className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                                >
+                                  삭제
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     </div>
   )

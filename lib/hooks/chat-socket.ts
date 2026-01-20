@@ -1,147 +1,3 @@
-// "use client"
-
-// import { Client, IMessage, StompSubscription } from '@stomp/stompjs'
-// import SockJS from 'sockjs-client'
-// import { useAuthStore } from '@/stores/auth-store'
-
-// export type ChatMessagePayload = {
-//   roomId?: string | number  // ← number도 허용
-//   senderId?: string | number
-//   receiverId?: string | number
-//   text: string
-//   type?: 'TEXT' | 'IMAGE' | 'FILE'
-//   sentAt?: string
-// }
-
-// type ConnectOptions = {
-//   onConnected?: () => void
-//   onDisconnected?: () => void
-//   onError?: (error: unknown) => void
-// }
-
-// // ============================================
-// // 싱글톤 관리
-// // ============================================
-// let stompClient: Client | null = null
-// let isConnecting = false
-// const subscriptionMap = new Map<string, StompSubscription>()  // 구독 중복 방지
-
-
-// function getWebSocketUrl(): string {
-//   const base = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws'
-//   return base
-// }
-
-// // ============================================
-// // 클라이언트 생성 (싱글톤)
-// // ============================================
-// export function getStompClient(): Client {
-//   if (stompClient) return stompClient
-
-//   const accessToken = useAuthStore.getState().accessToken
-  
-//   console.log("🔌 WebSocket 클라이언트 생성")
-//   console.log("📍 URL:", getWebSocketUrl())
-//   console.log("🔑 Token:", accessToken ? "존재함" : "없음")
-
-//   const client = new Client({
-//     webSocketFactory: () => new SockJS(getWebSocketUrl()),
-//     connectHeaders: {
-//       Authorization: `Bearer ${accessToken}`,
-//     },
-//     reconnectDelay: 3000,
-//     heartbeatIncoming: 15000,
-//     heartbeatOutgoing: 15000,
-//     debug: (str) => {
-//       console.log('🔍 STOMP Debug:', str)  
-//     },
-//   })
-
-//   stompClient = client
-//   return client
-// }
-
-// // ============================================
-// // 연결 (중복 방지하자요)
-// // ============================================
-// export function connectStomp(options?: ConnectOptions): void {
-//   const client = getStompClient()
-//   const { onConnected, onDisconnected, onError } = options || {}
-
-//   // 연결 성공 콜백
-//   client.onConnect = (frame) => {
-//     console.log("✅ WebSocket 연결 성공!", frame)
-//     onConnected?.()
-//   }
-
-//   // 에러 콜백
-//   client.onStompError = (frame) => {
-//     console.error("❌ STOMP 에러:", frame)
-//     onError?.(frame)
-//   }
-
-//   // 연결 종료 콜백
-//   client.onWebSocketClose = (event) => {
-//     console.log("🔌 WebSocket 연결 종료", event)
-//     onDisconnected?.()
-//   }
-
-//   // WebSocket 에러 콜백
-//   client.onWebSocketError = (event) => {
-//     console.error("❌ WebSocket 에러:", event)
-//   }
-
-//   // 활성화
-//   if (!client.active) {
-//     console.log("🚀 WebSocket 연결 시도 중...")
-//     client.activate()
-//   } else {
-//     console.log("ℹ️ 이미 연결되어 있음")
-//   }
-// }
-
-// export function disconnectStomp(): void {
-//   if (!stompClient) return
-//   try {
-//     console.log("🔌 WebSocket 연결 해제 중...")
-//     activeSubscriptions.forEach((s) => s.unsubscribe())
-//     activeSubscriptions = []
-//     stompClient.deactivate()
-//     console.log("✅ WebSocket 연결 해제 완료")
-//   } catch (error) {
-//     console.error("❌ 연결 해제 실패:", error)
-//   }
-// }
-
-// export function subscribeToTopic(topic: string, onMessage: (message: IMessage) => void): void {
-//   if (!stompClient || !stompClient.connected) {
-//     console.error("❌ 구독 실패: 연결되지 않음")
-//     return
-//   }
-  
-//   console.log("📡 구독 시작:", topic)
-//   const sub = stompClient.subscribe(topic, (message) => {
-//     console.log("📩 메시지 수신:", message)
-//     onMessage(message)
-//   })
-//   activeSubscriptions.push(sub)
-// }
-
-// export function sendChatMessage(destination: string, payload: ChatMessagePayload): void {
-//   if (!stompClient || !stompClient.connected) {
-//     console.warn("⚠️ 전송 실패: STOMP 클라이언트 연결 안 됨")
-//     return
-//   }
-  
-//   console.log("📤 메시지 전송:", { destination, payload })
-  
-//   stompClient.publish({
-//     destination,
-//     body: JSON.stringify(payload),
-//   })
-// }
-
-
 "use client"
 
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs'
@@ -149,9 +5,11 @@ import SockJS from 'sockjs-client'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type ChatMessagePayload = {
-  roomId?: string | number
-  senderId?: string | number
-  text: string
+  roomId?: number
+  senderId: string | number
+  senderName: string 
+  senderProfileImg: string 
+  content: string
   type?: 'TEXT' | 'IMAGE' | 'FILE'
   sentAt?: string
 }
@@ -198,7 +56,7 @@ export function connectStomp(options?: ConnectOptions): Promise<void> {
 
     client.onConnect = () => {
       options?.onConnected?.()
-      console.log("✅ WebSocket 연결 성공!")
+      console.log("[WebSocket] 연결 성공")
       resolve()
     }
 
@@ -221,20 +79,26 @@ export function subscribeToTopic(
   const client = getClient()
   
   if (!client.connected) {
-    console.error('❌ 연결되지 않음')
+    console.error("[WebSocket] 연결되지 않음, 구독 불가")
     return null
   }
 
   // 이미 구독 중이면 스킵
   if (subscriptions.has(topic)) {
+    console.log("[WebSocket] 이미 구독 중:", topic)
     return subscriptions.get(topic)!
   }
 
-  const sub = client.subscribe(topic, onMessage)
+  console.log("[WebSocket] 구독 시작:", topic)
+  const sub = client.subscribe(topic, (message) => {
+    onMessage(message)
+  })
+  
   subscriptions.set(topic, sub)
-  console.error('')
+  console.log("[WebSocket] 구독 완료, 총 구독 수:", subscriptions.size)
   return sub
 }
+
 
 // 구독 해제
 export function unsubscribeFromTopic(topic: string): void {
@@ -242,6 +106,7 @@ export function unsubscribeFromTopic(topic: string): void {
   if (sub) {
     sub.unsubscribe()
     subscriptions.delete(topic)
+    console.log("[WebSocket] 구독 해제:", topic)
   }
 }
 
@@ -253,13 +118,17 @@ export function sendChatMessage(
   const client = getClient()
   
   if (!client.connected) {
-    console.warn('⚠️ 연결 안 됨')
+    console.error("[WebSocket] 연결 안 됨, 메시지 전송 불가")
     return
   }
 
+  console.log("[ChatMessagePayload] 구독 해제:", payload)
+
+
   client.publish({
-    destination,                  // /pub/chat.send
-    body: JSON.stringify(payload),
+    destination: `/pub${destination}`, 
+    body: JSON.stringify(payload), // JSON.stringify 필수!
+
   })
 }
 
@@ -270,5 +139,6 @@ export function disconnectStomp(): void {
     subscriptions.clear()
     stompClient.deactivate()
     stompClient = null
+    console.log("[WebSocket] 연결 해제 완료")
   }
 }

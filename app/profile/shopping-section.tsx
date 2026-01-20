@@ -2,17 +2,6 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { MyOrder } from '@/types/order'
 
-// interface OrderDetail {
-//   id: number
-//   orderNumber: string
-//   productName: string
-//   productImage: string
-//   price: number
-//   orderDate: string
-//   status: string
-//   statusText: string
-// }
-
 interface ShoppingSectionProps {
   userPoints: number
   orderFilter: string
@@ -61,7 +50,7 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
               </svg>
             </div>
             <div>
-              <p className="text-sm text-white/80 mb-1">보유 포인트</p>
+              <p className="text-sm text-white/80 mb-1">보유 포인트(아직 기능 없음)</p>
               <p className="text-3xl font-bold">{userPoints.toLocaleString()}P</p>
             </div>
           </div>
@@ -135,9 +124,9 @@ export const ShoppingSection: React.FC<ShoppingSectionProps> = ({
                   </Button>
                   {order.status === "delivered" && (
                     <>
-                    <Button variant="outline" size="sm">
+                    {/* <Button variant="outline" size="sm">
                       리뷰 작성
-                    </Button>
+                    </Button> */}
                     <Button
                     variant="ghost"
                     size="sm"

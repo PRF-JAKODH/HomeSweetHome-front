@@ -11,10 +11,16 @@ import SettlementFilters from "@/components/settlement-filters"
 import SettlementSummary from "@/components/settlement-summary"
 import SettlementTable from "@/components/settlement-table"
 import { ProductManageResponse, ProductStatus, SkuStockResponse } from "@/types/api/product"
-import { getSellerProducts, getProductStock, updateProductStatus } from "@/lib/api/products"
+import { updateProductStatus } from "@/lib/api/products"
+import { getSellerProducts, getProductStock } from "@/lib/api/products"
+import { fetchSettlementByPeriod, fetchAllSettlements } from "@/api/sapi"
+import { useAuthStore } from "@/stores/auth-store"
+import { useRef } from "react"
+import { Week } from "react-day-picker"
 
-export type PeriodType = "daily" | "weekly" | "monthly" | "yearly"
-export type SettlementStatus = "carried-over" | "confirmed" | "completed"
+
+export type PeriodType = "all" | "daily" | "weekly" | "monthly" | "yearly"
+export type SettlementStatus = "PENDING" | "CANCELED" | "COMPLETED"
 export type DrillDownState = {
   level: "base" | "drilled"
   selectedPeriod: string | null
@@ -23,16 +29,310 @@ export type DrillDownState = {
 export default function SellerPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("products")
-  const [period, setPeriod] = useState<PeriodType>("daily")
+  const [period, setPeriod] = useState<PeriodType>("all")
   const [status, setStatus] = useState<SettlementStatus | "all">("all")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(),
+    from: new Date(new Date().setDate(new Date().getDate() - 29)),
     to: new Date(),
   })
+
   const [drillDown, setDrillDown] = useState<DrillDownState>({
     level: "base",
     selectedPeriod: null,
   })
+
+  // 페이지
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
+  const [pageMeta, setPageMeta] = useState<{ page: number; totalPages: number; totalElements: number } | null>(null)
+
+  // 정산
+  const user = useAuthStore((s) => s.user)
+  const isHydrated = useAuthStore((s) => s.isHydrated)
+  const userId = isHydrated ? user?.id : undefined
+
+  const [settlementData, setSettlementData] = useState<any[]>([])
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const [settlementError, setSettlementError] = useState<string | null>(null)
+
+  const skipNextFetchRef = useRef(false)
+  const PERIOD_PATH: Record<PeriodType, string> = {
+    all: "all",
+    daily: "daily",
+    weekly: "weekly",
+    monthly: "monthly",
+    yearly: "yearly",
+  }
+  type ViewSnapshot = {
+    period: PeriodType
+    dateRange: { from: Date; to: Date }
+    pageIndex: number
+    pageSize: number
+    status: typeof status
+  }
+  const prevViewRef = useRef<ViewSnapshot | null>(null)
+
+  // const id = userId
+  const start = dateRange.from
+  const end = dateRange.to
+
+  const toYMD = (d: Date) => {
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    return local.toISOString()
+      .slice(0, 10)
+  }
+
+  const isSameDate = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const eachDay = (from: Date, to: Date) => {
+    const days: Date[] = [];
+    const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const last = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    while (cur <= last) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
+  };
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const startOfWeek = (d: Date) => {
+    // 월요일 시작(월=1, …, 일=0) 기준
+    const day = d.getDay() === 0 ? 7 : d.getDay()
+    const s = new Date(d)
+    s.setHours(0, 0, 0, 0)
+    s.setDate(s.getDate() - (day - 1))
+    return s
+  }
+  const endOfWeek = (d: Date) => {
+    const s = startOfWeek(d)
+    const e = new Date(s)
+    e.setDate(e.getDate() + 6)
+    e.setHours(23, 59, 59, 999)
+    return e
+  }
+  const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
+  const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
+  const startOfYear = (d: Date) => new Date(d.getFullYear(), 0, 1)
+  const endOfYear = (d: Date) => new Date(d.getFullYear(), 11, 31)
+  const handleSetPeriod = (next: PeriodType) => {
+    const today = startOfDay(new Date());
+    setPeriod(next)
+    setPageIndex(0)
+    if (next === "daily") {
+      setDateRange({ from: today, to: today });
+    }
+    if (next === "weekly") {
+      const from = startOfWeek(today)
+      const to = endOfWeek(today)
+      setDateRange({ from, to })
+      return
+    }
+    if (next === "monthly") {
+      const from = startOfMonth(today)
+      const to = endOfMonth(today)
+      setDateRange({ from, to })
+      return
+    }
+    if (next === "yearly") {
+      const from = startOfYear(today)
+      const to = endOfYear(today)
+      setDateRange({ from, to })
+      return
+    }
+  }
+
+  const normalize = (item: any, period: PeriodType) => {
+    if (!item) return {}
+    const base = {
+      totalSales: item.totalSales ?? 0,
+      totalFee: item.totalFee ?? 0,
+      totalVat: item.totalVat ?? 0,
+      totalRefund: item.totalRefund ?? 0,
+      totalSettlement: item.totalSettlement ?? 0,
+      totalCount: item.totalCount ?? 0,
+      settlementStatus: item.settlementStatus ?? null,
+      settlementDate: item.settlementDate ?? null,
+      completedRate: item.completedRate ?? 0,
+      growthRate: item.growthRate ?? 0,
+    }
+    if (period === "all") {
+      return { ...base }
+    }
+    if (period === "daily") {
+      return {
+        ...base,
+        date: item.orderedAt ?? item.settlementDate ?? item.date ?? null,
+        settlementDate: item.settlementDate ?? null,
+      }
+    }
+    if (period === "weekly") {
+      return {
+        ...base,
+        year: item.year ?? null,
+        month: item.month ?? null,
+        week: item.week ?? null,
+        startDate: item.weekStartDate ?? null,
+        endDate: item.weekEndDate ?? null,
+      }
+    }
+    if (period === "monthly") {
+      return {
+        ...base,
+        year: item.year ?? null,
+        month: item.month ?? null,
+      }
+    }
+    return {
+      ...base,
+      year: item.year ?? null,
+    }
+  }
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  const isDailySingle = period === "daily" && sameDay(dateRange.from, dateRange.to);
+
+  const summaryDefaults = {
+    totalSales: 0,
+    totalFee: 0,
+    totalVat: 0,
+    totalRefund: 0,
+    totalSettlement: 0,
+    totalCount: 0,
+  }
+  const isSingleBucket =
+    (period === "daily" && sameDay(dateRange.from, dateRange.to)) ||
+    (period === "weekly" && Array.isArray(settlementData) && settlementData.length === 1);
+
+
+  const summaryData =
+    !Array.isArray(settlementData) || settlementData.length === 0
+      ? summaryDefaults
+      : isSingleBucket
+        ? settlementData[0] ?? summaryDefaults
+        : settlementData.reduce((acc: any, r: any) => ({
+          totalSales: acc.totalSales + (r.totalSales ?? 0),
+          totalFee: acc.totalFee + (r.totalFee ?? 0),
+          totalVat: acc.totalVat + (r.totalVat ?? 0),
+          totalRefund: acc.totalRefund + (r.totalRefund ?? 0),
+          totalSettlement: acc.totalSettlement + (r.totalSettlement ?? 0),
+          totalCount: acc.totalCount + (r.totalCount ?? 0),
+        }), { ...summaryDefaults });
+
+  const endOfDay = (d: Date) => {
+    const e = new Date(d)
+    e.setHours(23, 59, 59, 999)
+    return e
+  }
+
+  useEffect(() => {
+    if (activeTab !== "settlement") return
+    if (!isHydrated || userId === undefined) return
+    if (!userId) return
+    const id = userId
+
+    // 페이지인지 판별
+    function isPage<T>(v: any): v is { content: T[], number: number, size: number, totalElements: number, totalPages: number } {
+      return v && Array.isArray(v.content) && typeof v.totalPages === 'number'
+    }
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false
+      return
+    }
+    async function getSettlement() {
+      const fromForApi = new Date(dateRange.from)
+      const toForApi = endOfDay(new Date(dateRange.to)) // 포함되도록
+
+      setSettlementLoading(true)
+      setSettlementError(null)
+
+      try {
+        if (period === "all") {
+          const page = await fetchAllSettlements(
+            id,
+            fromForApi,
+            toForApi,
+            { page: pageIndex, size: pageSize },
+            status
+          )
+          const list = Array.isArray(page?.content) ? page.content : Array.isArray(page) ? page : []
+          setSettlementData(list)
+          setPageMeta({
+            page: page?.number ?? 0,
+            totalPages: page?.totalPages ?? 0,
+            totalElements: page?.totalElements ?? 0,
+          })
+          return
+        }
+        else if (period === "daily") {
+          // 1) 기간이 '하루'면 단건 호출
+          if (isSameDate(fromForApi, toForApi)) {
+            const res = await fetchSettlementByPeriod(id, "daily", fromForApi, toForApi, { page: 0, size: 1 })
+            const item = Array.isArray(res) ? res[0] : (res?.content?.[0] ?? res ?? {})
+            const row = normalize({ ...item, date: toYMD(fromForApi) }, "daily")
+            setSettlementData([row])
+            setPageMeta(null)
+          }
+
+          // 2) 여러 날이면 하루씩 쪼개서 병렬 호출
+          const days = eachDay(fromForApi, toForApi)
+          const dailyList = await Promise.all(
+            days.map(day =>
+              fetchSettlementByPeriod(
+                id,
+                "daily",
+                new Date(day),            // 00:00
+                endOfDay(new Date(day)),  // 23:59:59.999
+                { page: 0, size: 1 }
+              )
+            )
+          )
+
+          const rows = dailyList.map((res, idx) => {
+            const item = Array.isArray(res) ? res[0] : (res?.content?.[0] ?? res ?? {})
+            return normalize({ ...item, date: toYMD(days[idx]) }, "daily")
+          })
+
+          // 날짜 오름차순 정렬(보장용)
+          // rows.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))
+
+          setSettlementData(rows)
+          setPageMeta(null)
+          return
+        }
+
+        // weekly / monthly / yearly
+        const res = await fetchSettlementByPeriod(id, period, fromForApi, toForApi, { page: pageIndex, size: pageSize })
+        let rows: any[] = []
+        let meta: { page: number; totalPages: number; totalElements: number } | null = null
+
+        if (res?.content && Array.isArray(res.content)) {
+          rows = res.content
+          meta = { page: res.number, totalPages: res.totalPages, totalElements: res.totalElements }
+        } else if (Array.isArray(res)) {
+          rows = res
+          meta = null
+        } else if (res) {
+          rows = [res]
+          meta = null
+        }
+
+        setSettlementData(rows.map(x => normalize(x, period)))
+        setPageMeta(meta)
+      } catch (e: any) {
+        setSettlementError(e?.message ?? "정산 데이터를 불러오지 못했습니다.")
+      } finally {
+        setSettlementLoading(false)
+      }
+    }
+    getSettlement()
+  }, [activeTab, dateRange, status, pageIndex, pageSize, period])
+
   const [orderStatusFilter, setOrderStatusFilter] = useState("전체")
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
@@ -48,13 +348,11 @@ export default function SellerPage() {
   const [showEditOptionsModal, setShowEditOptionsModal] = useState(false)
   const [selectedProductForEdit, setSelectedProductForEdit] = useState<ProductManageResponse | null>(null)
 
-  const settlementRecords: any[] = []
-
   const getSettlementStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED":
         return "bg-green-100 text-green-700"
-      case "HOLD":
+      case "PENDING":
         return "bg-orange-100 text-orange-700"
       case "CANCELED":
         return "bg-red-100 text-red-700"
@@ -68,7 +366,7 @@ export default function SellerPage() {
       case "COMPLETED":
         return "정산 완료"
       case "HOLD":
-        return "정산 보류"
+        return "정산 진행중"
       case "CANCELED":
         return "정산 취소"
       default:
@@ -89,7 +387,7 @@ export default function SellerPage() {
     try {
       const startDate = dateRange.from ? dateRange.from.toISOString().split('T')[0] : undefined
       const endDate = dateRange.to ? dateRange.to.toISOString().split('T')[0] : undefined
-      
+
       const response = await getSellerProducts(startDate, endDate)
       setProducts(response)
     } catch (error) {
@@ -145,52 +443,6 @@ export default function SellerPage() {
     }
   }
 
-  const menuItems = [
-    {
-      title: "정책 처리",
-      subItems: ["정산 주기"],
-    },
-    {
-      title: "수수료 관리",
-      subItems: ["수수료 설정"],
-    },
-    {
-      title: "정산 계산",
-      subItems: ["지급액 자동 산출", "지급 현황 분류"],
-    },
-    {
-      title: "정산 조회",
-      subItems: ["정산 조회", "엑셀 다운로드"],
-    },
-  ]
-
-  const settlementDetails = {
-    "지급액 자동 산출": {
-      code: "AD-003",
-      description: "(총 매출액) - (판매 수수료)로 최종 지급액 계산한다.",
-    },
-    "지급 현황 분류": {
-      code: "AD-004",
-      description: "지급 완료된 내역을 조회한다.",
-    },
-    "엑셀 다운로드": {
-      code: "AD-006",
-      description: "조회된 내역 엑셀로 다운로드할 수 있다.",
-    },
-    "정산 주기": {
-      code: "AD-001",
-      description: "월별로 정산주기 설정한다.(정립일 기준 D+N일)",
-    },
-    "수수료 설정": {
-      code: "AD-002",
-      description: "단일 수수료로 설정한다.",
-    },
-    "정산 조회": {
-      code: "AD-007",
-      description: "일별/주별/월별/년별로 내역 조회할 수 있다.",
-    },
-  }
-
   const handleStatusChange = (orderId: number, newStatus: string) => {
     setOrders(orders.map((order) => (order.id === orderId ? { ...order, deliveryStatus: newStatus } : order)))
   }
@@ -242,10 +494,10 @@ export default function SellerPage() {
     try {
       const stockData = await getProductStock(product.id.toString())
       console.log('재고 조회 응답:', stockData) // 디버깅용
-      
+
       // 단일 옵션 제품인 경우 단일 옵션 재고만 표시
       const processedStockData = Array.isArray(stockData) ? stockData : []
-      
+
       setSelectedProductStock({
         product,
         stockData: processedStockData
@@ -269,18 +521,144 @@ export default function SellerPage() {
     return product.totalStock
   }
 
-  const handleDrillDown = (selectedPeriod: string) => {
-    setDrillDown({
-      level: "drilled",
-      selectedPeriod,
-    })
+  const toMonthNumber = (v: string) => {
+    if (!v) return NaN
+    if (/^\d+$/.test(v)) return Number(v)
+    const m = v.match(/(\d{1,2})월?$/) || v.match(/-(\d{1,2})$/)
+    return m ? Number(m[1]) : NaN
+  }
+  // 1) 월의 주(월~일) 범위 만들기
+  function listWeeksOfMonth(year: number, month: number) {
+    const first = new Date(year, month - 1, 1)
+    const last = new Date(year, month, 0) // 해당 월 말일
+
+    const firstWeekStart = (() => {
+      const d = new Date(first)
+      const dow = d.getDay() === 0 ? 7 : d.getDay() // Sun=0 → 7
+      d.setDate(d.getDate() - (dow - 1)) // 월요일
+      return d
+    })()
+
+    const toYmd = (x: Date) =>
+      `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+
+    const weeks: { start: string; end: string; rep: string }[] = []
+    for (let s = new Date(firstWeekStart); s <= last; s.setDate(s.getDate() + 7)) {
+      const e = new Date(s); e.setDate(e.getDate() + 6) // 일요일
+      weeks.push({
+        start: toYmd(new Date(s)),
+        end: toYmd(e),
+        rep: toYmd(new Date(s)), // weekly API에 넣을 대표일(주 시작일)
+      })
+    }
+    return weeks
+  }
+  function toRows(res: any): any[] {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (res?.content && Array.isArray(res.content)) return res.content;
+    return [res];
+  }
+  if (!prevViewRef.current) {
+    prevViewRef.current = {
+      period,
+      dateRange: { from: new Date(dateRange.from), to: new Date(dateRange.to) },
+      pageIndex,
+      pageSize,
+      status,
+    }
+  }
+  const handleDrillDown = async (selectedPeriod: string) => {
+    console.log("드릴 다운 클릭 됌")
+    if (!userId) return;
+    let parsed: any = null
+    try { parsed = JSON.parse(selectedPeriod) } catch { parsed = null }
+
+    //  주별 → 일별
+    if (parsed?.start && parsed?.end && userId) {
+      const start = new Date(parsed.start)
+      const end = new Date(parsed.end)
+      setDateRange({ from: start, to: endOfDay(end) })
+      setPageIndex(0)
+      setPeriod("daily")
+      setDrillDown({ level: "drilled", selectedPeriod })
+    }
+    // 월 타일 클릭(또는 select) 시
+    const y = parsed?.year ?? dateRange.from.getFullYear();
+    const mFromParsed = parsed?.month;
+    const mFromText = toMonthNumber(selectedPeriod); // "2025-02" / "2월" 등에서 숫자 추출
+    const m = mFromParsed ?? mFromText;
+    if (m && !Number.isNaN(m)) {
+      const first = new Date(y, m - 1, 1);
+      const last = new Date(y, m, 0);
+
+      setSettlementLoading(true);
+      try {
+        // 서버가 해당 월 범위를 주별 집계로 돌려준다는 전제
+        const res = await fetchSettlementByPeriod(userId, "weekly", first, last, { page: 0, size: pageSize });
+
+        const rows = toRows(res).map((r: any) => {
+          const startDate = r.weekStartDate ?? r.startDate ?? first;
+          const endDate = r.weekEndDate ?? r.endDate ?? last;
+          return { ...normalize(r, "weekly"), startDate, endDate };
+        });
+        const sorted = rows.sort(
+          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        );
+        const finalRows = sorted.map((r, i) => ({
+          ...r,
+          // week: r.week ?? (i + 1),
+        }));
+        // rows.forEach((r, i) => { r.week = i + 1; });
+        // setSettlementData(rows.map(r => normalize(r, "weekly")));
+        setSettlementData(finalRows)
+
+        // 상태 전환: 주간 탭 + 기간을 해당 월로 세팅
+        setPeriod("weekly");
+        setDateRange({ from: first, to: last });
+        setDrillDown({ level: "drilled", selectedPeriod });
+        setPageIndex(0);
+
+        // 페이지 메타는 Page일 때만
+        setPageMeta(
+          res && typeof res?.totalPages === "number"
+            ? { page: res.number ?? 0, totalPages: res.totalPages ?? 0, totalElements: res.totalElements ?? 0 }
+            : null
+        );
+      } catch (e: any) {
+        console.error(e);
+        setSettlementError(e?.message ?? "해당 월의 주별 데이터를 불러오지 못했습니다.");
+      } finally {
+        setSettlementLoading(false);
+      }
+      return;
+    }
   }
 
   const handleBackToBase = () => {
+    const snap = prevViewRef.current
     setDrillDown({
       level: "base",
       selectedPeriod: null,
     })
+    if (snap) {
+      // ❗복원 시에는 handleSetPeriod를 쓰지 말고 직접 setPeriod
+      // (handleSetPeriod는 daily/weekly 스냅을 다시 걸어버림)
+      setPeriod(snap.period)
+      setStatus(snap.status)
+      setPageSize(snap.pageSize)
+      setPageIndex(snap.pageIndex)
+      setDateRange({
+        from: new Date(snap.dateRange.from),
+        to: new Date(snap.dateRange.to),
+      })
+      setPageMeta(null) // 페이지메타는 재조회되게 초기화
+      prevViewRef.current = null
+    } else {
+      // 스냅샷이 없으면 안전하게 초기 상태로
+      setPageIndex(0)
+      setPageMeta(null)
+    }
   }
 
   return (
@@ -299,31 +677,28 @@ export default function SellerPage() {
         <div className="flex gap-2 mb-6 border-b">
           <button
             onClick={() => setActiveTab("products")}
-            className={`px-6 py-3 font-medium transition-colors relative ${
-              activeTab === "products"
-                ? "text-primary border-b-2 border-primary"
-                : "text-text-secondary hover:text-foreground"
-            }`}
+            className={`px-6 py-3 font-medium transition-colors relative ${activeTab === "products"
+              ? "text-primary border-b-2 border-primary"
+              : "text-text-secondary hover:text-foreground"
+              }`}
           >
             재고 목록
           </button>
           <button
             onClick={() => setActiveTab("stats")}
-            className={`px-6 py-3 font-medium transition-colors relative ${
-              activeTab === "stats"
-                ? "text-primary border-b-2 border-primary"
-                : "text-text-secondary hover:text-foreground"
-            }`}
+            className={`px-6 py-3 font-medium transition-colors relative ${activeTab === "stats"
+              ? "text-primary border-b-2 border-primary"
+              : "text-text-secondary hover:text-foreground"
+              }`}
           >
             주문 목록
           </button>
           <button
             onClick={() => setActiveTab("settlement")}
-            className={`px-6 py-3 font-medium transition-colors relative ${
-              activeTab === "settlement"
-                ? "text-primary border-b-2 border-primary"
-                : "text-text-secondary hover:text-foreground"
-            }`}
+            className={`px-6 py-3 font-medium transition-colors relative ${activeTab === "settlement"
+              ? "text-primary border-b-2 border-primary"
+              : "text-text-secondary hover:text-foreground"
+              }`}
           >
             정산
           </button>
@@ -422,25 +797,54 @@ export default function SellerPage() {
                         <th className="px-4 py-3 text-left text-sm font-medium w-32">가격</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">할인율</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-24">재고</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium w-24">배송</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-24">배송비</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-28">등록일</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">상태</th>
                         <th className="px-4 py-3 text-left text-sm font-medium w-20">관리</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredProducts.map((product) => (
-                        <tr 
-                          key={product.id} 
-                          className="hover:bg-background-section/50 cursor-pointer"
-                          onClick={(e) => {
-                            // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
-                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
-                              return
-                            }
-                            router.push(`/store/products/${product.id}`)
-                          }}
-                        >
+                      {filteredProducts.map((product) => {
+                        const basePrice = product.basePrice ?? 0
+                        const discountRate = product.discountRate ?? 0
+                        const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discountRate / 100)) : 0
+                        const formattedBasePrice = basePrice > 0 ? `₩${basePrice.toLocaleString()}` : "-"
+                        const formattedFinalPrice = finalPrice > 0 ? `₩${finalPrice.toLocaleString()}` : "-"
+                        const shippingLabel =
+                          product.shippingPrice === undefined
+                            ? "-"
+                            : product.shippingPrice === 0
+                              ? "무료배송"
+                              : `₩${product.shippingPrice.toLocaleString()}`
+                        const createdAtLabel = product.createdAt
+                          ? new Date(product.createdAt).toLocaleDateString("ko-KR")
+                          : "-"
+
+                        const statusLabel =
+                          product.status === ProductStatus.ON_SALE
+                            ? "판매중"
+                            : product.status === ProductStatus.SUSPENDED
+                              ? "판매 중지"
+                              : "품절"
+                        const statusClass =
+                          product.status === ProductStatus.ON_SALE
+                            ? "bg-green-100 text-green-700"
+                            : product.status === ProductStatus.SUSPENDED
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-gray-100 text-gray-700"
+
+                        return (
+                          <tr
+                            key={product.id}
+                            className="hover:bg-background-section/50 cursor-pointer"
+                            onClick={(e) => {
+                              // 버튼이나 관리 영역 클릭 시에는 상세 페이지로 이동하지 않음
+                              if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('td:last-child')) {
+                                return
+                              }
+                              router.push(`/store/products/${product.id}`)
+                            }}
+                          >
                           <td className="px-4 py-3 w-20">
                             <div className="relative w-16 h-16 rounded overflow-hidden">
                               <Image
@@ -461,10 +865,10 @@ export default function SellerPage() {
                             <div className="space-y-1">
                               {product.discountRate > 0 && (
                                 <div className="text-xs text-text-secondary line-through">
-                                  ₩{product.basePrice.toLocaleString()}
+                                  {formattedBasePrice}
                                 </div>
                               )}
-                              <div className="font-semibold text-sm">₩{Math.round(product.basePrice * (1 - product.discountRate / 100)).toLocaleString()}</div>
+                              <div className="font-semibold text-sm">{formattedFinalPrice}</div>
                             </div>
                           </td>
                           <td className="px-4 py-3 w-28">
@@ -491,23 +895,14 @@ export default function SellerPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 w-24">
-                            <span className="text-sm">{product.shippingPrice === 0 ? "무료배송" : `₩${product.shippingPrice.toLocaleString()}`}</span>
+                            <span className="text-sm">{shippingLabel}</span>
                           </td>
                           <td className="px-4 py-3 w-28">
-                            <span className="text-sm text-text-secondary whitespace-nowrap">{new Date(product.createdAt).toLocaleDateString()}</span>
+                            <span className="text-sm text-text-secondary whitespace-nowrap">{createdAtLabel}</span>
                           </td>
                           <td className="px-4 py-3 w-20">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                                product.status === ProductStatus.ON_SALE
-                                  ? "bg-green-100 text-green-700"
-                                  : product.status === ProductStatus.OUT_OF_STOCK
-                                    ? "bg-gray-100 text-gray-700"
-                                    : "bg-yellow-100 text-yellow-700"
-                              }`}
-                            >
-                              {product.status === ProductStatus.ON_SALE ? "판매중" : 
-                               product.status === ProductStatus.OUT_OF_STOCK ? "품절" : "판매 중지"}
+                            <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${statusClass}`}>
+                              {statusLabel}
                             </span>
                           </td>
                           <td className="px-4 py-3 w-20">
@@ -548,8 +943,9 @@ export default function SellerPage() {
                               )}
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -653,7 +1049,7 @@ export default function SellerPage() {
                         </td>
                         <td className="px-4 py-3 text-sm font-medium">{order.quantity}</td>
                         <td className="px-4 py-3 text-sm font-mono font-semibold">
-                          ₩{order.orderAmount.toLocaleString()}
+                          {/* ₩{order.orderAmount.toLocaleString()} */}
                         </td>
                         <td className="px-4 py-3 text-sm text-text-secondary">{order.orderDate}</td>
                         <td className="px-4 py-3">
@@ -697,35 +1093,88 @@ export default function SellerPage() {
           </div>
         )}
 
+        {/* 정산 */}
         {activeTab === "settlement" && (
           <div className="space-y-6">
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">정산 조회</h2>
               <div className="flex items-center gap-4 text-sm text-text-secondary">
-                <span className="font-mono bg-background-section px-3 py-1 rounded">AD-007</span>
-                <span>일별/주별/월별/년별로 내역 조회할 수 있다.</span>
+
               </div>
             </div>
-
             <SettlementFilters
               period={period}
-              setPeriod={setPeriod}
+              setPeriod={handleSetPeriod}
               status={status}
               setStatus={setStatus}
               dateRange={dateRange}
-              setDateRange={setDateRange}
+              setDateRange={(r: { from?: Date | string; to?: Date | string } = {}) => {
+                setPageIndex(0)
+                setDateRange(prev => ({
+                  from: r.from ? new Date(r.from) : prev.from,
+                  to: r.to ? new Date(r.to) : prev.to,
+                }))
+              }}
             />
 
-            <SettlementSummary period={period} status={status} dateRange={dateRange} />
+            {settlementLoading ? (
+              <div className="text-sm text-muted-foreground">정산 데이터를 불러오는 중입니다...</div>
+            ) : settlementError ? (
+              <div className="text-sm text-red-500">{settlementError}</div>
+            ) : (
+              <>
+                {period !== "all" && (<SettlementSummary
+                  period={period}
+                  status={status}
+                  dateRange={dateRange}
+                  data={summaryData
+                    // Array.isArray(settlementData)
+                    //   ? (settlementData[0] ?? { totalCount: 0 })
+                    //   : (settlementData ?? { totalCount: 0 })
+                  }
+                />)}
+                {pageMeta && pageMeta.totalPages > 0 && (
+                  <div className="flex items-center justify-end gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pageIndex <= 0}
+                      onClick={() => setPageIndex(p => Math.max(0, p - 1))}
+                    >
+                      이전
+                    </Button>
+                    <span className="text-sm">
+                      {pageMeta.page + 1} / {pageMeta.totalPages || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pageIndex >= pageMeta.totalPages - 1}
+                      onClick={() => setPageIndex(p => Math.min(pageMeta.totalPages - 1, p + 1))}
+                    >
+                      다음
+                    </Button>
 
-            <SettlementTable
-              period={period}
-              status={status}
-              dateRange={dateRange}
-              drillDown={drillDown}
-              onDrillDown={handleDrillDown}
-              onBackToBase={handleBackToBase}
-            />
+                    <select
+                      className="ml-2 border rounded px-2 py-1 text-sm"
+                      value={pageSize}
+                      onChange={(e) => { setPageIndex(0); setPageSize(Number(e.target.value)) }}
+                    >
+                      {[10, 20, 50].map(s => <option key={s} value={s}>{s}/페이지</option>)}
+                    </select>
+                  </div>
+                )}
+                <SettlementTable
+                  period={period}
+                  status={status}
+                  dateRange={dateRange}
+                  drillDown={drillDown}
+                  onDrillDown={(handleDrillDown)}
+                  onBackToBase={handleBackToBase}
+                  data={settlementData}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -787,7 +1236,7 @@ export default function SellerPage() {
                       <tr key={idx}>
                         <td className="px-4 py-3 text-sm">{option.name}</td>
                         <td className="px-4 py-3 text-sm font-mono">
-                          {option.additionalPrice > 0 ? `+₩${option.additionalPrice.toLocaleString()}` : "-"}
+                          {/* {option.additionalPrice > 0 ? `+₩${option.additionalPrice.toLocaleString()}` : "-"} */}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-sm font-medium ${getStockColor(option.stock)}`}>{option.stock}</span>
@@ -853,7 +1302,7 @@ export default function SellerPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm font-mono">
-                            {sku.priceAdjustment > 0 ? `+₩${sku.priceAdjustment.toLocaleString()}` : "-"}
+                            {/* {sku.priceAdjustment > 0 ? `+₩${sku.priceAdjustment.toLocaleString()}` : "-"} */}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`text-sm font-medium ${getStockColor(sku.stockQuantity)}`}>

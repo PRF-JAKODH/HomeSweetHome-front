@@ -66,7 +66,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground mb-4">설정</h2>
-        <p className="text-text-secondary">프로필 정보를 수정하세요</p>
       </div>
 
       <div className="max-w-2xl space-y-6">

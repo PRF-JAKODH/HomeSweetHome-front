@@ -1,9 +1,39 @@
+export const getRecentSearches = async (): Promise<string[]> => {
+  const response = await apiClient.get<string[]>(PRODUCT_ENDPOINTS.SEARCH_RECENT)
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
+
+export const deleteRecentSearchKeyword = async (keyword: string): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_DELETE_KEYWORD, {
+    params: { keyword },
+  })
+}
+
+export const clearRecentSearches = async (): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.SEARCH_RECENT_CLEAR_ALL)
+}
+
+export const getRecentViews = async (): Promise<RecentViewPreviewResponse[]> => {
+  const response = await apiClient.get<RecentViewPreviewResponse[]>(PRODUCT_ENDPOINTS.RECENT_VIEWS)
+  if (Array.isArray(response)) {
+    return response
+  }
+  return Array.isArray((response as any)?.data) ? (response as any).data : []
+}
+
+export const deleteRecentViewItem = async (productId: number): Promise<void> => {
+  await apiClient.delete(PRODUCT_ENDPOINTS.RECENT_VIEWS_DELETE_ONE, {
+    params: { productId },
+  })
+}
 /**
  * 상품 관련 API 함수들
  */
 
 import { apiClient } from './client'
-import { PRODUCT_ENDPOINTS } from './endpoints'
 import {
   Product,
   GetProductsRequest,
@@ -18,6 +48,9 @@ import {
   ProductPreviewResponse,
   GetProductPreviewsRequest,
   GetProductPreviewsResponse,
+  ProductFilterRequest,
+  ProductSortType,
+  RangeFilter,
   SkuStockResponse,
   GetProductStockResponse,
   ProductManageResponse,
@@ -27,7 +60,9 @@ import {
   ProductImageUpdateRequest,
   SkuStockUpdateRequest,
   ProductSkuUpdateRequest,
+  RecentViewPreviewResponse,
 } from '@/types/api/product'
+import { PRODUCT_ENDPOINTS } from './endpoints'
 import { ApiResponse } from '@/types/api/common'
 
 // 상품 목록 조회
@@ -40,6 +75,10 @@ export const getProducts = async (params?: GetProductsRequest): Promise<GetProdu
 // 상품 상세 조회
 export const getProduct = async (id: string): Promise<GetProductResponse> => {
   return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT(id))
+}
+
+export const getProductDetailAuthenticated = async (id: string): Promise<GetProductResponse> => {
+  return apiClient.get<GetProductResponse>(PRODUCT_ENDPOINTS.SEARCH_PRODUCT_DETAIL(id))
 }
 
 // 상품 생성
@@ -104,6 +143,59 @@ export const getProductsBySubCategory = async (subCategoryId: string, params?: O
 // 상품 프리뷰 조회 (무한 스크롤)
 export const getProductPreviews = async (params: GetProductPreviewsRequest = {}): Promise<GetProductPreviewsResponse> => {
   return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.GET_PRODUCT_PREVIEWS, { params })
+}
+
+export const searchProductPreviewsAuthenticated = async (
+  params: GetProductPreviewsRequest = {}
+): Promise<GetProductPreviewsResponse> => {
+  return apiClient.get<GetProductPreviewsResponse>(PRODUCT_ENDPOINTS.SEARCH_AUTHENTICATED, { params })
+}
+
+type FilterProductPreviewsParams = {
+  cursorId?: number
+  limit?: number
+  sortType?: ProductSortType
+  filters: ProductFilterRequest
+}
+
+// 옵션 필터 기반 상품 프리뷰 조회
+export const filterProductPreviews = async ({
+  cursorId,
+  limit,
+  sortType,
+  filters,
+}: FilterProductPreviewsParams): Promise<GetProductPreviewsResponse> => {
+  const payload: ProductFilterRequest = {}
+
+  if (typeof filters.categoryId === 'number') {
+    payload.categoryId = filters.categoryId
+  }
+
+  if (filters.keyword) {
+    payload.keyword = filters.keyword
+  }
+
+  if (filters.optionFilters && Object.keys(filters.optionFilters).length > 0) {
+    payload.optionFilters = filters.optionFilters
+  }
+
+  if (filters.rangeFilters && Object.keys(filters.rangeFilters).length > 0) {
+    payload.rangeFilters = filters.rangeFilters as Record<string, RangeFilter>
+  }
+
+  const response = await apiClient.post<GetProductPreviewsResponse>(
+    PRODUCT_ENDPOINTS.FILTER_PRODUCT_PREVIEWS,
+    payload,
+    {
+      params: {
+        cursorId,
+        limit,
+        sortType,
+      },
+    },
+  )
+
+  return response.data ?? (response as unknown as GetProductPreviewsResponse)
 }
 
 // 상품 통계 조회

@@ -8,7 +8,8 @@ import {
   getCartItems, 
   deleteCartItem, 
   deleteCartItems, 
-  clearCart 
+  clearCart,
+  updateCartItemQuantity
 } from '@/lib/api/cart'
 import { CartRequest, Cart, CartResponse } from '@/types/api/cart'
 import { ScrollResponse } from '@/types/api/common'
@@ -122,4 +123,27 @@ export const useClearCart = () => {
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() })
     },
   })
+}
+
+/**
+ * 장바구니 아이템 수량 변경 훅
+ */
+export const useUpdateCartQuantity = () => {
+  const queryClient = useQueryClient();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  return useMutation<any, Error, { cartId: string; quantity: number }>({
+    mutationFn: ({ cartId, quantity }) => { // cartId와 quantity를 객체로 받음
+      if (!isAuthenticated) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      // 1단계에서 만든 API 함수 호출
+      return updateCartItemQuantity(cartId, quantity); 
+    },
+    onSuccess: () => {
+      // 성공 시 장바구니 목록 쿼리를 무효화하여 새로고침 (깜빡임 발생)
+      // TODO: Optimistic Update로 개선 가능
+      queryClient.invalidateQueries({ queryKey: CART_QUERY_KEYS.list() });
+    },
+  });
 }
