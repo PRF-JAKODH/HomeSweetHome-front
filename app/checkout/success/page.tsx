@@ -56,7 +56,7 @@ function SuccessPageContent() {
                 // --- 백엔드 API 2 호출 ---
                 console.log('API 2 요청 데이터:', { paymentKey, orderId, amount });
                 const response = await apiClient.post<PaymentConfirmResponseDto>(
-                    `${apiUrl}/api/v1/orders/payments/confirm`, // 백엔드 결제 검증 API 주소
+                    `${apiUrl}/api/v1/payments/confirm`, // 백엔드 결제 검증 API 주소
                     { paymentKey, orderId, amount }
                 )
                 console.log('API 2 응답 데이터:', response.data);

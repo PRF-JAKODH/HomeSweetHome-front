@@ -9,7 +9,6 @@ import Image from "next/image"
 import { useAuth } from "@/hooks/use-auth"
 import { useCart } from "@/lib/hooks/use-cart"
 import { useAuthStore } from "@/stores/auth-store"
-import { NotificationDropdown } from "@/components/notification/notification-dropdown"
 import { SearchModal } from "@/components/search/search-modal"
 
 export function Header() {
@@ -289,12 +288,7 @@ function Navigation() {
   )
 }
 
-// NotificationDropdown 컴포넌트
-interface NotificationDropdownProps {}
 
-function NotificationDropdownWrapper({}: NotificationDropdownProps) {
-  return <NotificationDropdown />
-}
 
 // UserActions 컴포넌트 (인증된 사용자용)
 interface UserActionsProps {
@@ -319,7 +313,7 @@ function UserActions({
       <Button variant="ghost" size="icon" onClick={onSearchClick} aria-label="검색 열기">
         <Search className="h-5 w-5" />
       </Button>
-      <NotificationDropdownWrapper />
+
       <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => router.push("/messages")}>
         <MessageCircle className="h-5 w-5" />
       </Button>
